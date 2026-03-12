@@ -1,0 +1,5 @@
+{
+  "name": "KROME Sports Performance",
+  "description": "Premium sports performance and online fitness platform for elite athletic training.",
+  "requestFramePermissions": ["microphone"]
+}

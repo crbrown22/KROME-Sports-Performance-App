@@ -1,0 +1,575 @@
+export interface Recipe {
+  id: string;
+  name: string;
+  ingredients: string;
+  portion: string;
+  calories: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  instructions: string;
+  mealType: "Breakfast" | "Lunch" | "Dinner" | "Snack" | "Dessert";
+  day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+}
+
+export const recipes: Recipe[] = [
+  // Monday
+  {
+    id: "mon_breakfast",
+    name: "Egg & Turkey Power Bowl",
+    ingredients: "4 whole eggs, 4 egg whites, 6 oz lean ground turkey, 1 cup cooked oats, 1 Tbsp almond butter",
+    portion: "1 bowl",
+    calories: 720,
+    carbs: 40,
+    protein: 65,
+    fat: 28,
+    instructions: "Cook turkey until browned. Scramble eggs. Cook oats. Combine eggs, turkey, oats. Top with almond butter.",
+    mealType: "Breakfast",
+    day: "Monday"
+  },
+  {
+    id: "mon_snack1",
+    name: "Chicken & Avocado Wrap",
+    ingredients: "Grilled chicken breast, whole wheat tortilla, ¼ avocado, 1 tsp olive oil, lettuce, tomato, cucumber",
+    portion: "1 wrap",
+    calories: 427,
+    carbs: 27,
+    protein: 40,
+    fat: 16,
+    instructions: "Grill chicken, slice. Assemble with tortilla, avocado, lettuce, tomato, cucumber. Roll and serve.",
+    mealType: "Snack",
+    day: "Monday"
+  },
+  {
+    id: "mon_lunch",
+    name: "Grilled Chicken Sweet Potato Bowl",
+    ingredients: "8 oz grilled chicken, 1.5 cups roasted sweet potato, 1 Tbsp olive oil, 1 cup steamed veggies",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 80,
+    protein: 80,
+    fat: 20,
+    instructions: "Grill chicken. Roast sweet potatoes at 400°F for 20–25 min. Steam veggies. Combine in bowl with olive oil.",
+    mealType: "Lunch",
+    day: "Monday"
+  },
+  {
+    id: "mon_snack2",
+    name: "Protein Balls",
+    ingredients: "½ cup oats, 2 scoops whey, 2 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "3 balls",
+    calories: 500,
+    carbs: 50,
+    protein: 40,
+    fat: 15,
+    instructions: "Mix ingredients. Roll into 3 balls. Refrigerate or serve immediately.",
+    mealType: "Snack",
+    day: "Monday"
+  },
+  {
+    id: "mon_dinner",
+    name: "Beef & Rice Power Bowl",
+    ingredients: "8 oz lean beef, 2 cups cooked rice, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 85,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook beef. Steam vegetables. Serve over rice with olive oil.",
+    mealType: "Dinner",
+    day: "Monday"
+  },
+  {
+    id: "mon_dessert",
+    name: "Mug Protein Cake",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 cup milk",
+    portion: "1 serving",
+    calories: 450,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix in microwave-safe mug. Microwave 90–120 sec until set.",
+    mealType: "Dessert",
+    day: "Monday"
+  },
+
+  // Tuesday
+  {
+    id: "tue_breakfast",
+    name: "Egg & Egg White Scramble + Oats + Peanut Butter",
+    ingredients: "6 whole eggs, 1 cup egg whites, 1 cup oats, 2 Tbsp peanut butter",
+    portion: "1 serving",
+    calories: 800,
+    carbs: 90,
+    protein: 70,
+    fat: 25,
+    instructions: "Scramble eggs and egg whites. Cook oats. Stir in peanut butter. Serve eggs with oats.",
+    mealType: "Breakfast",
+    day: "Tuesday"
+  },
+  {
+    id: "tue_snack1",
+    name: "Protein Smoothie",
+    ingredients: "2 scoops whey, 2 cups almond milk, ½ cup oats, 1 banana, 2 Tbsp peanut butter",
+    portion: "1 large glass",
+    calories: 700,
+    carbs: 70,
+    protein: 60,
+    fat: 20,
+    instructions: "Blend all ingredients until smooth. Serve cold.",
+    mealType: "Snack",
+    day: "Tuesday"
+  },
+  {
+    id: "tue_lunch",
+    name: "Turkey Sweet Potato Bowl",
+    ingredients: "8 oz lean turkey, 1 cup roasted sweet potato, 1 Tbsp olive oil, 1 cup steamed veggies",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 70,
+    protein: 80,
+    fat: 35,
+    instructions: "Cook turkey until browned. Roast sweet potato. Steam veggies. Mix all together with olive oil.",
+    mealType: "Lunch",
+    day: "Tuesday"
+  },
+  {
+    id: "tue_snack2",
+    name: "Chicken & Avocado Wrap",
+    ingredients: "Grilled chicken breast, whole wheat tortilla, ¼ avocado, 1 tsp olive oil, lettuce, tomato, cucumber",
+    portion: "1 wrap",
+    calories: 427,
+    carbs: 27,
+    protein: 40,
+    fat: 16,
+    instructions: "Grill chicken, slice. Assemble with tortilla, avocado, lettuce, tomato, cucumber. Roll and serve.",
+    mealType: "Snack",
+    day: "Tuesday"
+  },
+  {
+    id: "tue_dinner",
+    name: "Chicken & Quinoa Power Bowl",
+    ingredients: "8 oz grilled chicken, 1 cup quinoa, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 850,
+    carbs: 70,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook quinoa. Grill chicken. Steam veggies. Combine with olive oil.",
+    mealType: "Dinner",
+    day: "Tuesday"
+  },
+  {
+    id: "tue_dessert",
+    name: "Protein Cookies",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "2 cookies",
+    calories: 500,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix ingredients. Shape into 2 cookies. Bake at 350°F for 10–12 min.",
+    mealType: "Dessert",
+    day: "Tuesday"
+  },
+
+  // Wednesday
+  {
+    id: "wed_breakfast",
+    name: "Protein Pancakes + Banana + Peanut Butter",
+    ingredients: "1 cup oats, 2 scoops whey, 2 eggs, 1 banana, 2 Tbsp peanut butter",
+    portion: "2 servings",
+    calories: 800,
+    carbs: 90,
+    protein: 60,
+    fat: 20,
+    instructions: "Blend ingredients. Cook pancakes on skillet 2–3 min per side. Top with peanut butter.",
+    mealType: "Breakfast",
+    day: "Wednesday"
+  },
+  {
+    id: "wed_snack1",
+    name: "Egg White Omelette + Spinach + Cheese",
+    ingredients: "6 egg whites, ½ cup spinach, ¼ cup shredded cheese",
+    portion: "1 omelette",
+    calories: 300,
+    carbs: 5,
+    protein: 40,
+    fat: 12,
+    instructions: "Whisk egg whites. Pour into pan. Add spinach, cheese. Fold and cook until set.",
+    mealType: "Snack",
+    day: "Wednesday"
+  },
+  {
+    id: "wed_lunch",
+    name: "Grilled Chicken & Brown Rice Bowl",
+    ingredients: "8 oz grilled chicken, 1.5 cups brown rice, ½ avocado, 1 Tbsp olive oil, 1 cup steamed veggies",
+    portion: "1 bowl",
+    calories: 850,
+    carbs: 80,
+    protein: 80,
+    fat: 20,
+    instructions: "Grill chicken. Cook rice. Steam veggies. Slice avocado. Combine all, drizzle olive oil.",
+    mealType: "Lunch",
+    day: "Wednesday"
+  },
+  {
+    id: "wed_snack2",
+    name: "Protein Balls",
+    ingredients: "½ cup oats, 2 scoops whey, 2 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "3 balls",
+    calories: 500,
+    carbs: 50,
+    protein: 40,
+    fat: 15,
+    instructions: "Mix ingredients. Roll into 3 balls. Refrigerate or serve immediately.",
+    mealType: "Snack",
+    day: "Wednesday"
+  },
+  {
+    id: "wed_dinner",
+    name: "Beef Stir Fry",
+    ingredients: "8 oz lean steak, 2 cups cooked rice, 1 cup mixed vegetables, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 80,
+    protein: 80,
+    fat: 25,
+    instructions: "Slice steak. Sauté in olive oil. Add vegetables, cook 5 min. Serve over rice.",
+    mealType: "Dinner",
+    day: "Wednesday"
+  },
+  {
+    id: "wed_dessert",
+    name: "Mug Protein Cake",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 cup milk",
+    portion: "1 serving",
+    calories: 450,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix in microwave-safe mug. Microwave 90–120 sec until set.",
+    mealType: "Dessert",
+    day: "Wednesday"
+  },
+
+  // Thursday
+  {
+    id: "thu_breakfast",
+    name: "Egg & Turkey Power Bowl",
+    ingredients: "4 whole eggs, 4 egg whites, 6 oz lean ground turkey, 1 cup cooked oats, 1 Tbsp almond butter",
+    portion: "1 bowl",
+    calories: 720,
+    carbs: 40,
+    protein: 65,
+    fat: 28,
+    instructions: "Cook turkey until browned. Scramble eggs. Cook oats. Combine eggs, turkey, oats. Top with almond butter.",
+    mealType: "Breakfast",
+    day: "Thursday"
+  },
+  {
+    id: "thu_snack1",
+    name: "Chicken & Avocado Wrap",
+    ingredients: "Grilled chicken breast, whole wheat tortilla, ¼ avocado, 1 tsp olive oil, lettuce, tomato, cucumber",
+    portion: "1 wrap",
+    calories: 427,
+    carbs: 27,
+    protein: 40,
+    fat: 16,
+    instructions: "Grill chicken, slice. Assemble with tortilla, avocado, lettuce, tomato, cucumber. Roll and serve.",
+    mealType: "Snack",
+    day: "Thursday"
+  },
+  {
+    id: "thu_lunch",
+    name: "Chicken & Sweet Potato Hash",
+    ingredients: "8 oz chicken, 1 cup diced sweet potatoes, ½ cup peppers, 1 Tbsp olive oil",
+    portion: "1 serving",
+    calories: 700,
+    carbs: 60,
+    protein: 65,
+    fat: 20,
+    instructions: "Cook chicken. Sauté sweet potatoes and peppers in olive oil. Mix all together.",
+    mealType: "Lunch",
+    day: "Thursday"
+  },
+  {
+    id: "thu_snack2",
+    name: "Protein Smoothie",
+    ingredients: "2 scoops whey, 2 cups almond milk, ½ cup oats, 1 banana, 2 Tbsp peanut butter",
+    portion: "1 large glass",
+    calories: 700,
+    carbs: 70,
+    protein: 60,
+    fat: 20,
+    instructions: "Blend all ingredients until smooth. Serve cold.",
+    mealType: "Snack",
+    day: "Thursday"
+  },
+  {
+    id: "thu_dinner",
+    name: "Beef & Rice Power Bowl",
+    ingredients: "8 oz lean beef, 2 cups cooked rice, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 85,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook beef. Steam vegetables. Serve over rice with olive oil.",
+    mealType: "Dinner",
+    day: "Thursday"
+  },
+  {
+    id: "thu_dessert",
+    name: "Protein Cookies",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "2 cookies",
+    calories: 500,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix ingredients. Shape into 2 cookies. Bake at 350°F for 10–12 min.",
+    mealType: "Dessert",
+    day: "Thursday"
+  },
+
+  // Friday
+  {
+    id: "fri_breakfast",
+    name: "Egg & Egg White Scramble + Oats + Peanut Butter",
+    ingredients: "6 whole eggs, 1 cup egg whites, 1 cup oats, 2 Tbsp peanut butter",
+    portion: "1 serving",
+    calories: 800,
+    carbs: 90,
+    protein: 70,
+    fat: 25,
+    instructions: "Scramble eggs and egg whites. Cook oats. Stir in peanut butter. Serve eggs with oats.",
+    mealType: "Breakfast",
+    day: "Friday"
+  },
+  {
+    id: "fri_snack1",
+    name: "Protein Balls",
+    ingredients: "½ cup oats, 2 scoops whey, 2 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "3 balls",
+    calories: 500,
+    carbs: 50,
+    protein: 40,
+    fat: 15,
+    instructions: "Mix ingredients. Roll into 3 balls. Refrigerate or serve immediately.",
+    mealType: "Snack",
+    day: "Friday"
+  },
+  {
+    id: "fri_lunch",
+    name: "Turkey Sweet Potato Bowl",
+    ingredients: "8 oz lean turkey, 1 cup roasted sweet potato, 1 Tbsp olive oil, 1 cup steamed veggies",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 70,
+    protein: 80,
+    fat: 35,
+    instructions: "Cook turkey until browned. Roast sweet potato. Steam veggies. Mix all together with olive oil.",
+    mealType: "Lunch",
+    day: "Friday"
+  },
+  {
+    id: "fri_snack2",
+    name: "Chicken & Avocado Wrap",
+    ingredients: "Grilled chicken breast, whole wheat tortilla, ¼ avocado, 1 tsp olive oil, lettuce, tomato, cucumber",
+    portion: "1 wrap",
+    calories: 427,
+    carbs: 27,
+    protein: 40,
+    fat: 16,
+    instructions: "Grill chicken, slice. Assemble with tortilla, avocado, lettuce, tomato, cucumber. Roll and serve.",
+    mealType: "Snack",
+    day: "Friday"
+  },
+  {
+    id: "fri_dinner",
+    name: "Chicken & Quinoa Power Bowl",
+    ingredients: "8 oz grilled chicken, 1 cup quinoa, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 850,
+    carbs: 70,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook quinoa. Grill chicken. Steam veggies. Combine with olive oil.",
+    mealType: "Dinner",
+    day: "Friday"
+  },
+  {
+    id: "fri_dessert",
+    name: "Mug Protein Cake",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 cup milk",
+    portion: "1 serving",
+    calories: 450,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix in microwave-safe mug. Microwave 90–120 sec until set.",
+    mealType: "Dessert",
+    day: "Friday"
+  },
+
+  // Saturday
+  {
+    id: "sat_breakfast",
+    name: "Protein Pancakes + Banana + Peanut Butter",
+    ingredients: "1 cup oats, 2 scoops whey, 2 eggs, 1 banana, 2 Tbsp peanut butter",
+    portion: "2 servings",
+    calories: 800,
+    carbs: 90,
+    protein: 60,
+    fat: 20,
+    instructions: "Blend ingredients. Cook pancakes on skillet 2–3 min per side. Top with peanut butter.",
+    mealType: "Breakfast",
+    day: "Saturday"
+  },
+  {
+    id: "sat_snack1",
+    name: "Egg White Omelette + Spinach + Cheese",
+    ingredients: "6 egg whites, ½ cup spinach, ¼ cup shredded cheese",
+    portion: "1 omelette",
+    calories: 300,
+    carbs: 5,
+    protein: 40,
+    fat: 12,
+    instructions: "Whisk egg whites. Pour into pan. Add spinach, cheese. Fold and cook until set.",
+    mealType: "Snack",
+    day: "Saturday"
+  },
+  {
+    id: "sat_lunch",
+    name: "Grilled Chicken Sweet Potato Bowl",
+    ingredients: "8 oz grilled chicken, 1.5 cups roasted sweet potato, 1 Tbsp olive oil, 1 cup steamed veggies",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 80,
+    protein: 80,
+    fat: 20,
+    instructions: "Grill chicken. Roast sweet potatoes at 400°F for 20–25 min. Steam veggies. Combine in bowl with olive oil.",
+    mealType: "Lunch",
+    day: "Saturday"
+  },
+  {
+    id: "sat_snack2",
+    name: "Protein Smoothie",
+    ingredients: "2 scoops whey, 2 cups almond milk, ½ cup oats, 1 banana, 2 Tbsp peanut butter",
+    portion: "1 large glass",
+    calories: 700,
+    carbs: 70,
+    protein: 60,
+    fat: 20,
+    instructions: "Blend all ingredients until smooth. Serve cold.",
+    mealType: "Snack",
+    day: "Saturday"
+  },
+  {
+    id: "sat_dinner",
+    name: "Beef Stir Fry",
+    ingredients: "8 oz lean steak, 2 cups cooked rice, 1 cup mixed vegetables, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 80,
+    protein: 80,
+    fat: 25,
+    instructions: "Slice steak. Sauté in olive oil. Add vegetables, cook 5 min. Serve over rice.",
+    mealType: "Dinner",
+    day: "Saturday"
+  },
+  {
+    id: "sat_dessert",
+    name: "Protein Cookies",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "2 cookies",
+    calories: 500,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix ingredients. Shape into 2 cookies. Bake at 350°F for 10–12 min.",
+    mealType: "Dessert",
+    day: "Saturday"
+  },
+
+  // Sunday
+  {
+    id: "sun_breakfast",
+    name: "Egg & Turkey Power Bowl",
+    ingredients: "4 whole eggs, 4 egg whites, 6 oz lean ground turkey, 1 cup cooked oats, 1 Tbsp almond butter",
+    portion: "1 bowl",
+    calories: 720,
+    carbs: 40,
+    protein: 65,
+    fat: 28,
+    instructions: "Cook turkey until browned. Scramble eggs. Cook oats. Combine eggs, turkey, oats. Top with almond butter.",
+    mealType: "Breakfast",
+    day: "Sunday"
+  },
+  {
+    id: "sun_snack1",
+    name: "Chicken & Avocado Wrap",
+    ingredients: "Grilled chicken breast, whole wheat tortilla, ¼ avocado, 1 tsp olive oil, lettuce, tomato, cucumber",
+    portion: "1 wrap",
+    calories: 427,
+    carbs: 27,
+    protein: 40,
+    fat: 16,
+    instructions: "Grill chicken, slice. Assemble with tortilla, avocado, lettuce, tomato, cucumber. Roll and serve.",
+    mealType: "Snack",
+    day: "Sunday"
+  },
+  {
+    id: "sun_lunch",
+    name: "Chicken & Quinoa Power Bowl",
+    ingredients: "8 oz grilled chicken, 1 cup quinoa, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 850,
+    carbs: 70,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook quinoa. Grill chicken. Steam veggies. Combine with olive oil.",
+    mealType: "Lunch",
+    day: "Sunday"
+  },
+  {
+    id: "sun_snack2",
+    name: "Protein Balls",
+    ingredients: "½ cup oats, 2 scoops whey, 2 Tbsp peanut butter, 1 Tbsp honey",
+    portion: "3 balls",
+    calories: 500,
+    carbs: 50,
+    protein: 40,
+    fat: 15,
+    instructions: "Mix ingredients. Roll into 3 balls. Refrigerate or serve immediately.",
+    mealType: "Snack",
+    day: "Sunday"
+  },
+  {
+    id: "sun_dinner",
+    name: "Beef & Rice Power Bowl",
+    ingredients: "8 oz lean beef, 2 cups cooked rice, 1 cup mixed veggies, 1 Tbsp olive oil",
+    portion: "1 bowl",
+    calories: 900,
+    carbs: 85,
+    protein: 80,
+    fat: 25,
+    instructions: "Cook beef. Steam vegetables. Serve over rice with olive oil.",
+    mealType: "Dinner",
+    day: "Sunday"
+  },
+  {
+    id: "sun_dessert",
+    name: "Mug Protein Cake",
+    ingredients: "1 scoop whey, ¼ cup oats, 1 Tbsp peanut butter, 1 cup milk",
+    portion: "1 serving",
+    calories: 450,
+    carbs: 50,
+    protein: 35,
+    fat: 15,
+    instructions: "Mix in microwave-safe mug. Microwave 90–120 sec until set.",
+    mealType: "Dessert",
+    day: "Sunday"
+  }
+];

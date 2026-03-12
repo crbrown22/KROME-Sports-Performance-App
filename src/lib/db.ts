@@ -1,0 +1,277 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+
+let db: any;
+try {
+  db = new Database(path.join(process.cwd(), 'database.db'));
+  console.log("Database connected successfully.");
+} catch (err) {
+  console.error("Failed to connect to database:", err);
+  // Fallback to in-memory database if file fails
+  db = new Database(':memory:');
+  console.log("Using in-memory database as fallback.");
+}
+
+// Initialize tables
+try {
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    email TEXT UNIQUE,
+    password TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    avatar_url TEXT,
+    role TEXT DEFAULT 'user',
+    status TEXT DEFAULT 'active',
+    parq_completed INTEGER DEFAULT 0,
+    email_notifications INTEGER DEFAULT 1,
+    push_notifications INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    metric_name TEXT,
+    metric_value REAL,
+    unit TEXT,
+    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS nutrition_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    log_id TEXT UNIQUE,
+    food_id TEXT,
+    name TEXT,
+    category TEXT,
+    meal TEXT,
+    date TEXT,
+    servings REAL,
+    serving_size TEXT,
+    calories REAL,
+    protein REAL,
+    carbs REAL,
+    fat REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS user_metrics (
+    user_id INTEGER PRIMARY KEY,
+    data TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS body_comp_history (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER,
+    week INTEGER,
+    date TEXT,
+    weight REAL,
+    height REAL,
+    bmi REAL,
+    body_fat REAL,
+    lean_muscle REAL,
+    fat_mass REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS user_parq (
+    user_id INTEGER PRIMARY KEY,
+    data TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS workout_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    workout_id TEXT,
+    exercise_id TEXT,
+    completed INTEGER DEFAULT 0,
+    date TEXT,
+    edited_data TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, workout_id, exercise_id, date)
+  );
+
+  CREATE TABLE IF NOT EXISTS program_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    program_id TEXT,
+    phase TEXT,
+    week INTEGER,
+    day INTEGER,
+    completed INTEGER DEFAULT 0,
+    date TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, program_id, phase, week, day)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_activity_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    action TEXT,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS body_composition_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    image_url TEXT,
+    analysis TEXT,
+    feedback TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS fitness_overviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    overview TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    item_name TEXT,
+    price REAL,
+    square_order_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS custom_programs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT,
+    description TEXT,
+    data TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER,
+    receiver_id INTEGER,
+    message TEXT,
+    is_read INTEGER DEFAULT 0,
+    is_deleted INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    subscription TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS workout_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    workout_id TEXT,
+    program_id TEXT,
+    rating INTEGER,
+    comment TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+} catch (err) {
+  console.error("Failed to initialize tables:", err);
+}
+
+// Migration: Add is_read column to messages table if it doesn't exist
+try {
+  db.prepare('SELECT is_read FROM messages LIMIT 1').get();
+} catch (err) {
+  console.log('Adding is_read column to messages table...');
+  db.exec('ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0');
+}
+
+// Migration: Add is_deleted and updated_at columns to messages table if they don't exist
+try {
+  db.prepare('SELECT is_deleted FROM messages LIMIT 1').get();
+} catch (err) {
+  console.log('Adding is_deleted and updated_at columns to messages table...');
+  db.exec('ALTER TABLE messages ADD COLUMN is_deleted INTEGER DEFAULT 0');
+  db.exec('ALTER TABLE messages ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+}
+
+// Migration: Add avatar_url column if it doesn't exist
+try {
+  db.prepare('SELECT avatar_url FROM users LIMIT 1').get();
+} catch (err) {
+  console.log('Adding avatar_url column to users table...');
+  db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+}
+
+// Migration: Add workout_start_time and workout_end_time columns to workout_logs table if they don't exist
+try {
+  db.prepare('SELECT workout_start_time FROM workout_logs LIMIT 1').get();
+} catch (err) {
+  console.log('Adding workout_start_time and workout_end_time columns to workout_logs table...');
+  db.exec('ALTER TABLE workout_logs ADD COLUMN workout_start_time DATETIME');
+  db.exec('ALTER TABLE workout_logs ADD COLUMN workout_end_time DATETIME');
+}
+
+// Migration: Add square_order_id column to purchases table if it doesn't exist
+try {
+  db.prepare('SELECT square_order_id FROM purchases LIMIT 1').get();
+} catch (err) {
+  console.log('Adding square_order_id column to purchases table...');
+  db.exec('ALTER TABLE purchases ADD COLUMN square_order_id TEXT');
+}
+
+// Migration: Add stripe_session_id column to purchases table if it doesn't exist
+try {
+  db.prepare('SELECT stripe_session_id FROM purchases LIMIT 1').get();
+} catch (err) {
+  console.log('Adding stripe_session_id column to purchases table...');
+  db.exec('ALTER TABLE purchases ADD COLUMN stripe_session_id TEXT');
+}
+
+// Migration: Add status column if it doesn't exist
+try {
+  db.prepare('SELECT status FROM users LIMIT 1').get();
+} catch (err) {
+  console.log('Adding status column to users table...');
+  db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'");
+}
+
+// Migration: Add notification toggle columns if they don't exist
+try {
+  db.prepare('SELECT email_notifications FROM users LIMIT 1').get();
+} catch (err) {
+  console.log('Adding notification toggle columns to users table...');
+  db.exec("ALTER TABLE users ADD COLUMN email_notifications INTEGER DEFAULT 1");
+  db.exec("ALTER TABLE users ADD COLUMN push_notifications INTEGER DEFAULT 1");
+}
+
+// Create a default admin if none exists
+const adminExists = db.prepare('SELECT * FROM users WHERE role = ?').get('admin');
+if (!adminExists) {
+  const insert = db.prepare('INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)');
+  insert.run('admin', 'admin@krome.com', 'admin123', 'KROME', 'Admin', 'admin');
+  console.log('Default admin created: admin / admin123');
+}
+
+export default db;

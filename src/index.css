@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  
+  --color-gold: #c59c21;
+  --color-gold-light: #e0b43a;
+  --color-gold-dark: #a3811b;
+  --color-accent: #b2d8d8;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white font-sans antialiased;
+  }
+}
+
+@utility glass {
+  @apply bg-black/60 backdrop-blur-md border-b border-white/10;
+}
+
+@utility gold-gradient {
+  background: linear-gradient(135deg, #c59c21 0%, #e0b43a 100%);
+}
+
+@utility accent-gradient {
+  background: linear-gradient(135deg, #b2d8d8 0%, #8abebf 100%);
+}
+
+@utility profile-gradient {
+  background: linear-gradient(135deg, #18181b 0%, #18181b 70%, rgba(178, 216, 216, 0.25) 100%);
+}
+
+@utility btn-gold {
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 gold-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-gold/20;
+}
+
+@utility btn-accent {
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 accent-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-accent/20;
+}
+
+@utility btn-outline-gold {
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-gold text-gold hover:bg-gold hover:text-black active:scale-95;
+}
+
+@utility btn-outline-accent {
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-accent text-accent hover:bg-accent hover:text-black active:scale-95;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(197, 156, 33, 0.5); /* Gold with opacity */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

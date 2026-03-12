@@ -1,0 +1,532 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Activity, 
+  Calendar, 
+  TrendingUp, 
+  CheckCircle2, 
+  Circle, 
+  Clock, 
+  Award,
+  BarChart3,
+  ChevronRight,
+  ChevronLeft,
+  Zap,
+  Dumbbell,
+  StretchHorizontal,
+  X,
+  RefreshCw,
+  Trash2
+} from 'lucide-react';
+import { formatDate, getCurrentDate } from '../utils/date';
+import WorkoutFeedback from './WorkoutFeedback';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area,
+  BarChart,
+  Bar,
+  Cell
+} from 'recharts';
+
+interface WorkoutLog {
+  workoutId: string;
+  exerciseId: string;
+  completed: boolean;
+  date: string;
+  editedData?: any;
+  workoutStartTime?: string;
+  workoutEndTime?: string;
+}
+
+interface ProgramProgress {
+  programId: string;
+  phase: string;
+  week: number;
+  day: number;
+  completed: boolean;
+  date: string;
+}
+
+interface WorkoutTrackerProps {
+  userId: string;
+  isAdminView?: boolean;
+  onBack?: () => void;
+}
+
+export default function WorkoutTracker({ userId, isAdminView = false, onBack }: WorkoutTrackerProps) {
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [programProgress, setProgramProgress] = useState<ProgramProgress[]>([]);
+  const [feedback, setFeedback] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [metric, setMetric] = useState<'phase' | 'completion' | 'exercises' | 'duration'>('phase');
+
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch(`/api/workout-logs/${userId}`, {
+        headers: { 'X-User-Id': userId }
+      });
+      if (res.ok) {
+        const logs = await res.json();
+        setWorkoutLogs(logs.map((l: any) => ({
+          ...l,
+          workoutId: l.workout_id,
+          exerciseId: l.exercise_id,
+          completed: l.completed === 1,
+          editedData: l.edited_data ? JSON.parse(l.edited_data) : {},
+          workoutStartTime: l.workout_start_time,
+          workoutEndTime: l.workout_end_time
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to fetch workout logs", err);
+    }
+  };
+
+  const fetchFeedback = async () => {
+    try {
+      const res = await fetch(`/api/workout-feedback/${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFeedback(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch feedback", err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await Promise.all([
+          fetchLogs(),
+          fetchFeedback(),
+          (async () => {
+            const progressRes = await fetch(`/api/program-progress/${userId}`);
+            if (progressRes.ok) {
+              const progress = await progressRes.json();
+              setProgramProgress(progress.map((p: any) => ({
+                ...p,
+                programId: p.program_id,
+                completed: p.completed === 1
+              })));
+            }
+          })()
+        ]);
+      } catch (err) {
+        console.error("Failed to fetch workout data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId]);
+
+  const handleAddLog = async (log: WorkoutLog) => {
+    await fetch(`/api/workout-logs/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+      body: JSON.stringify({ logs: [log] })
+    });
+    await fetchLogs();
+  };
+
+  const handleUpdateLog = async (log: WorkoutLog) => {
+    await fetch(`/api/workout-logs/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+      body: JSON.stringify({ logs: [{ ...log, completed: !log.completed }] })
+    });
+    await fetchLogs();
+  };
+
+  const handleDeleteLog = async (log: WorkoutLog) => {
+    if (!window.confirm("Are you sure you want to delete this workout log?")) {
+      return;
+    }
+    await fetch(`/api/workout-logs/${userId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+      body: JSON.stringify({ workout_id: log.workoutId, exercise_id: log.exerciseId, date: log.date })
+    });
+    await fetchLogs();
+  };
+
+  const calculateCompletion = (period: 'week' | 'month' | 'year') => {
+    // Use getCurrentDate to get timezone-aware date string, then convert to Date object
+    const nowStr = getCurrentDate();
+    const [y, m, d] = nowStr.split('-').map(Number);
+    const now = new Date(y, m - 1, d);
+    let startDate = new Date(y, m - 1, d);
+
+    if (period === 'week') startDate.setDate(now.getDate() - 7);
+    else if (period === 'month') startDate.setMonth(now.getMonth() - 1);
+    else if (period === 'year') startDate.setFullYear(now.getFullYear() - 1);
+
+    // Get all unique exercises for the workouts in the period
+    // Since we don't have the full template data here, we'll assume 
+    // a standard of 20 exercises per day for this calculation
+    const periodLogs = workoutLogs.filter(log => new Date(log.date) >= startDate);
+    const completed = periodLogs.filter(log => log.completed).length;
+    
+    // Estimate total exercises: 5 days * 20 exercises = 100 per week
+    const daysInPeriod = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const totalExercises = daysInPeriod * 20;
+
+    return totalExercises === 0 ? 0 : Math.min(100, Math.round((completed / totalExercises) * 100));
+  };
+
+  const getPhaseData = () => {
+    const phases = [
+      { name: 'MEE', range: [1, 12] },
+      { name: 'S&P', range: [13, 24] },
+      { name: 'SHP', range: [25, 36] },
+      { name: 'FTTX', range: [37, 48] },
+      { name: 'OP', range: [49, 52] },
+    ];
+
+    return phases.map(phase => {
+      const phaseProgress = programProgress.filter(p => p.week >= phase.range[0] && p.week <= phase.range[1]);
+      const completed = phaseProgress.filter(p => p.completed).length;
+      const total = (phase.range[1] - phase.range[0] + 1) * 7; // Assuming 7 days per week
+      return {
+        name: phase.name,
+        value: total === 0 ? 0 : Math.round((completed / total) * 100)
+      };
+    });
+  };
+
+  const getChartData = () => {
+    if (metric === 'phase') return getPhaseData();
+
+    // Group logs by date
+    const logsByDate: Record<string, WorkoutLog[]> = {};
+    workoutLogs.forEach(log => {
+      if (!logsByDate[log.date]) logsByDate[log.date] = [];
+      logsByDate[log.date].push(log);
+    });
+
+    return Object.entries(logsByDate).map(([date, logs]) => {
+      const completed = logs.filter(l => l.completed).length;
+      const total = logs.length;
+      
+      let value = 0;
+      if (metric === 'completion') value = total === 0 ? 0 : Math.round((completed / total) * 100);
+      else if (metric === 'exercises') value = completed;
+      else if (metric === 'duration') {
+        // Calculate duration for each workout session on this date
+        const sessions: Record<string, { start: Date, end: Date }> = {};
+        logs.forEach(log => {
+          if (log.workoutStartTime && log.workoutEndTime) {
+            const sessionId = log.workoutId;
+            const start = new Date(log.workoutStartTime);
+            const end = new Date(log.workoutEndTime);
+            if (!sessions[sessionId] || start < sessions[sessionId].start) sessions[sessionId] = { start, end };
+            if (end > sessions[sessionId].end) sessions[sessionId].end = end;
+          }
+        });
+        value = Object.values(sessions).reduce((acc, s) => acc + (s.end.getTime() - s.start.getTime()) / (1000 * 60), 0);
+      }
+
+      return { name: date.slice(5), value };
+    });
+  };
+
+  const calculateDuration = (start?: string, end?: string) => {
+    if (!start || !end) return 0;
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    return Math.max(0, Math.round((endTime - startTime) / (1000 * 60)));
+  };
+
+  const getRecentSessions = () => {
+    const sessions: Record<string, { 
+      workoutId: string, 
+      date: string, 
+      startTime?: string, 
+      endTime?: string, 
+      completedCount: number, 
+      totalCount: number,
+      logs: WorkoutLog[]
+    }> = {};
+
+    workoutLogs.forEach(log => {
+      const key = `${log.workoutId}-${log.date}`;
+      if (!sessions[key]) {
+        sessions[key] = {
+          workoutId: log.workoutId,
+          date: log.date,
+          startTime: log.workoutStartTime,
+          endTime: log.workoutEndTime,
+          completedCount: 0,
+          totalCount: 0,
+          logs: []
+        };
+      }
+      sessions[key].logs.push(log);
+      sessions[key].totalCount++;
+      if (log.completed) sessions[key].completedCount++;
+      if (log.workoutStartTime) sessions[key].startTime = log.workoutStartTime;
+      if (log.workoutEndTime) sessions[key].endTime = log.workoutEndTime;
+    });
+
+    return Object.values(sessions)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+  };
+
+  const getSessionsNeedingFeedback = () => {
+    const sessions = getRecentSessions();
+    if (!Array.isArray(feedback)) return [];
+    return sessions.filter(session => {
+      // Check if feedback exists for this workoutId on this date
+      // We look for feedback where the workout_id matches and it was created on the same day as the session
+      return !feedback.some(f => 
+        f.workout_id === session.workoutId && 
+        f.created_at && f.created_at.startsWith(session.date)
+      );
+    });
+  };
+
+  const handleDeleteSession = async (session: any) => {
+    if (!window.confirm("Are you sure you want to delete this entire workout session?")) {
+      return;
+    }
+    console.log("Deleting session:", session);
+    for (const log of session.logs) {
+      console.log("Deleting log:", log);
+      const response = await fetch(`/api/workout-logs/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+        body: JSON.stringify({ workout_id: log.workoutId, exercise_id: log.exerciseId, date: log.date })
+      });
+      console.log("Delete response status:", response.status);
+    }
+    await fetchLogs();
+  };
+
+  if (loading) {
+    return (
+      <div className="p-20 text-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-white/40 font-bold uppercase tracking-widest text-xs">Loading workout data...</p>
+      </div>
+    );
+  }
+
+  const pendingSessions = getSessionsNeedingFeedback();
+  const firstPendingSession = pendingSessions[0];
+
+  return (
+    <div className="space-y-8">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          { label: 'Weekly Completion', value: calculateCompletion('week'), icon: Activity, color: 'text-gold' },
+          { label: 'Monthly Progress', value: calculateCompletion('month'), icon: TrendingUp, color: 'text-accent' },
+          { label: 'Yearly Consistency', value: calculateCompletion('year'), icon: Award, color: 'text-blue-400' }
+        ].map((stat, idx) => (
+          <motion.div 
+            key={idx}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            className="bg-zinc-900/50 border border-white/5 p-6 rounded-3xl relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <stat.icon className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">{stat.label}</div>
+              <div className="flex flex-col items-start gap-0">
+                <div className={`text-4xl font-black italic ${stat.color}`}>{stat.value}%</div>
+                <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Completed</div>
+              </div>
+              <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stat.value}%` }}
+                  className={`h-full bg-gradient-to-r from-gold to-accent`}
+                  role="progressbar"
+                  aria-valuenow={stat.value}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${stat.label} progress`}
+                />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="space-y-8">
+        {/* Phase Progress Chart */}
+        <div className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-xl font-black uppercase italic tracking-tight">
+              {metric === 'phase' ? 'Phase' : metric === 'completion' ? 'Completion' : metric === 'exercises' ? 'Exercises' : 'Duration'} <span className="text-gold">Progress</span>
+            </h3>
+            <select 
+              value={metric} 
+              onChange={(e) => setMetric(e.target.value as any)}
+              className="bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-gold w-32"
+              aria-label="Select metric for progress chart"
+            >
+              <option value="phase">Phase</option>
+              <option value="completion">Completion %</option>
+              <option value="exercises">Exercises</option>
+              <option value="duration">Duration</option>
+            </select>
+          </div>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={getChartData()}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#D4AF37" />
+                    <stop offset="100%" stopColor="#008080" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                <XAxis dataKey="name" stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  cursor={{ fill: '#ffffff05' }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-zinc-950 border border-white/10 p-3 rounded-xl shadow-xl">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">{label}</p>
+                          <p className="text-sm font-black italic text-gold">{payload[0].value} {metric === 'duration' ? 'min' : ''}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="value" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Phase Progress */}
+        <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
+          <h3 className="text-xl font-black uppercase italic tracking-tight mb-6 text-white/80">Phase <span className="text-gold">Progress</span></h3>
+          <div className="space-y-4">
+            {[
+              { name: 'MEE', range: [1, 12], color: 'from-amber-900 via-gold to-amber-900' },
+              { name: 'S&P', range: [13, 24], color: 'from-emerald-900 via-emerald-500 to-emerald-900' },
+              { name: 'SHP', range: [25, 36], color: 'from-blue-900 via-blue-500 to-blue-900' },
+              { name: 'FTTX', range: [37, 48], color: 'from-purple-900 via-purple-500 to-purple-900' },
+              { name: 'OP', range: [49, 52], color: 'from-rose-900 via-rose-500 to-rose-900' }
+            ].map((phase) => {
+              const phaseProgress = programProgress.filter(p => p.week >= phase.range[0] && p.week <= phase.range[1]);
+              const completed = phaseProgress.filter(p => p.completed).length;
+              const total = (phase.range[1] - phase.range[0] + 1) * 7;
+              const percent = Math.min(100, Math.round((completed / total) * 100));
+
+              return (
+                <div key={phase.name} className="p-4 bg-black/20 rounded-2xl border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors">
+                  <div className="text-xs font-black uppercase tracking-widest text-white/70">{phase.name}</div>
+                  <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percent}%` }}
+                      className={`h-full bg-gradient-to-r ${phase.color}`}
+                      role="progressbar"
+                      aria-valuenow={percent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${phase.name} phase progress`}
+                    />
+                  </div>
+                  <div className="text-xs font-black italic text-gold w-10 text-right">{percent}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Workouts - Full Width */}
+      <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-black uppercase italic tracking-tight text-white/80">Recent <span className="text-gold">Workouts</span></h3>
+          <button 
+            onClick={fetchLogs} 
+            className="text-white/60 hover:text-gold transition-colors"
+            aria-label="Refresh workout logs"
+          >
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {getRecentSessions().map((session, idx) => (
+            <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-default gap-8">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${session.completedCount === session.totalCount ? 'bg-emerald-500' : 'bg-gold'}`} />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold uppercase tracking-widest text-white/70 whitespace-nowrap overflow-hidden text-ellipsis" title={session.workoutId.replace(/-/g, ' ')}>
+                    {session.workoutId.replace(/-/g, ' ')}
+                  </span>
+                  <span className="text-xs text-white/30">
+                    {session.completedCount}/{session.totalCount} Exercises
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-6 shrink-0">
+                {session.startTime && session.endTime && (
+                  <div className="flex items-center gap-2 text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/10">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-mono font-bold whitespace-nowrap">
+                      {calculateDuration(session.startTime, session.endTime)} min
+                    </span>
+                  </div>
+                )}
+                <span className="text-sm text-white/30 font-medium whitespace-nowrap">
+                  {formatDate(session.date)}
+                </span>
+                <button 
+                  onClick={() => handleDeleteSession(session)}
+                  className="text-white/40 hover:text-red-500 transition-colors"
+                  aria-label="Delete workout session"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Workout Feedback */}
+      {!isAdminView && firstPendingSession && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Pending Feedback Required</h4>
+          </div>
+          <WorkoutFeedback 
+            userId={userId} 
+            workoutId={firstPendingSession.workoutId} 
+            programId="52-week-foundation" 
+            onSuccess={() => {
+              // Refresh feedback list after submission
+              setTimeout(fetchFeedback, 2000);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
