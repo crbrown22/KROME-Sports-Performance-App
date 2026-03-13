@@ -461,7 +461,13 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
 
           <div className="space-y-3" role="tablist" aria-label="Profile sections">
             <button 
-              onClick={() => onNavigate('programCatalog')}
+              onClick={() => {
+                if (onProgramSelect) {
+                  onProgramSelect('');
+                } else {
+                  onNavigate('programViewer');
+                }
+              }}
               disabled={user.parq_completed === 0}
               className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >

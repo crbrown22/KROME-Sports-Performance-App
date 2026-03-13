@@ -21,11 +21,14 @@ let squareClient: SquareClient | null = null;
 export function getSquare(): SquareClient {
   if (!squareClient) {
     const token = process.env.SQUARE_ACCESS_TOKEN;
+    const environment = process.env.SQUARE_ENVIRONMENT;
+    console.log(`Initializing Square Client: Env=${environment}, TokenLength=${token?.length}`);
+    
     if (!token) {
       throw new Error('SQUARE_ACCESS_TOKEN environment variable is required');
     }
     squareClient = new SquareClient({
-      environment: process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
+      environment: environment === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
       token: token,
     });
   }
@@ -133,7 +136,8 @@ async function startServer() {
             const price = payment.amount_money?.amount ? Number(payment.amount_money.amount) / 100 : 0;
 
             if (userId) {
-              db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id) VALUES (?, ?, ?, ?)').run(userId, itemName, price, orderId);
+              const programId = order.metadata.programId;
+              db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(userId, itemName, price, orderId, programId);
               
               // Send notification
               sendNotification(Number(userId), 'Purchase Confirmed', `Thank you for purchasing ${itemName}! Your program is now available in your profile.`, '/profile');
@@ -157,7 +161,7 @@ async function startServer() {
   app.post('/api/create-checkout-session', async (req, res) => {
     try {
       const square = getSquare();
-      const { itemName, price, userId } = req.body;
+      const { itemName, price, userId, programId } = req.body;
       
       const locationId = process.env.SQUARE_LOCATION_ID;
       if (!locationId) {
@@ -182,6 +186,7 @@ async function startServer() {
           metadata: {
             userId: userId ? String(userId) : '',
             itemName: itemName,
+            programId: programId ? String(programId) : '',
           }
         },
         checkoutOptions: {
@@ -469,6 +474,18 @@ async function startServer() {
       db.prepare('DELETE FROM users WHERE id = ?').run(id);
       res.json({ success: true });
     } catch (err) {
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Admin: Assign program to user
+  app.post("/api/admin/assign-program", (req, res) => {
+    const { userId, programId, itemName, price } = req.body;
+    try {
+      db.prepare('INSERT INTO purchases (user_id, item_name, price, program_id) VALUES (?, ?, ?, ?)').run(userId, itemName, price || 0, programId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error assigning program:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -1075,6 +1092,33 @@ async function startServer() {
     }
   });
 
+  // Messages: Get unread messages
+  app.get("/api/messages/unread", (req, res) => {
+    const { userId } = req.query;
+    try {
+      let query = `
+        SELECT m.*, u.username as sender_username 
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        WHERE m.is_read = 0
+      `;
+      const params: any[] = [];
+      
+      if (userId) {
+        query += ` AND m.receiver_id = ?`;
+        params.push(userId);
+      }
+      
+      query += ` ORDER BY m.created_at DESC`;
+      
+      const messages = db.prepare(query).all(...params);
+      res.json(messages);
+    } catch (err) {
+      console.error("Error fetching unread messages:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // Messages: Get conversation
   app.get("/api/messages/:userId", (req, res) => {
     const { userId } = req.params;
@@ -1105,33 +1149,6 @@ async function startServer() {
 
       res.json({ id: result.lastInsertRowid, success: true });
     } catch (err) {
-      res.status(500).json({ error: "Database error" });
-    }
-  });
-
-  // Messages: Get unread messages
-  app.get("/api/messages/unread", (req, res) => {
-    const { userId } = req.query;
-    try {
-      let query = `
-        SELECT m.*, u.username as sender_username 
-        FROM messages m
-        JOIN users u ON m.sender_id = u.id
-        WHERE m.is_read = 0
-      `;
-      const params: any[] = [];
-      
-      if (userId) {
-        query += ` AND m.receiver_id = ?`;
-        params.push(userId);
-      }
-      
-      query += ` ORDER BY m.created_at DESC`;
-      
-      const messages = db.prepare(query).all(...params);
-      res.json(messages);
-    } catch (err) {
-      console.error("Error fetching unread messages:", err);
       res.status(500).json({ error: "Database error" });
     }
   });

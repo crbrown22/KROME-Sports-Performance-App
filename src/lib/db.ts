@@ -293,6 +293,14 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN push_notifications INTEGER DEFAULT 1");
 }
 
+// Migration: Add program_id column to purchases table if it doesn't exist
+try {
+  db.prepare('SELECT program_id FROM purchases LIMIT 1').get();
+} catch (err) {
+  console.log('Adding program_id column to purchases table...');
+  db.exec('ALTER TABLE purchases ADD COLUMN program_id TEXT');
+}
+
 // Create a default admin if none exists
 const adminExists = db.prepare('SELECT * FROM users WHERE role = ?').get('admin');
 if (!adminExists) {

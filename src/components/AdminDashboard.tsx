@@ -49,6 +49,7 @@ import { LoggedFood } from "../data/nutritionData";
 import { calculateNutritionRecommendations } from "../utils/nutrition";
 import { getSupplementRecommendation, generateDefaultSupplements } from "../utils/supplements";
 import { BodyMetricsData, INITIAL_DATA } from "../types";
+import { FullProgramTemplate } from "../data/workoutTemplates";
 import AdminAssistant from "./AdminAssistant";
 import VideoAnalyzer from "./VideoAnalyzer";
 import AthleteSettings from "./AthleteSettings";
@@ -87,9 +88,18 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     const saved = localStorage.getItem('krome_admin_selected_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [activeTab, setActiveTab] = useState<'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback'>(() => {
-    return initialTab || (localStorage.getItem('krome_admin_active_tab') as any) || 'workouts';
+  const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback'>(() => {
+    const saved = localStorage.getItem('krome_admin_active_tab');
+    if (window.innerWidth < 1024) return 'menu';
+    return initialTab || (saved as any) || 'workouts';
   });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback'>(() => {
     if (initialTab === 'chat') return 'chat';
@@ -143,6 +153,8 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     last_name: '',
     role: 'user' as 'user' | 'admin'
   });
+  const [selectedProgram, setSelectedProgram] = useState<FullProgramTemplate | undefined>(undefined);
+  const [isCustomProgram, setIsCustomProgram] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [editFormData, setEditFormData] = useState({ 
     first_name: '', 
@@ -776,141 +788,373 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-5xl bg-zinc-900 border border-white/10 rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="relative w-full max-w-6xl bg-zinc-900 border border-white/10 rounded-[40px] shadow-2xl overflow-hidden h-full lg:h-[90vh] flex flex-col lg:flex-row"
             >
-              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-zinc-900/50 backdrop-blur-xl">
-                <div className="flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl gold-gradient p-0.5 shadow-xl shadow-gold/10">
-                    <div className="w-full h-full bg-zinc-900 rounded-[14px] flex items-center justify-center overflow-hidden">
-                      {selectedUser.avatar_url ? (
-                        <img 
-                          src={selectedUser.avatar_url} 
-                          alt={selectedUser.username} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="text-2xl font-black italic text-gold/40">
-                          {selectedUser.username[0].toUpperCase()}
-                        </div>
-                      )}
+              {/* Sidebar - Desktop Only */}
+              {!isMobile && (
+                <div className="w-72 border-r border-white/5 flex flex-col bg-zinc-900/50 backdrop-blur-xl flex-none">
+                  <div className="p-8 flex flex-col items-center border-b border-white/5">
+                    <div className="w-24 h-24 rounded-3xl gold-gradient p-0.5 shadow-xl shadow-gold/10 mb-4">
+                      <div className="w-full h-full bg-zinc-900 rounded-[22px] flex items-center justify-center overflow-hidden">
+                        {selectedUser.avatar_url ? (
+                          <img 
+                            src={selectedUser.avatar_url} 
+                            alt={selectedUser.username} 
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="text-3xl font-black italic text-gold/40">
+                            {selectedUser.username[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <h3 className="text-lg font-black uppercase italic tracking-tight text-center">
+                      {selectedUser.first_name || selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.username}
+                    </h3>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-1">Athlete Profile</p>
                   </div>
-                  <div className="flex justify-between items-center mb-8">
-                    <button 
-                      onClick={() => setSelectedUser(null)}
-                      className="px-6 py-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white krome-outline"
-                    >
-                      Back to Dashboard
-                    </button>
-                    <button 
-                      onClick={() => { /* Add logout logic */ }}
-                      className="px-6 py-3 rounded-full bg-gold/10 border border-gold/20 hover:bg-gold/20 transition-all text-xs font-bold uppercase tracking-widest text-gold krome-outline"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                  <h3 className="text-2xl font-black uppercase italic tracking-tight mb-8 text-center">
-                    {selectedUser.first_name || selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.username}
-                  </h3>
-                  <div className="space-y-3">
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">
                     <button 
                       onClick={() => setActiveTab('progress')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'progress' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'progress' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <TrendingUp className="w-4 h-4" /> Training Stats
                     </button>
                     <button 
                       onClick={() => setActiveTab('programs')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'programs' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'programs' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
-                      <Calendar className="w-4 h-4" /> Training Programs
+                      <Calendar className="w-4 h-4" /> Training Program
                     </button>
                     <button 
                       onClick={() => setActiveTab('builder')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'builder' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'builder' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Edit3 className="w-4 h-4" /> Program Builder
                     </button>
                     <button 
                       onClick={() => setActiveTab('metrics')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'metrics' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'metrics' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Activity className="w-4 h-4" /> Body Metrics
                     </button>
                     <button 
                       onClick={() => setActiveTab('workouts')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'workouts' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'workouts' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Dumbbell className="w-4 h-4" /> Workouts
                     </button>
                     <button 
                       onClick={() => setActiveTab('composition')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'composition' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'composition' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Camera className="w-4 h-4" /> Body Comp
                     </button>
                     <button 
                       onClick={() => setActiveTab('overview')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <TrendingUp className="w-4 h-4" /> Overview
                     </button>
                     <button 
                       onClick={() => setActiveTab('parq')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'parq' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'parq' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
-                      <ShieldAlert className="w-4 h-4" /> PAR-Q
+                      <ShieldAlert className="w-4 h-4" /> PAR Q
                     </button>
                     <button 
                       onClick={() => setActiveTab('nutrition')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'nutrition' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'nutrition' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Apple className="w-4 h-4" /> Nutrition
                     </button>
                     <button 
                       onClick={() => setActiveTab('activity')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <History className="w-4 h-4" /> Activity Log
                     </button>
                     <button 
                       onClick={() => setActiveTab('video')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'video' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'video' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Video className="w-4 h-4" /> Video Analysis
                     </button>
                     <button 
                       onClick={() => setActiveTab('ai-tools')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'ai-tools' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ai-tools' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Zap className="w-4 h-4" /> AI Academy Lab
                     </button>
                     <button 
                       onClick={() => setActiveTab('chat')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'chat' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'chat' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <MessageSquare className="w-4 h-4" /> Chat
                     </button>
                     <button 
+                      onClick={() => setActiveTab('feedback')}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'feedback' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      <Star className="w-4 h-4" /> Feedback
+                    </button>
+                    <button 
                       onClick={() => setActiveTab('settings')}
-                      className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+                      className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
                       <Settings className="w-4 h-4" /> Settings
                     </button>
                   </div>
+
+                  <div className="p-4 border-t border-white/5">
+                    <button 
+                      onClick={() => setSelectedUser(null)}
+                      className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white flex items-center justify-center gap-2"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Dashboard
+                    </button>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedUser(null)}
-                  className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-white/60 hover:text-white krome-outline"
-                  aria-label="Close user details"
-                >
-                  <X className="w-6 h-6" aria-hidden="true" />
-                </button>
-              </div>
-              
-              <div className="p-8 overflow-y-auto custom-scrollbar">
-                {activeTab === 'progress' ? (
+              )}
+
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-black/20 min-h-0">
+                <div className="p-4 lg:p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/30 backdrop-blur-xl">
+                  <div className="flex items-center gap-4">
+                    {isMobile && activeTab !== 'menu' && (
+                      <button 
+                        onClick={() => setActiveTab('menu')}
+                        className="p-2 bg-white/5 rounded-xl border border-white/10 text-gold hover:bg-white/10 transition-all"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                    )}
+                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white/40">
+                      {activeTab === 'menu' ? 'Menu' : activeTab.replace('-', ' ')}
+                    </h2>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedUser(null)}
+                    className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-white/60 hover:text-white"
+                  >
+                    <X className="w-4 h-4 lg:w-5 lg:h-5" />
+                  </button>
+                </div>
+                
+                <div className="flex-1 p-4 lg:p-8 overflow-y-auto custom-scrollbar">
+                {isMobile && activeTab === 'menu' ? (
+                  <div className="space-y-4">
+                    <div className="p-6 flex flex-col items-center bg-zinc-900/50 rounded-3xl border border-white/5 mb-6">
+                      <div className="w-20 h-20 rounded-2xl gold-gradient p-0.5 shadow-xl shadow-gold/10 mb-4">
+                        <div className="w-full h-full bg-zinc-900 rounded-[18px] flex items-center justify-center overflow-hidden">
+                          {selectedUser.avatar_url ? (
+                            <img 
+                              src={selectedUser.avatar_url} 
+                              alt={selectedUser.username} 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="text-2xl font-black italic text-gold/40">
+                              {selectedUser.username[0].toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-black uppercase italic tracking-tight text-center">
+                        {selectedUser.first_name || selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.username}
+                      </h3>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-1">Athlete Profile</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      <button 
+                        onClick={() => setActiveTab('progress')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Training Stats</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('programs')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Calendar className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Training Program</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('builder')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Edit3 className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Program Builder</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('metrics')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Activity className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Body Metrics</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('workouts')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Dumbbell className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Workouts</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('composition')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Camera className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Body Comp</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('overview')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Overview</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('parq')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <ShieldAlert className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">PAR Q</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('nutrition')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Apple className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Nutrition</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('activity')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <History className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Activity Log</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('video')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Video className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Video Analysis</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('ai-tools')}
+                        className="w-full px-4 py-3 rounded-xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10"
+                      >
+                        <Zap className="w-4 h-4" /> AI Academy Lab
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('chat')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <MessageSquare className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Chat</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('feedback')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Star className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Feedback</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('settings')}
+                        className="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-gold transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                            <Settings className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-widest">Settings</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => setSelectedUser(null)}
+                      className="w-full py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 font-black uppercase tracking-widest text-xs mt-8"
+                    >
+                      Close Profile
+                    </button>
+                  </div>
+                ) : activeTab === 'progress' ? (
                   <ProgressTracker userId={selectedUser?.id || 0} isAdmin={true} />
                 ) : activeTab === 'chat' ? (
                   <AdminMessageDashboard adminId={adminId.toString()} />
@@ -1157,22 +1401,66 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                   </div>
                 ) : activeTab === 'programs' ? (
                   <div className="space-y-8">
-                    <ProgramViewer userId={selectedUser?.id?.toString() || '0'} onBack={() => setActiveTab('overview')} isAdmin={true} />
+                    <ProgramViewer 
+                      userId={selectedUser?.id?.toString() || '0'} 
+                      onBack={() => setActiveTab('overview')} 
+                      isAdmin={true} 
+                      onEdit={(program, isCustom) => {
+                        // When editing from the programs list, switch to builder tab
+                        // and pass the program to it
+                        setSelectedProgram(program);
+                        setIsCustomProgram(isCustom);
+                        setActiveTab('builder');
+                      }}
+                      onAssign={async (program) => {
+                        if (!selectedUser) return;
+                        try {
+                          const res = await fetch('/api/admin/assign-program', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              userId: selectedUser.id,
+                              programId: program.id,
+                              itemName: program.name,
+                              price: 0
+                            })
+                          });
+                          if (res.ok) {
+                            alert(`Program ${program.name} assigned to ${selectedUser.first_name} ${selectedUser.last_name}`);
+                          } else {
+                            alert("Failed to assign program");
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert("Failed to assign program");
+                        }
+                      }}
+                    />
                   </div>
                 ) : activeTab === 'builder' ? (
                   <div className="space-y-8">
-                    <ProgramBuilder userId={selectedUser?.id?.toString() || '0'} onSave={() => {
-                      // Log activity when a program is saved
-                      fetch('/api/activity', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          userId: selectedUser.id,
-                          action: 'admin_updated_program',
-                          details: JSON.stringify({ message: 'Admin built/updated a custom program' })
-                        })
-                      }).catch(console.error);
-                    }} />
+                    <ProgramBuilder 
+                      key={selectedUser?.id ? `builder-${selectedUser.id}-${selectedProgram?.id || 'new'}` : 'builder-none'}
+                      userId={selectedUser?.id?.toString() || '0'} 
+                      initialProgram={selectedProgram}
+                      isCustom={isCustomProgram}
+                      onSave={() => {
+                        // Log activity when a program is saved
+                        fetch('/api/activity', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            userId: selectedUser.id,
+                            action: 'admin_updated_program',
+                            details: JSON.stringify({ message: 'Admin built/updated a custom program' })
+                          })
+                        }).catch(console.error);
+                        
+                        // After saving, maybe we should refresh or show the programs list?
+                        // For now, let's just clear the selected program so it's ready for next one
+                        setSelectedProgram(undefined);
+                        setIsCustomProgram(false);
+                      }} />
                   </div>
                 ) : activeTab === 'video' ? (
                   <div className="space-y-8">
@@ -1186,14 +1474,17 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                   <div className="space-y-8">
                     <AthleteSettings user={selectedUser} onUpdate={(updated) => setSelectedUser(updated)} />
                   </div>
+                ) : activeTab === 'feedback' ? (
+                  <FeedbackViewer />
                 ) : (
                   <PARQ userId={selectedUser?.id?.toString() || '0'} initialReadOnly={false} />
                 )}
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
 
       {/* Exercise History Modal */}
       {selectedExercise && (

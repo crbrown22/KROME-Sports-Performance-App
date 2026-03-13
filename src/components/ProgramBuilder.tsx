@@ -17,7 +17,8 @@ import {
   TrendingUp,
   BarChart2,
   Layout,
-  Activity
+  Activity,
+  MoreHorizontal
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -282,7 +283,8 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                 notes: '',
                 nameOverride: '',
                 videoLinkOverride: '',
-                canGenerateVideo: true
+                canGenerateVideo: true,
+                collapsed: true
               };
               console.log("New exercise created:", newExercise);
               return { ...d, exercises: [...d.exercises, newExercise] };
@@ -402,6 +404,14 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
     }
 
     setSaving(true);
+    console.log("Saving program...", {
+      userId,
+      isCustom,
+      initialProgramId: initialProgram?.id,
+      programName: trimmedName,
+      weeksCount: weeks.length
+    });
+
     try {
       const phases: any[] = [{
         name: 'Custom Phase',
@@ -430,6 +440,8 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
       const method = (isCustom && initialProgram?.id) ? 'PATCH' : 'POST';
       const url = (isCustom && initialProgram?.id) ? `/api/custom-programs/${userId}/${initialProgram.id}` : `/api/custom-programs/${userId}`;
 
+      console.log(`Sending ${method} request to ${url}`);
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -440,13 +452,20 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
         })
       });
 
+      console.log("Save response status:", res.status);
+
       if (res.ok) {
+        const result = await res.json();
+        console.log("Save successful:", result);
         setMessage({ type: 'success', text: 'Program saved successfully!' });
         if (onSave) onSave();
       } else {
+        const errorText = await res.text();
+        console.error("Save failed:", errorText);
         throw new Error('Failed to save');
       }
     } catch (err) {
+      console.error("Error in handleSave:", err);
       setMessage({ type: 'error', text: 'Failed to save program' });
     } finally {
       setSaving(false);
@@ -539,65 +558,64 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
   });
 
   return (
-    <div className="w-full px-4 md:px-8 space-y-8">
+    <div className="w-full px-2 md:px-8 space-y-4 md:space-y-8">
       {onBack && (
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+          className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all px-2"
         >
-          <ChevronLeft className="w-4 h-4" /> Back
+          <ChevronLeft className="w-3 h-3 md:w-4 md:h-4" /> Back
         </button>
       )}
-      <header className="bg-zinc-900/50 p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-white/5 shadow-2xl">
-        <div className="flex flex-col gap-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold shrink-0">
+      <header className="bg-zinc-900/50 p-4 md:p-8 rounded-[24px] md:rounded-[40px] border border-white/5 shadow-2xl">
+        <div className="flex flex-col gap-4 md:gap-6">
+          <div className="space-y-3 md:space-y-4">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gold/10 flex items-center justify-center text-gold shrink-0">
                 <Layout className="w-4 h-4 md:w-5 md:h-5" />
               </div>
               <input 
                 type="text" 
-                placeholder="Program Name (e.g., 52-Week Elite Soccer)"
-                className="text-xl md:text-2xl font-black uppercase italic bg-transparent border-b-2 border-white/10 focus:border-gold outline-none w-full pb-2 text-white transition-all"
+                placeholder="Program Name"
+                className="text-lg md:text-2xl font-black uppercase italic bg-transparent border-b-2 border-white/10 focus:border-gold outline-none w-full pb-1 md:pb-2 text-white transition-all"
                 value={programName}
                 onChange={(e) => {
                   console.log("Program name changed to:", e.target.value);
                   setProgramName(e.target.value);
                 }}
-                onBlur={(e) => console.log("Program name blurred:", e.target.value)}
                 aria-label="Program Name"
               />
             </div>
             <textarea 
-              placeholder="Program Description (Goals, focus areas, equipment needed...)"
-              className="w-full bg-transparent text-white/60 outline-none resize-none h-16 md:h-20 text-sm md:text-base leading-relaxed"
+              placeholder="Program Description (Goals, focus areas...)"
+              className="w-full bg-transparent text-white/60 outline-none resize-none h-12 md:h-20 text-xs md:text-base leading-relaxed"
               value={programDescription}
               onChange={(e) => setProgramDescription(e.target.value)}
               aria-label="Program Description"
             />
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
-            <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 md:pt-4 border-t border-white/5">
+            <div className="flex bg-black/40 p-1 rounded-xl md:rounded-2xl border border-white/5 w-full sm:w-auto">
               <button 
                 onClick={() => setActiveView('builder')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'builder' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
+                className={`flex-1 sm:flex-none px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'builder' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
               >
-                <Dumbbell className="w-3.5 h-3.5" /> Builder
+                <Dumbbell className="w-3 md:w-3.5 h-3 md:h-3.5" /> Builder
               </button>
               <button 
                 onClick={() => setActiveView('analytics')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'analytics' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
+                className={`flex-1 sm:flex-none px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'analytics' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
               >
-                <TrendingUp className="w-3.5 h-3.5" /> Analytics
+                <TrendingUp className="w-3 md:w-3.5 h-3 md:h-3.5" /> Analytics
               </button>
             </div>
             <button 
               onClick={handleSave}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-3 bg-gold text-black font-black uppercase tracking-widest text-[10px] rounded-xl flex items-center justify-center gap-2 hover:bg-gold/90 transition-all disabled:opacity-50 shadow-lg shadow-gold/10 krome-outline"
+              className="w-full sm:w-auto px-5 md:px-6 py-2.5 md:py-3 bg-gold text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] rounded-lg md:rounded-xl flex items-center justify-center gap-2 hover:bg-gold/90 transition-all disabled:opacity-50 shadow-lg shadow-gold/10 krome-outline"
             >
-              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? <RefreshCw className="w-3.5 md:w-4 h-3.5 md:h-4 animate-spin" /> : <Save className="w-3.5 md:w-4 h-3.5 md:h-4" />}
               {saving ? 'Saving...' : 'Save Program'}
             </button>
           </div>
@@ -808,14 +826,14 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          className="px-6 md:px-8 pb-8 space-y-8"
+                          className="px-4 md:px-6 pb-8"
                         >
                           <Droppable droppableId={`week-${week.id}`} direction="horizontal" type="day">
                             {(provided) => (
                               <div 
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
-                                className="flex flex-wrap gap-2 pt-4 border-t border-white/5"
+                                className="flex gap-6 overflow-x-auto pb-6 pt-4 custom-scrollbar min-h-[400px]"
                               >
                                 {week.days.map((day, index) => (
                                   <Draggable key={day.id} draggableId={`day-${day.id}`} index={index}>
@@ -823,14 +841,189 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                                       <div
                                         ref={provided.innerRef}
                                         {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
+                                        className="flex-none w-80 bg-zinc-900/40 border border-white/5 rounded-[32px] p-4 flex flex-col h-fit max-h-[80vh]"
                                       >
-                                        <button
-                                          onClick={() => setActiveDayId(day.id)}
-                                          className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeDayId === day.id ? 'bg-accent text-black shadow-lg shadow-accent/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                                        <div {...provided.dragHandleProps} className="flex justify-between items-center mb-6 px-2 cursor-grab active:cursor-grabbing">
+                                          <div className="flex-1 mr-2">
+                                            <input 
+                                              type="text"
+                                              value={day.title}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                setWeeks(weeks.map(w => w.id === week.id ? {
+                                                  ...w,
+                                                  days: w.days.map(d => d.id === day.id ? { ...d, title: e.target.value } : d)
+                                                } : w));
+                                              }}
+                                              className="bg-transparent border-b border-transparent hover:border-white/10 text-sm font-black uppercase italic tracking-widest outline-none focus:border-gold pb-1 text-white w-full transition-all"
+                                            />
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded-full font-black">
+                                              {day.exercises.length}
+                                            </span>
+                                            <button 
+                                              onClick={() => { setDeleteTarget({ type: 'day', weekId: week.id, dayId: day.id }); setShowDeleteConfirm(true); }}
+                                              className="p-1.5 text-white/20 hover:text-rose-500 transition-colors"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <Droppable droppableId={`exercises-${week.id}-day-${day.id}`} type="exercise">
+                                          {(provided) => (
+                                            <div 
+                                              ref={provided.innerRef}
+                                              {...provided.droppableProps}
+                                              className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 min-h-[50px]"
+                                            >
+                                              {day.exercises.map((ex, exIndex) => (
+                                                <Draggable key={ex.id} draggableId={`exercise-${ex.id}`} index={exIndex}>
+                                                  {(provided) => (
+                                                    <div
+                                                      ref={provided.innerRef}
+                                                      {...provided.draggableProps}
+                                                      {...provided.dragHandleProps}
+                                                    >
+                                                      <motion.div 
+                                                        layout
+                                                        className={`bg-zinc-900 border ${ex.collapsed ? 'border-white/5' : 'border-gold/30 shadow-lg shadow-gold/5'} rounded-2xl p-4 cursor-pointer hover:border-gold/50 transition-all group relative`}
+                                                        onClick={() => toggleExerciseCollapse(week.id, day.id, ex.id)}
+                                                      >
+                                                        <div className="flex justify-between items-start mb-2">
+                                                          <div className="flex-1">
+                                                            <h5 className="font-black text-xs uppercase italic text-white group-hover:text-gold transition-colors line-clamp-1">
+                                                              {ex.nameOverride || EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.name || 'Unknown Exercise'}
+                                                            </h5>
+                                                            <div className="text-[9px] font-black uppercase tracking-widest text-white/30 mt-0.5">
+                                                              {EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.category || 'General'}
+                                                            </div>
+                                                          </div>
+                                                          <div className="relative" onClick={e => e.stopPropagation()}>
+                                                            <button 
+                                                              onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const menu = document.getElementById(`ex-menu-${ex.id}`);
+                                                                if (menu) menu.classList.toggle('hidden');
+                                                              }}
+                                                              className="p-1 text-white/20 hover:text-white"
+                                                            >
+                                                              <MoreHorizontal className="w-4 h-4" />
+                                                            </button>
+                                                            <div id={`ex-menu-${ex.id}`} className="absolute right-0 top-full mt-2 w-40 bg-zinc-800 border border-white/10 rounded-xl shadow-xl hidden z-20 overflow-hidden">
+                                                              <button 
+                                                                onClick={() => {
+                                                                  toggleExerciseCollapse(week.id, day.id, ex.id);
+                                                                  document.getElementById(`ex-menu-${ex.id}`)?.classList.add('hidden');
+                                                                }}
+                                                                className="w-full text-left px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-colors"
+                                                              >
+                                                                {ex.collapsed ? 'Expand' : 'Collapse'}
+                                                              </button>
+                                                              <button 
+                                                                onClick={() => {
+                                                                  setDeleteTarget({ type: 'exercise', weekId: week.id, dayId: day.id, exerciseId: ex.id });
+                                                                  setShowDeleteConfirm(true);
+                                                                  document.getElementById(`ex-menu-${ex.id}`)?.classList.add('hidden');
+                                                                }}
+                                                                className="w-full text-left px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                                              >
+                                                                Delete
+                                                              </button>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+
+                                                        {ex.collapsed ? (
+                                                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                                                            <div className="flex gap-3">
+                                                              <div className="flex flex-col">
+                                                                <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">Sets x Reps</span>
+                                                                <span className="text-[10px] font-bold text-emerald-400">{ex.sets} x {ex.reps}</span>
+                                                              </div>
+                                                              {ex.rest && (
+                                                                <div className="flex flex-col">
+                                                                  <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">Rest</span>
+                                                                  <span className="text-[10px] font-bold text-white/60">{ex.rest}</span>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                            <Activity className="w-3 h-3 text-gold/20" />
+                                                          </div>
+                                                        ) : (
+                                                          <div className="space-y-4 mt-4 pt-4 border-t border-white/10" onClick={e => e.stopPropagation()}>
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                              <div className="space-y-1">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Sets</label>
+                                                                <input 
+                                                                  type="text" 
+                                                                  value={ex.sets}
+                                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'sets', e.target.value)}
+                                                                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-bold text-white focus:border-gold outline-none transition-all"
+                                                                />
+                                                              </div>
+                                                              <div className="space-y-1">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Reps</label>
+                                                                <input 
+                                                                  type="text" 
+                                                                  value={ex.reps}
+                                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'reps', e.target.value)}
+                                                                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-bold text-white focus:border-gold outline-none transition-all"
+                                                                />
+                                                              </div>
+                                                              <div className="space-y-1">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Tempo</label>
+                                                                <input 
+                                                                  type="text" 
+                                                                  value={ex.tempo}
+                                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'tempo', e.target.value)}
+                                                                  placeholder="3-1-1"
+                                                                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-bold text-white focus:border-gold outline-none transition-all"
+                                                                />
+                                                              </div>
+                                                              <div className="space-y-1">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Rest</label>
+                                                                <input 
+                                                                  type="text" 
+                                                                  value={ex.rest}
+                                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'rest', e.target.value)}
+                                                                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-bold text-white focus:border-gold outline-none transition-all"
+                                                                />
+                                                              </div>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                              <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Notes</label>
+                                                              <textarea 
+                                                                value={ex.notes}
+                                                                onChange={(e) => updateExercise(week.id, day.id, ex.id, 'notes', e.target.value)}
+                                                                placeholder="Add coaching cues..."
+                                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-bold text-white focus:border-gold outline-none transition-all min-h-[60px] resize-none"
+                                                              />
+                                                            </div>
+                                                            <button 
+                                                              onClick={() => toggleExerciseCollapse(week.id, day.id, ex.id)}
+                                                              className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-white/40 transition-all"
+                                                            >
+                                                              Close Details
+                                                            </button>
+                                                          </div>
+                                                        )}
+                                                      </motion.div>
+                                                    </div>
+                                                  )}
+                                                </Draggable>
+                                              ))}
+                                              {provided.placeholder}
+                                            </div>
+                                          )}
+                                        </Droppable>
+
+                                        <button 
+                                          onClick={() => setIsAddingExercise({ weekId: week.id, dayId: day.id })}
+                                          className="mt-4 w-full py-3 border border-dashed border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/20 hover:text-gold hover:border-gold/30 hover:bg-gold/5 transition-all flex items-center justify-center gap-2"
                                         >
-                                          {day.title}
-                                          <span className="w-4 h-4 rounded bg-black/20 flex items-center justify-center text-[8px]">{day.exercises.length}</span>
+                                          <Plus className="w-3 h-3" /> Add Exercise
                                         </button>
                                       </div>
                                     )}
@@ -840,153 +1033,20 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                                 {week.days.length < 7 && (
                                   <button 
                                     onClick={() => {
-                                      console.log("Add Day button clicked");
                                       setTargetWeekId(week.id);
                                       setIsAddingWorkout(true);
                                     }}
-                                    className="px-5 py-2.5 rounded-xl bg-white/5 text-gold hover:bg-gold/10 transition-all flex items-center gap-2 font-black uppercase text-[10px] tracking-widest border border-gold/20 border-dashed"
+                                    className="flex-none w-80 h-[200px] border-2 border-dashed border-white/5 rounded-[32px] bg-zinc-900/10 hover:bg-zinc-900/20 hover:border-gold/20 transition-all flex flex-col items-center justify-center gap-4 group"
                                   >
-                                    <Plus className="w-3 h-3" /> Add Day
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/20 group-hover:bg-gold/10 group-hover:text-gold transition-all">
+                                      <Plus className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20 group-hover:text-gold transition-all">Add Training Day</span>
                                   </button>
                                 )}
                               </div>
                             )}
                           </Droppable>
-
-                          {week.days.map((day) => activeDayId === day.id && (
-                            <div key={day.id} className="space-y-6">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <input 
-                                  type="text"
-                                  value={day.title}
-                                  onChange={(e) => {
-                                    setWeeks(weeks.map(w => w.id === week.id ? {
-                                      ...w,
-                                      days: w.days.map(d => d.id === day.id ? { ...d, title: e.target.value } : d)
-                                    } : w));
-                                  }}
-                                  className="bg-transparent border-b-2 border-white/5 text-xl md:text-2xl font-black uppercase italic tracking-tighter outline-none focus:border-gold pb-2 text-white w-full max-w-md transition-all"
-                                />
-                                <div className="flex items-center gap-4">
-                                  <div className="text-[10px] font-black uppercase tracking-widest text-white/20">Day Configuration</div>
-                                  <button 
-                                    onClick={() => { setDeleteTarget({ type: 'day', weekId: week.id, dayId: day.id }); setShowDeleteConfirm(true); }}
-                                    className="w-8 h-8 rounded-lg bg-rose-500/5 text-rose-500/30 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0"
-                                    aria-label="Delete Day"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <Droppable droppableId={`exercises-${week.id}-day-${day.id}`} type="exercise">
-                                {(provided) => (
-                                  <div 
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                    className="space-y-4"
-                                  >
-                                    {day.exercises.length === 0 && (
-                                      <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-[24px] bg-black/20">
-                                        <Dumbbell className="w-10 h-10 text-white/5 mx-auto mb-4" />
-                                        <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">No exercises added yet</p>
-                                      </div>
-                                    )}
-                                    {day.exercises.map((ex, index) => (
-                                      <Draggable key={ex.id} draggableId={`exercise-${ex.id}`} index={index}>
-                                        {(provided) => (
-                                          <div
-                                            ref={provided.innerRef}
-                                            {...provided.draggableProps}
-                                            {...provided.dragHandleProps}
-                                          >
-                                            <motion.div 
-                                              layout
-                                              className="bg-zinc-900 border border-white/10 p-6 rounded-2xl space-y-4 hover:border-gold/50 transition-all group relative cursor-pointer"
-                                            >
-                                              <div className="flex items-center justify-between gap-4">
-                                                  <div className="flex items-center gap-4">
-                                                    <button 
-                                                      onClick={() => toggleExerciseCollapse(week.id, day.id, ex.id)}
-                                                      className="w-10 h-10 rounded-xl bg-gold/5 flex items-center justify-center text-gold shrink-0 hover:bg-gold/10 transition-all"
-                                                    >
-                                                      {ex.collapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                                                    </button>
-                                                    <div>
-                                                      <span className="text-sm font-black uppercase italic text-white">{ex.nameOverride || EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.name || 'Unknown Exercise'}</span>
-                                                      <div className="text-[10px] font-black uppercase tracking-widest text-white/30">{EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.category || 'General'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <button 
-                                                    onClick={() => { setDeleteTarget({ type: 'exercise', weekId: week.id, dayId: day.id, exerciseId: ex.id }); setShowDeleteConfirm(true); }}
-                                                    className="w-8 h-8 rounded-lg bg-rose-500/5 text-rose-500/30 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0"
-                                                  >
-                                                    <Trash2 className="w-4 h-4" />
-                                                  </button>
-                                                </div>
-
-                                                {!ex.collapsed && (
-                                                  <div className="flex flex-col gap-4">
-                                                  <div className="space-y-1">
-                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Sets</label>
-                                                    <input 
-                                                      type="text" 
-                                                      value={ex.sets}
-                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'sets', e.target.value)}
-                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                                    />
-                                                  </div>
-                                                  <div className="space-y-1">
-                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Reps</label>
-                                                    <input 
-                                                      type="text" 
-                                                      value={ex.reps}
-                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'reps', e.target.value)}
-                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                                    />
-                                                  </div>
-                                                  <div className="space-y-1">
-                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Tempo</label>
-                                                    <input 
-                                                      type="text" 
-                                                      value={ex.tempo}
-                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'tempo', e.target.value)}
-                                                      placeholder="3-1-1"
-                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                                    />
-                                                  </div>
-                                                  <div className="space-y-1">
-                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Rest</label>
-                                                    <input 
-                                                      type="text" 
-                                                      value={ex.rest}
-                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'rest', e.target.value)}
-                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                                    />
-                                                  </div>
-                                                </div>
-                                                )}
-                                              <div className="space-y-1">
-                                                <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Coaching Cues & Notes</label>
-                                                <input 
-                                                  type="text" 
-                                                  value={ex.notes}
-                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'notes', e.target.value)}
-                                                  placeholder="Add specific cues or personal performance notes..."
-                                                  className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                                />
-                                              </div>
-                                            </motion.div>
-                                          </div>
-                                        )}
-                                      </Draggable>
-                                    ))}
-                                    {provided.placeholder}
-                                  </div>
-                                )}
-                              </Droppable>
-                            </div>
-                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>

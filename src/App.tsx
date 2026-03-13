@@ -94,7 +94,7 @@ const programs = [
   }
 ];
 
-type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings';
+type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'myPrograms' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings';
 
 const programPrices: Record<string, number> = {
   'soccer-52-week': 99.99,
@@ -121,6 +121,8 @@ export default function App() {
     setViewStack(prev => [...prev, view]);
   };
 
+  const setCurrentView = navigateTo;
+
   const goBack = () => {
     if (viewStack.length > 1) {
       setViewStack(prev => prev.slice(0, -1));
@@ -132,9 +134,6 @@ export default function App() {
   const resetToView = (view: View) => {
     setViewStack([view]);
   };
-
-  // For compatibility with existing code during refactor
-  const setCurrentView = (view: View) => navigateTo(view);
 
   const [selectedProgramId, setSelectedProgramId] = useState<string | undefined>(undefined);
   const [selectedProgram, setSelectedProgram] = useState<any | undefined>(undefined);
@@ -229,15 +228,10 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      console.log("App user effect, parq_completed:", user.parq_completed, typeof user.parq_completed);
-      if (user.parq_completed == 0) {
-        resetToView('profile');
-      } else {
-        resetToView('home');
-      }
+    if (user && user.parq_completed == 0 && currentView !== 'parq' && currentView !== 'profile') {
+      resetToView('profile');
     }
-  }, [user]);
+  }, [user, currentView]);
 
   useEffect(() => {
     if (user) {
@@ -272,18 +266,18 @@ export default function App() {
   const handleProgramClick = (id: string) => {
     if (id === 'flexibility') {
       setSelectedProgramId('lower-back-rehab');
-      setCurrentView('programViewer');
+      navigateTo('programViewer');
     } else if (id === 'strength') {
       setSelectedProgramId('soccer-52-week');
-      setCurrentView('programViewer');
+      navigateTo('programViewer');
     } else if (id === 'conditioning') {
       setSelectedProgramId('softball-52-week');
-      setCurrentView('programViewer');
+      navigateTo('programViewer');
     } else if (id === 'aerobic') {
       setSelectedProgramId('baseball-52-week');
-      setCurrentView('programViewer');
+      navigateTo('programViewer');
     } else if (id === 'specialized') {
-      setCurrentView('specializedLanding');
+      navigateTo('specializedLanding');
     }
   };
 
@@ -316,11 +310,11 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <div 
             className="flex items-center gap-2 cursor-pointer" 
-            onClick={() => setCurrentView('home')}
+            onClick={() => navigateTo('home')}
             role="button"
             aria-label="KROME Sports Home"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentView('home'); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
           >
             <img src="/logo.png" alt="KROME Sports Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
             <span className="text-xl font-black tracking-tighter uppercase italic">
@@ -330,7 +324,7 @@ export default function App() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-widest">
-            <a href="#" onClick={() => setCurrentView('home')} className="hover:text-gold transition-colors !outline-none hover:krome-outline px-2 py-1 rounded-lg">Home</a>
+            <a href="#" onClick={() => navigateTo('home')} className="hover:text-gold transition-colors !outline-none hover:krome-outline px-2 py-1 rounded-lg">Home</a>
             
             <div 
               className="relative group"
@@ -357,7 +351,7 @@ export default function App() {
                   >
                     <div className="flex flex-col gap-1 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
                       <button 
-                        onClick={() => { setCurrentView('programCatalog'); setProgramsDropdownOpen(false); }}
+                        onClick={() => { navigateTo('programCatalog'); setProgramsDropdownOpen(false); }}
                         className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">52 Week Program</div>
@@ -365,7 +359,7 @@ export default function App() {
                       </button>
 
                       <button 
-                        onClick={() => { setCurrentView('specializedLanding'); setProgramsDropdownOpen(false); }}
+                        onClick={() => { navigateTo('specializedLanding'); setProgramsDropdownOpen(false); }}
                         className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Specialized Training</div>
@@ -383,7 +377,7 @@ export default function App() {
               onMouseLeave={() => setShopDropdownOpen(false)}
             >
               <button 
-                onClick={() => { setShopCategory('all'); setCurrentView('shop'); setShopDropdownOpen(false); }}
+                onClick={() => { setShopCategory('all'); navigateTo('shop'); setShopDropdownOpen(false); }}
                 className="flex items-center gap-1 hover:text-gold transition-colors uppercase tracking-widest !outline-none hover:krome-outline px-2 py-1 rounded-lg"
                 aria-expanded={shopDropdownOpen}
                 aria-haspopup="true"
@@ -403,13 +397,13 @@ export default function App() {
                   >
                     <div className="flex flex-col gap-1">
                       <button 
-                        onClick={() => { setShopCategory('programs'); setCurrentView('shop'); setShopDropdownOpen(false); }}
+                        onClick={() => { setShopCategory('programs'); navigateTo('shop'); setShopDropdownOpen(false); }}
                         className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Programs</div>
                       </button>
                       <button 
-                        onClick={() => { setShopCategory('apparel'); setCurrentView('shop'); setShopDropdownOpen(false); }}
+                        onClick={() => { setShopCategory('apparel'); navigateTo('shop'); setShopDropdownOpen(false); }}
                         className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Apparel</div>
@@ -424,7 +418,7 @@ export default function App() {
               href="#" 
               onClick={(e) => {
                 e.preventDefault();
-                setCurrentView('contact');
+                navigateTo('contact');
               }} 
               className="hover:text-gold transition-colors !outline-none hover:krome-outline px-2 py-1 rounded-lg"
             >
@@ -434,7 +428,7 @@ export default function App() {
             
             {user?.role === 'admin' && (
               <button 
-                onClick={() => setCurrentView('admin')}
+                onClick={() => navigateTo('admin')}
                 className="text-gold hover:text-white transition-colors flex items-center gap-2 !outline-none hover:krome-outline px-2 py-1 rounded-lg"
               >
                 <Shield className="w-4 h-4" /> Admin
@@ -444,14 +438,14 @@ export default function App() {
             <NotificationIcon 
               userId={user?.id}
               onOpenChat={() => setShowChat(true)} 
-              onOpenAdminChat={() => { setAdminInitialTab('chat'); setCurrentView('admin'); localStorage.setItem('krome_admin_active_tab', 'chat'); }}
+              onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); localStorage.setItem('krome_admin_active_tab', 'chat'); }}
               isAdmin={user?.role === 'admin'}
               unreadCount={unreadCount}
             />
 
             {user ? (
               <button 
-                onClick={() => setCurrentView('profile')}
+                onClick={() => navigateTo('profile')}
                 className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-full hover:bg-white/10 transition-all group krome-outline"
               >
                 <div className="w-6 h-6 rounded-full gold-gradient flex items-center justify-center text-black overflow-hidden relative">
@@ -476,7 +470,7 @@ export default function App() {
               </button>
             ) : (
               <button 
-                onClick={() => { setAuthMode('login'); setCurrentView('auth'); }}
+                onClick={() => { setAuthMode('login'); navigateTo('auth'); }}
                 className="btn-gold !py-2 !px-6 !text-xs !outline-none"
               >
                 Login
@@ -504,23 +498,23 @@ export default function App() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden absolute top-full left-0 w-full bg-black/95 border-b border-white/10 p-6 flex flex-col gap-4 text-center uppercase font-bold tracking-widest overflow-y-auto max-h-[80vh]"
             >
-              <a href="#" onClick={() => { setCurrentView('home'); setMobileMenuOpen(false); }} className="!outline-none">About</a>
-              <a href="#" onClick={() => { setCurrentView('contact'); setMobileMenuOpen(false); }} className="!outline-none">Contact</a>
+              <a href="#" onClick={() => { navigateTo('home'); setMobileMenuOpen(false); }} className="!outline-none">About</a>
+              <a href="#" onClick={() => { navigateTo('contact'); setMobileMenuOpen(false); }} className="!outline-none">Contact</a>
               
               <div className="text-[10px] text-white/30 mt-4 border-b border-white/5 pb-2">Programs</div>
-              <a href="#" onClick={() => { setCurrentView('programCatalog'); setMobileMenuOpen(false); }} className="text-gold !outline-none">52 Week Program</a>
-              <a href="#" onClick={() => { setCurrentView('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Specialized Training</a>
+              <a href="#" onClick={() => { navigateTo('programCatalog'); setMobileMenuOpen(false); }} className="text-gold !outline-none">52 Week Program</a>
+              <a href="#" onClick={() => { navigateTo('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Specialized Training</a>
 
               <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-4">
-              <a href="#" onClick={() => { setShopCategory('all'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Shop</a>
-              <a href="#" onClick={() => { setShopCategory('programs'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Programs</a>
-              <a href="#" onClick={() => { setShopCategory('apparel'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Apparel</a>
+              <a href="#" onClick={() => { setShopCategory('all'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Shop</a>
+              <a href="#" onClick={() => { setShopCategory('programs'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Programs</a>
+              <a href="#" onClick={() => { setShopCategory('apparel'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Apparel</a>
 
                 {user?.role === 'admin' && (
-                  <button onClick={() => { setCurrentView('admin'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Admin Dashboard</button>
+                  <button onClick={() => { navigateTo('admin'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Admin Dashboard</button>
                 )}
                 {user ? (
-                  <button onClick={() => { setCurrentView('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto !outline-none">
+                  <button onClick={() => { navigateTo('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto !outline-none">
                     Profile
                     {unreadCount > 0 && (
                       <span className="flex h-2 w-2">
@@ -530,7 +524,7 @@ export default function App() {
                     )}
                   </button>
                 ) : (
-                  <button onClick={() => { setAuthMode('login'); setCurrentView('auth'); setMobileMenuOpen(false); }} className="btn-gold !outline-none">Login</button>
+                  <button onClick={() => { setAuthMode('login'); navigateTo('auth'); setMobileMenuOpen(false); }} className="btn-gold !outline-none">Login</button>
                 )}
               </div>
             </motion.div>
@@ -607,8 +601,8 @@ export default function App() {
                     Elite sports performance training designed to build strength, speed, and durability.
                   </p>
                   <div className="flex flex-col md:flex-row gap-4 justify-center">
-                    <button className="btn-gold text-lg" onClick={() => setCurrentView('programCatalog')}>Start Training</button>
-                    <button className="btn-outline-accent text-lg" onClick={() => setCurrentView('programCatalog')}>View Programs</button>
+                    <button className="btn-gold text-lg" onClick={() => navigateTo('programCatalog')}>Start Training</button>
+                    <button className="btn-outline-accent text-lg" onClick={() => navigateTo('programCatalog')}>View Programs</button>
                   </div>
                 </motion.div>
               </div>
@@ -626,7 +620,7 @@ export default function App() {
 
             {/* Programs Section */}
             <section className="py-24 bg-zinc-950 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#b2d8d8]/5 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[var(--color-accent)]/5 to-transparent pointer-events-none" />
               <div className="max-w-7xl mx-auto px-6 relative z-10">
                 <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
                   <div>
@@ -675,7 +669,7 @@ export default function App() {
 
             {/* Video Section */}
             <section className="py-24 bg-black relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[#b2d8d8]/5 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[var(--color-accent)]/5 to-transparent pointer-events-none" />
               <div className="max-w-7xl mx-auto px-6 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                   <motion.div
@@ -751,16 +745,40 @@ export default function App() {
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
-                setCurrentView('auth');
+                navigateTo('auth');
                 return;
               }
               if (locked) {
                 setSelectedProgram(program);
-                setCurrentView('productDescription');
+                navigateTo('productDescription');
                 return;
               }
               setSelectedProgramId(program.id);
-              setCurrentView('programViewer');
+              navigateTo('programViewer');
+            }}
+          />
+        )}
+
+        {currentView === 'myPrograms' && (
+          <ProgramCatalog 
+            key="myPrograms"
+            userId={user?.id || 'guest'}
+            isAdmin={user?.role === 'admin'}
+            type="myPrograms"
+            onBack={goBack}
+            onSelectProgram={(program, locked) => {
+              if (locked && !user) {
+                setAuthMode('login');
+                navigateTo('auth');
+                return;
+              }
+              if (locked) {
+                setSelectedProgram(program);
+                navigateTo('productDescription');
+                return;
+              }
+              setSelectedProgramId(program.id);
+              navigateTo('programViewer');
             }}
           />
         )}
@@ -775,16 +793,16 @@ export default function App() {
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
-                setCurrentView('auth');
+                navigateTo('auth');
                 return;
               }
               if (locked) {
                 setSelectedProgram(program);
-                setCurrentView('productDescription');
+                navigateTo('productDescription');
                 return;
               }
               setSelectedProgramId(program.id);
-              setCurrentView('programViewer');
+              navigateTo('programViewer');
             }}
           />
         )}
@@ -799,16 +817,16 @@ export default function App() {
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
-                setCurrentView('auth');
+                navigateTo('auth');
                 return;
               }
               if (locked) {
                 setSelectedProgram(program);
-                setCurrentView('productDescription');
+                navigateTo('productDescription');
                 return;
               }
               setSelectedProgramId(program.id);
-              setCurrentView('programViewer');
+              navigateTo('programViewer');
             }}
           />
         )}
@@ -821,16 +839,16 @@ export default function App() {
               if (num <= 5) {
                 setSelectedProgramId('soccer-52-week');
                 setSelectedPhaseIdx(num - 1);
-                setCurrentView('programViewer');
+                navigateTo('programViewer');
               } else if (num === 6) {
                 setSpecializedType('speed');
-                setCurrentView('specialized');
+                navigateTo('specialized');
               } else if (num === 7) {
                 setSpecializedType('movement');
-                setCurrentView('specialized');
+                navigateTo('specialized');
               } else if (num === 8) {
                 setSpecializedType('nutrition');
-                setCurrentView('specialized');
+                navigateTo('specialized');
               }
             }}
           />
@@ -841,7 +859,7 @@ export default function App() {
             key="movementLanding"
             onBack={goBack}
             onStartProgram={() => {
-              setCurrentView('movementPrograms');
+              navigateTo('movementPrograms');
             }}
           />
         )}
@@ -852,7 +870,7 @@ export default function App() {
             onBack={goBack}
             onStartProgram={() => {
               setSpecializedType('nutrition');
-              setCurrentView('specialized');
+              navigateTo('specialized');
             }}
           />
         )}
@@ -862,7 +880,7 @@ export default function App() {
             key="breakProgramsLanding"
             onBack={goBack}
             onStartProgram={() => {
-              setCurrentView('breakPrograms');
+              navigateTo('breakPrograms');
             }}
           />
         )}
@@ -872,7 +890,7 @@ export default function App() {
             key="specializedLanding"
             onBack={goBack}
             onNavigate={(view) => {
-              setCurrentView(view as View);
+              navigateTo(view as View);
             }}
           />
         )}
@@ -882,7 +900,7 @@ export default function App() {
             key={`specialized-${specializedType}`}
             type={specializedType} 
             onBack={goBack} 
-            onNavigate={(view) => setCurrentView(view as View)}
+            onNavigate={(view) => navigateTo(view as View)}
           />
         )}
 
@@ -906,10 +924,10 @@ export default function App() {
               localStorage.setItem('krome_user', JSON.stringify(updated));
             }}
             onDelete={handleLogout}
-            onNavigate={(view) => setCurrentView(view as View)}
+            onNavigate={(view) => navigateTo(view as View)}
             onProgramSelect={(programId) => {
               setSelectedProgramId(programId);
-              setCurrentView('programViewer');
+              navigateTo('programViewer');
             }}
             initialTab={user.parq_completed === 0 ? 'parq' : 'workouts'}
           />
@@ -919,7 +937,7 @@ export default function App() {
           <div className="pt-24 px-6 max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-8">
               <button 
-                onClick={() => setCurrentView('profile')}
+                onClick={() => navigateTo('profile')}
                 className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
               >
                 <ChevronLeft className="w-4 h-4" /> Back to Profile
@@ -941,7 +959,7 @@ export default function App() {
           <div className="pt-24 px-6 max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-8">
               <button 
-                onClick={() => setCurrentView('profile')}
+                onClick={() => navigateTo('profile')}
                 className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
               >
                 <ChevronLeft className="w-4 h-4" /> Back to Profile
@@ -1097,7 +1115,7 @@ export default function App() {
                 const updatedUser = { ...user, parq_completed: 1 };
                 setUser(updatedUser);
                 localStorage.setItem('krome_user', JSON.stringify(updatedUser));
-                resetToView('profile');
+                goBack();
               }}
             />
           </div>
@@ -1174,7 +1192,7 @@ export default function App() {
             userId={user?.id || ''} 
             onRedirectToLogin={() => {
               setAuthMode('login');
-              setCurrentView('auth');
+              navigateTo('auth');
             }}
             initialCategory={shopCategory} 
           />
@@ -1183,7 +1201,7 @@ export default function App() {
         {currentView === 'contact' && (
           <Contact 
             onBack={goBack} 
-            onNavigateToRegister={() => { setAuthMode('register'); setCurrentView('auth'); }}
+            onNavigateToRegister={() => { setAuthMode('register'); navigateTo('auth'); }}
             user={user}
           />
         )}
@@ -1200,17 +1218,17 @@ export default function App() {
 
                 if (!isPurchased && !isAdmin) {
                   setSelectedProgram(program);
-                  setCurrentView('productDescription');
+                  navigateTo('productDescription');
                   return;
                 }
                 
                 setSelectedProgramId('lower-back-rehab');
                 setSelectedPhaseIdx(0);
-                setCurrentView('programViewer');
+                navigateTo('programViewer');
               }}
             />
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={() => navigateTo('home')} onLoginSuccess={handleLoginSuccess} />
           )
         )}
 
@@ -1471,7 +1489,7 @@ export default function App() {
                 role="button"
                 aria-label="KROME Sports Home"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentView('home'); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
               >
                 <img src="/logo.png" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
                 <span className="text-lg font-black tracking-tighter uppercase italic">
@@ -1498,10 +1516,10 @@ export default function App() {
               <div>
                 <h5 className="font-bold uppercase tracking-widest text-xs text-white/60 mb-6">Quick Links</h5>
                 <ul className="flex flex-row gap-6 text-sm font-medium">
-                  <li><a href="#" onClick={() => setCurrentView('home')} className="hover:text-accent transition-colors">About Us</a></li>
-                  <li><a href="#" onClick={() => setCurrentView('programCatalog')} className="hover:text-accent transition-colors">Programs</a></li>
-                  <li><a href="#" onClick={() => { setShopCategory('all'); setCurrentView('shop'); }} className="hover:text-accent transition-colors">Shop</a></li>
-                  <li><a href="#" onClick={() => setCurrentView('contact')} className="hover:text-accent transition-colors">Contact</a></li>
+                  <li><a href="#" onClick={() => navigateTo('home')} className="hover:text-accent transition-colors">About Us</a></li>
+                  <li><a href="#" onClick={() => navigateTo('programCatalog')} className="hover:text-accent transition-colors">Programs</a></li>
+                  <li><a href="#" onClick={() => { setShopCategory('all'); navigateTo('shop'); }} className="hover:text-accent transition-colors">Shop</a></li>
+                  <li><a href="#" onClick={() => navigateTo('contact')} className="hover:text-accent transition-colors">Contact</a></li>
                 </ul>
               </div>
             </div>

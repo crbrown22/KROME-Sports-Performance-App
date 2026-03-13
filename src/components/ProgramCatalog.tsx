@@ -18,7 +18,7 @@ interface ProgramCatalogProps {
   isAdmin?: boolean;
   onBack: () => void;
   onSelectProgram: (program: FullProgramTemplate, locked: boolean) => void;
-  type?: 'all' | 'breaks' | 'movement';
+  type?: 'all' | 'breaks' | 'movement' | 'myPrograms';
 }
 
 export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSelectProgram, type = 'all' }: ProgramCatalogProps) {
@@ -33,8 +33,8 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
         const res = await fetch(`/api/purchases/${userId}`);
         if (res.ok) {
           const data = await res.json();
-          // Assuming item_name contains the program name or ID
-          setPurchasedPrograms(data.map((p: any) => p.item_name));
+          // Use program_id if available, fallback to item_name
+          setPurchasedPrograms(data.map((p: any) => p.program_id || p.item_name));
         }
       } catch (err) {
         console.error("Failed to fetch purchases", err);
@@ -48,9 +48,11 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
     ? ['softball-winter', 'baseball-winter', 'softball-summer', 'baseball-summer']
     : type === 'movement'
     ? ['lower-back-rehab']
+    : type === 'myPrograms'
+    ? purchasedPrograms
     : ALL_PROGRAMS.map(p => p.id);
 
-  const isPurchased = (programName: string) => purchasedPrograms.includes(programName);
+  const isPurchased = (programId: string) => purchasedPrograms.includes(programId);
 
   const basePrograms = catalogIds
     .map(id => ALL_PROGRAMS.find(p => p.id === id))
@@ -139,12 +141,12 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-8">
           {uniqueSports.length > 0 && (
             <select 
               value={filterSport} 
               onChange={(e) => setFilterSport(e.target.value)}
-              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+              className="w-full sm:w-auto bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
             >
               <option value="all">All Sports</option>
               {uniqueSports.map(sport => (
@@ -156,7 +158,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
             <select 
               value={filterGoal} 
               onChange={(e) => setFilterGoal(e.target.value)}
-              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+              className="w-full sm:w-auto bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
             >
               <option value="all">All Goals</option>
               {uniqueGoals.map(goal => (
@@ -168,7 +170,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
             <select 
               value={filterTrainer} 
               onChange={(e) => setFilterTrainer(e.target.value)}
-              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+              className="w-full sm:w-auto bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
             >
               <option value="all">All Trainers</option>
               {uniqueTrainers.map(trainer => (
@@ -181,7 +183,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
         {/* Programs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {catalogPrograms.map((program) => {
-            const locked = !isPurchased(program.name) && !isAdmin;
+            const locked = !isPurchased(program.id) && !isAdmin;
             return (
               <motion.button
                 key={program.id}
