@@ -15,7 +15,7 @@ export default function Contact({ onBack, onNavigateToRegister, user }: ContactP
   if (showForm) {
     return <ContactForm 
       onBack={() => setShowForm(false)} 
-      initialName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : ''}
+      initialName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : ''}
       initialEmail={user?.email || ''}
     />;
   }

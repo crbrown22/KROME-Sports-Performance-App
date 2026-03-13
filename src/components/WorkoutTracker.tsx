@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Activity, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   TrendingUp, 
   CheckCircle2, 
   Circle, 
@@ -16,7 +16,8 @@ import {
   StretchHorizontal,
   X,
   RefreshCw,
-  Trash2
+  Trash2,
+  List as ListIcon
 } from 'lucide-react';
 import { formatDate, getCurrentDate } from '../utils/date';
 import WorkoutFeedback from './WorkoutFeedback';
@@ -34,6 +35,11 @@ import {
   Bar,
   Cell
 } from 'recharts';
+import ReactCalendar from 'react-calendar';
+import { format, isSameDay } from 'date-fns';
+import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
+import VideoModal from './VideoModal';
+import { PlayCircle } from 'lucide-react';
 
 interface WorkoutLog {
   workoutId: string;
@@ -66,6 +72,9 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   const [feedback, setFeedback] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [metric, setMetric] = useState<'phase' | 'completion' | 'exercises' | 'duration'>('phase');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [videoModal, setVideoModal] = useState<{isOpen: boolean, url: string, title: string}>({isOpen: false, url: '', title: ''});
 
   const fetchLogs = async () => {
     try {
@@ -79,6 +88,7 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
           workoutId: l.workout_id,
           exerciseId: l.exercise_id,
           completed: l.completed === 1,
+          date: l.date || new Date().toISOString(), // Fallback to current date if missing
           editedData: l.edited_data ? JSON.parse(l.edited_data) : {},
           workoutStartTime: l.workout_start_time,
           workoutEndTime: l.workout_end_time
@@ -326,207 +336,280 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
 
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { label: 'Weekly Completion', value: calculateCompletion('week'), icon: Activity, color: 'text-gold' },
-          { label: 'Monthly Progress', value: calculateCompletion('month'), icon: TrendingUp, color: 'text-accent' },
-          { label: 'Yearly Consistency', value: calculateCompletion('year'), icon: Award, color: 'text-blue-400' }
-        ].map((stat, idx) => (
-          <motion.div 
-            key={idx}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-zinc-900/50 border border-white/5 p-6 rounded-3xl relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <stat.icon className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">{stat.label}</div>
-              <div className="flex flex-col items-start gap-0">
-                <div className={`text-4xl font-black italic ${stat.color}`}>{stat.value}%</div>
-                <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Completed</div>
-              </div>
-              <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${stat.value}%` }}
-                  className={`h-full bg-gradient-to-r from-gold to-accent`}
-                  role="progressbar"
-                  aria-valuenow={stat.value}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`${stat.label} progress`}
-                />
-              </div>
-            </div>
-          </motion.div>
-        ))}
+      {/* View Toggle */}
+      <div className="flex items-center justify-end gap-2">
+        <button 
+          onClick={() => setViewMode('list')}
+          className={`p-2 rounded-xl transition-colors krome-outline ${viewMode === 'list' ? 'bg-gold text-black' : 'bg-white/5 text-white/60'}`}
+        >
+          <ListIcon className="w-5 h-5" />
+        </button>
+        <button 
+          onClick={() => setViewMode('calendar')}
+          className={`p-2 rounded-xl transition-colors ${viewMode === 'calendar' ? 'bg-gold text-black' : 'bg-white/5 text-white/60'}`}
+        >
+          <CalendarIcon className="w-5 h-5" />
+        </button>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="space-y-8">
-        {/* Phase Progress Chart */}
+      {viewMode === 'calendar' ? (
         <div className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-black uppercase italic tracking-tight">
-              {metric === 'phase' ? 'Phase' : metric === 'completion' ? 'Completion' : metric === 'exercises' ? 'Exercises' : 'Duration'} <span className="text-gold">Progress</span>
-            </h3>
-            <select 
-              value={metric} 
-              onChange={(e) => setMetric(e.target.value as any)}
-              className="bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-gold w-32"
-              aria-label="Select metric for progress chart"
-            >
-              <option value="phase">Phase</option>
-              <option value="completion">Completion %</option>
-              <option value="exercises">Exercises</option>
-              <option value="duration">Duration</option>
-            </select>
-          </div>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={getChartData()}>
-                <defs>
-                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#D4AF37" />
-                    <stop offset="100%" stopColor="#008080" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis dataKey="name" stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  cursor={{ fill: '#ffffff05' }}
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-zinc-950 border border-white/10 p-3 rounded-xl shadow-xl">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">{label}</p>
-                          <p className="text-sm font-black italic text-gold">{payload[0].value} {metric === 'duration' ? 'min' : ''}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="value" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <ReactCalendar 
+            onChange={(value) => setSelectedDate(value as Date)} 
+            value={selectedDate}
+            tileContent={({ date }) => {
+              const hasWorkout = workoutLogs.some(log => isSameDay(new Date(log.date), date));
+              return hasWorkout ? <div className="w-2 h-2 bg-gold rounded-full mx-auto mt-1" /> : null;
+            }}
+            className="w-full bg-transparent border-none text-white"
+          />
+          <div className="mt-8">
+            <h4 className="text-lg font-black uppercase italic mb-4">Workouts on {format(selectedDate, 'PPP')}</h4>
+            {workoutLogs.filter(log => isSameDay(new Date(log.date), selectedDate)).length > 0 ? (
+              <div className="space-y-2">
+                {workoutLogs.filter(log => isSameDay(new Date(log.date), selectedDate)).map(log => {
+                  const exerciseDetails = EXERCISE_LIBRARY.find(e => e.id === log.exerciseId);
+                  const videoUrl = exerciseDetails?.videoUrl;
+                  const name = exerciseDetails?.name || log.exerciseId;
+
+                  return (
+                    <div key={`${log.workoutId}-${log.exerciseId}`} className="p-4 bg-black/20 rounded-2xl border border-white/5 flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-gold">{log.workoutId.replace(/-/g, ' ')}</p>
+                        <p className="text-xs text-white/60">Exercise: {name}</p>
+                        {videoUrl && (
+                          <button 
+                            onClick={() => setVideoModal({ isOpen: true, url: videoUrl, title: name })}
+                            className="text-[10px] text-gold hover:underline mt-1 flex items-center gap-1 !outline-none"
+                          >
+                            <PlayCircle className="w-3 h-3" /> Watch Demo
+                          </button>
+                        )}
+                      </div>
+                      <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${log.completed ? 'bg-emerald-500/20 text-emerald-500' : 'bg-gold/20 text-gold'}`}>
+                        {log.completed ? 'Completed' : 'Pending'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-white/40">No workouts on this day.</p>
+            )}
           </div>
         </div>
-
-        {/* Phase Progress */}
-        <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
-          <h3 className="text-xl font-black uppercase italic tracking-tight mb-6 text-white/80">Phase <span className="text-gold">Progress</span></h3>
-          <div className="space-y-4">
+      ) : (
+        <>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: 'MEE', range: [1, 12], color: 'from-amber-900 via-gold to-amber-900' },
-              { name: 'S&P', range: [13, 24], color: 'from-emerald-900 via-emerald-500 to-emerald-900' },
-              { name: 'SHP', range: [25, 36], color: 'from-blue-900 via-blue-500 to-blue-900' },
-              { name: 'FTTX', range: [37, 48], color: 'from-purple-900 via-purple-500 to-purple-900' },
-              { name: 'OP', range: [49, 52], color: 'from-rose-900 via-rose-500 to-rose-900' }
-            ].map((phase) => {
-              const phaseProgress = programProgress.filter(p => p.week >= phase.range[0] && p.week <= phase.range[1]);
-              const completed = phaseProgress.filter(p => p.completed).length;
-              const total = (phase.range[1] - phase.range[0] + 1) * 7;
-              const percent = Math.min(100, Math.round((completed / total) * 100));
-
-              return (
-                <div key={phase.name} className="p-4 bg-black/20 rounded-2xl border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors">
-                  <div className="text-xs font-black uppercase tracking-widest text-white/70">{phase.name}</div>
-                  <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+              { label: 'Weekly Completion', value: calculateCompletion('week'), icon: Activity, color: 'text-gold' },
+              { label: 'Monthly Progress', value: calculateCompletion('month'), icon: TrendingUp, color: 'text-accent' },
+              { label: 'Yearly Consistency', value: calculateCompletion('year'), icon: Award, color: 'text-blue-400' }
+            ].map((stat, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="bg-zinc-900/50 border border-white/5 p-6 rounded-3xl relative overflow-hidden group"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <stat.icon className="w-16 h-16" />
+                </div>
+                <div className="relative z-10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">{stat.label}</div>
+                  <div className="flex flex-col items-start gap-0">
+                    <div className={`text-4xl font-black italic ${stat.color}`}>{stat.value}%</div>
+                    <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Completed</div>
+                  </div>
+                  <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
-                      className={`h-full bg-gradient-to-r ${phase.color}`}
+                      animate={{ width: `${stat.value}%` }}
+                      className={`h-full bg-gradient-to-r from-gold to-accent`}
                       role="progressbar"
-                      aria-valuenow={percent}
+                      aria-valuenow={stat.value}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-label={`${phase.name} phase progress`}
+                      aria-label={`${stat.label} progress`}
                     />
                   </div>
-                  <div className="text-xs font-black italic text-gold w-10 text-right">{percent}%</div>
                 </div>
-              );
-            })}
+              </motion.div>
+            ))}
           </div>
-        </div>
-      </div>
 
-      {/* Recent Workouts - Full Width */}
-      <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black uppercase italic tracking-tight text-white/80">Recent <span className="text-gold">Workouts</span></h3>
-          <button 
-            onClick={fetchLogs} 
-            className="text-white/60 hover:text-gold transition-colors"
-            aria-label="Refresh workout logs"
-          >
-            <RefreshCw className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {getRecentSessions().map((session, idx) => (
-            <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-default gap-8">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${session.completedCount === session.totalCount ? 'bg-emerald-500' : 'bg-gold'}`} />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold uppercase tracking-widest text-white/70 whitespace-nowrap overflow-hidden text-ellipsis" title={session.workoutId.replace(/-/g, ' ')}>
-                    {session.workoutId.replace(/-/g, ' ')}
-                  </span>
-                  <span className="text-xs text-white/30">
-                    {session.completedCount}/{session.totalCount} Exercises
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-6 shrink-0">
-                {session.startTime && session.endTime && (
-                  <div className="flex items-center gap-2 text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/10">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm font-mono font-bold whitespace-nowrap">
-                      {calculateDuration(session.startTime, session.endTime)} min
-                    </span>
-                  </div>
-                )}
-                <span className="text-sm text-white/30 font-medium whitespace-nowrap">
-                  {formatDate(session.date)}
-                </span>
-                <button 
-                  onClick={() => handleDeleteSession(session)}
-                  className="text-white/40 hover:text-red-500 transition-colors"
-                  aria-label="Delete workout session"
+          {/* Main Content Grid */}
+          <div className="space-y-8">
+            {/* Phase Progress Chart */}
+            <div className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-black uppercase italic tracking-tight">
+                  {metric === 'phase' ? 'Phase' : metric === 'completion' ? 'Completion' : metric === 'exercises' ? 'Exercises' : 'Duration'} <span className="text-gold">Progress</span>
+                </h3>
+                <select 
+                  value={metric} 
+                  onChange={(e) => setMetric(e.target.value as any)}
+                  className="bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-gold w-32"
+                  aria-label="Select metric for progress chart"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  <option value="phase">Phase</option>
+                  <option value="completion">Completion %</option>
+                  <option value="exercises">Exercises</option>
+                  <option value="duration">Duration</option>
+                </select>
+              </div>
+              <div className="h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={getChartData()}>
+                    <defs>
+                      <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#D4AF37" />
+                        <stop offset="100%" stopColor="#008080" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                    <XAxis dataKey="name" stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip 
+                      cursor={{ fill: '#ffffff05' }}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-zinc-950 border border-white/10 p-3 rounded-xl shadow-xl">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">{label}</p>
+                              <p className="text-sm font-black italic text-gold">{payload[0].value} {metric === 'duration' ? 'min' : ''}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="value" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Workout Feedback */}
-      {!isAdminView && firstPendingSession && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Pending Feedback Required</h4>
+            {/* Phase Progress */}
+            <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
+              <h3 className="text-xl font-black uppercase italic tracking-tight mb-6 text-white/80">Phase <span className="text-gold">Progress</span></h3>
+              <div className="space-y-4">
+                {[
+                  { name: 'MEE', range: [1, 12], color: 'from-amber-900 via-gold to-amber-900' },
+                  { name: 'S&P', range: [13, 24], color: 'from-emerald-900 via-emerald-500 to-emerald-900' },
+                  { name: 'SHP', range: [25, 36], color: 'from-blue-900 via-blue-500 to-blue-900' },
+                  { name: 'FTTX', range: [37, 48], color: 'from-purple-900 via-purple-500 to-purple-900' },
+                  { name: 'OP', range: [49, 52], color: 'from-rose-900 via-rose-500 to-rose-900' }
+                ].map((phase) => {
+                  const phaseProgress = programProgress.filter(p => p.week >= phase.range[0] && p.week <= phase.range[1]);
+                  const completed = phaseProgress.filter(p => p.completed).length;
+                  const total = (phase.range[1] - phase.range[0] + 1) * 7;
+                  const percent = Math.min(100, Math.round((completed / total) * 100));
+
+                  return (
+                    <div key={phase.name} className="p-4 bg-black/20 rounded-2xl border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors">
+                      <div className="text-xs font-black uppercase tracking-widest text-white/70">{phase.name}</div>
+                      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          className={`h-full bg-gradient-to-r ${phase.color}`}
+                          role="progressbar"
+                          aria-valuenow={percent}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`${phase.name} phase progress`}
+                        />
+                      </div>
+                      <div className="text-xs font-black italic text-gold w-10 text-right">{percent}%</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          <WorkoutFeedback 
-            userId={userId} 
-            workoutId={firstPendingSession.workoutId} 
-            programId="52-week-foundation" 
-            onSuccess={() => {
-              // Refresh feedback list after submission
-              setTimeout(fetchFeedback, 2000);
-            }}
-          />
-        </div>
+
+          {/* Recent Workouts - Full Width */}
+          <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black uppercase italic tracking-tight text-white/80">Recent <span className="text-gold">Workouts</span></h3>
+              <button 
+                onClick={fetchLogs} 
+                className="text-white/60 hover:text-gold transition-colors"
+                aria-label="Refresh workout logs"
+              >
+                <RefreshCw className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              {getRecentSessions().map((session, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-default gap-8">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${session.completedCount === session.totalCount ? 'bg-emerald-500' : 'bg-gold'}`} />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold uppercase tracking-widest text-white/70 whitespace-nowrap overflow-hidden text-ellipsis" title={session.workoutId.replace(/-/g, ' ')}>
+                        {session.workoutId.replace(/-/g, ' ')}
+                      </span>
+                      <span className="text-xs text-white/30">
+                        {session.completedCount}/{session.totalCount} Exercises
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6 shrink-0">
+                    {session.startTime && session.endTime && (
+                      <div className="flex items-center gap-2 text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/10">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm font-mono font-bold whitespace-nowrap">
+                          {calculateDuration(session.startTime, session.endTime)} min
+                        </span>
+                      </div>
+                    )}
+                    <span className="text-sm text-white/30 font-medium whitespace-nowrap">
+                      {formatDate(session.date)}
+                    </span>
+                    <button 
+                      onClick={() => handleDeleteSession(session)}
+                      className="text-white/40 hover:text-red-500 transition-colors"
+                      aria-label="Delete workout session"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Workout Feedback */}
+          {!isAdminView && firstPendingSession && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Pending Feedback Required</h4>
+              </div>
+              <WorkoutFeedback 
+                userId={userId} 
+                workoutId={firstPendingSession.workoutId} 
+                programId="52-week-foundation" 
+                onSuccess={() => {
+                  // Refresh feedback list after submission
+                  setTimeout(fetchFeedback, 2000);
+                }}
+              />
+            </div>
+          )}
+        </>
       )}
+
+      <VideoModal 
+        isOpen={videoModal.isOpen}
+        onClose={() => setVideoModal({ ...videoModal, isOpen: false })}
+        videoUrl={videoModal.url}
+        title={videoModal.title}
+      />
     </div>
   );
 }

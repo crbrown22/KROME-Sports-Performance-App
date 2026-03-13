@@ -43,6 +43,29 @@ interface BodyMetricsProps {
   setData: React.Dispatch<React.SetStateAction<BodyMetricsData>>;
 }
 
+const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }: { title: string, icon: any, id: string, expandedSection: string | null, toggleSection: (id: string) => void }) => (
+  <button 
+    onClick={() => toggleSection(id)}
+    className={`w-full flex items-center justify-between p-6 md:p-8 transition-all border-b border-white/5 ${expandedSection === id ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
+    aria-expanded={expandedSection === id}
+    aria-controls={`section-content-${id}`}
+    aria-label={`Toggle ${title} section`}
+  >
+    <div className="flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${expandedSection === id ? 'bg-gold text-black' : 'bg-gold/10 text-gold'}`}>
+        <Icon className="w-6 h-6" aria-hidden="true" />
+      </div>
+      <div className="text-left">
+        <h3 className="text-xl font-black uppercase italic tracking-tight">{title}</h3>
+        {expandedSection !== id && <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Click to expand</p>}
+      </div>
+    </div>
+    <div className={`w-10 h-10 rounded-full border border-white/10 flex items-center justify-center transition-all ${expandedSection === id ? 'rotate-180 bg-white/10 text-white' : 'text-white/40'}`}>
+      <ChevronDown className="w-5 h-5" aria-hidden="true" />
+    </div>
+  </button>
+);
+
 export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps) {
   const [bodyCompHistory, setBodyCompHistory] = useState<BodyCompEntry[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -78,12 +101,13 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
     const recommendations = calculateNutritionRecommendations(data);
 
     // 3. Update if different
-    if (
-      data.recommendations.totalCalories !== recommendations.totalCalories ||
-      data.recommendations.proteinGrams !== recommendations.proteinGrams ||
-      data.recommendations.carbsGrams !== recommendations.carbsGrams ||
-      data.recommendations.fatGrams !== recommendations.fatGrams
-    ) {
+    const hasChanged = 
+      (data.recommendations.totalCalories !== recommendations.totalCalories && !(isNaN(data.recommendations.totalCalories) && isNaN(recommendations.totalCalories))) ||
+      (data.recommendations.proteinGrams !== recommendations.proteinGrams && !(isNaN(data.recommendations.proteinGrams) && isNaN(recommendations.proteinGrams))) ||
+      (data.recommendations.carbsGrams !== recommendations.carbsGrams && !(isNaN(data.recommendations.carbsGrams) && isNaN(recommendations.carbsGrams))) ||
+      (data.recommendations.fatGrams !== recommendations.fatGrams && !(isNaN(data.recommendations.fatGrams) && isNaN(recommendations.fatGrams)));
+
+    if (hasChanged) {
       setData(prev => ({
         ...prev,
         recommendations
@@ -221,37 +245,35 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
   };
 
   const updateBodyCompEntry = (id: string, field: keyof BodyCompEntry, value: any) => {
-    setBodyCompHistory(prev => {
-      const updatedHistory = prev.map(entry => {
-        if (entry.id !== id) return entry;
-        
-        const numValue = value === '' ? 0 : parseFloat(value);
-        const updated = { ...entry, [field]: isNaN(numValue) ? 0 : numValue };
-        
-        // Auto-calculate lean/fat mass if weight and body fat are present
-        const w = field === 'weight' ? (isNaN(numValue) ? 0 : numValue) : entry.weight;
-        const bf = field === 'bodyFat' ? (isNaN(numValue) ? 0 : numValue) : entry.bodyFat;
-        
-        updated.fatMass = parseFloat(((w * bf) / 100).toFixed(1));
-        updated.leanMuscle = parseFloat((w - updated.fatMass).toFixed(1));
-        
-        // Calculate BMI: weight (lb) / [height (in)]^2 * 703
-        const h = field === 'height' ? (isNaN(numValue) ? 0 : numValue) : entry.height;
-        if (w > 0 && h > 0) {
-          updated.bmi = parseFloat(((w / (h * h)) * 703).toFixed(1));
-        }
-        
-        return updated;
-      });
-
-      // Update initialWeight if the modified entry is the latest one
-      const latestEntry = updatedHistory[updatedHistory.length - 1];
-      if (latestEntry && latestEntry.id === id && field === 'weight') {
-        setData(prevData => ({ ...prevData, initialWeight: latestEntry.weight }));
+    const newHistory = bodyCompHistory.map(entry => {
+      if (entry.id !== id) return entry;
+      
+      const numValue = value === '' ? 0 : parseFloat(value);
+      const updated = { ...entry, [field]: isNaN(numValue) ? 0 : numValue };
+      
+      // Auto-calculate lean/fat mass if weight and body fat are present
+      const w = field === 'weight' ? (isNaN(numValue) ? 0 : numValue) : entry.weight;
+      const bf = field === 'bodyFat' ? (isNaN(numValue) ? 0 : numValue) : entry.bodyFat;
+      
+      updated.fatMass = parseFloat(((w * bf) / 100).toFixed(1));
+      updated.leanMuscle = parseFloat((w - updated.fatMass).toFixed(1));
+      
+      // Calculate BMI: weight (lb) / [height (in)]^2 * 703
+      const h = field === 'height' ? (isNaN(numValue) ? 0 : numValue) : entry.height;
+      if (w > 0 && h > 0) {
+        updated.bmi = parseFloat(((w / (h * h)) * 703).toFixed(1));
       }
       
-      return updatedHistory;
+      return updated;
     });
+
+    setBodyCompHistory(newHistory);
+
+    // Update initialWeight if the modified entry is the latest one
+    const latestEntry = newHistory[newHistory.length - 1];
+    if (latestEntry && latestEntry.id === id && field === 'weight') {
+      setData(prevData => ({ ...prevData, initialWeight: latestEntry.weight }));
+    }
   };
 
   const deleteBodyCompEntry = (id: string) => {
@@ -312,29 +334,6 @@ Goal: ${data.primaryGoal}
     setExpandedSection(expandedSection === section ? null : section);
   };
 
-  const SectionHeader = ({ title, icon: Icon, id }: { title: string, icon: any, id: string }) => (
-    <button 
-      onClick={() => toggleSection(id)}
-      className={`w-full flex items-center justify-between p-6 md:p-8 transition-all border-b border-white/5 ${expandedSection === id ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
-      aria-expanded={expandedSection === id}
-      aria-controls={`section-content-${id}`}
-      aria-label={`Toggle ${title} section`}
-    >
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${expandedSection === id ? 'bg-gold text-black' : 'bg-gold/10 text-gold'}`}>
-          <Icon className="w-6 h-6" aria-hidden="true" />
-        </div>
-        <div className="text-left">
-          <h3 className="text-xl font-black uppercase italic tracking-tight">{title}</h3>
-          {expandedSection !== id && <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Click to expand</p>}
-        </div>
-      </div>
-      <div className={`w-10 h-10 rounded-full border border-white/10 flex items-center justify-center transition-all ${expandedSection === id ? 'rotate-180 bg-white/10 text-white' : 'text-white/40'}`}>
-        <ChevronDown className="w-5 h-5" aria-hidden="true" />
-      </div>
-    </button>
-  );
-
   return (
     <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] backdrop-blur-xl overflow-hidden">
       {/* Header Actions */}
@@ -350,10 +349,10 @@ Goal: ${data.primaryGoal}
             </button>
           ) : (
             <>
-              <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all" aria-label="Edit body metrics">
+              <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all krome-outline" aria-label="Edit body metrics">
                 <Edit2 className="w-4 h-4" aria-hidden="true" /> Edit
               </button>
-              <button onClick={handleShare} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all" aria-label="Share body metrics summary">
+              <button onClick={handleShare} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all krome-outline" aria-label="Share body metrics summary">
                 <Share2 className="w-4 h-4" aria-hidden="true" /> Share
               </button>
             </>
@@ -363,7 +362,7 @@ Goal: ${data.primaryGoal}
 
       {/* 1. Body Composition Tracking */}
       <div>
-        <SectionHeader title="Body Composition" icon={Scale} id="bodyComp" />
+        <SectionHeader title="Body Composition" icon={Scale} id="bodyComp" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
           {expandedSection === 'bodyComp' && (
             <motion.div 
@@ -399,7 +398,7 @@ Goal: ${data.primaryGoal}
                                   const inches = (data.height || 0) % 12;
                                   setData(prev => ({ ...prev, height: (ft * 12) + inches }));
                                 }}
-                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50 outline-none"
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
                               />
                               <input 
                                 type="number"
@@ -412,7 +411,7 @@ Goal: ${data.primaryGoal}
                                   const ft = Math.floor((data.height || 0) / 12);
                                   setData(prev => ({ ...prev, height: (ft * 12) + inches }));
                                 }}
-                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50 outline-none"
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
                               />
                             </div>
                           ) : (
@@ -447,7 +446,7 @@ Goal: ${data.primaryGoal}
                                   });
                                 }
                               }}
-                              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50 outline-none"
+                              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
                             />
                           )
                       ) : (
@@ -525,7 +524,7 @@ Goal: ${data.primaryGoal}
                                   type="date" 
                                   value={entry.date}
                                   onChange={(e) => updateBodyCompEntry(entry.id, 'date', e.target.value)}
-                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-32 focus:border-gold/50 outline-none"
+                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-32 focus:border-gold/50 krome-outline"
                                 />
                               ) : <span className="font-mono text-white/80">{entry.date}</span>}
                             </td>
@@ -535,7 +534,7 @@ Goal: ${data.primaryGoal}
                                   type="number" 
                                   value={entry.weight}
                                   onChange={(e) => updateBodyCompEntry(entry.id, 'weight', e.target.value === '' ? 0 : parseFloat(e.target.value))}
-                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-24 focus:border-gold/50 outline-none"
+                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-24 focus:border-gold/50 krome-outline"
                                 />
                               ) : <span className="font-bold">{entry.weight} <span className="text-xs font-normal text-white/40">lbs</span></span>}
                             </td>
@@ -545,7 +544,7 @@ Goal: ${data.primaryGoal}
                                   type="number" 
                                   value={entry.bodyFat}
                                   onChange={(e) => updateBodyCompEntry(entry.id, 'bodyFat', e.target.value === '' ? 0 : parseFloat(e.target.value))}
-                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-24 focus:border-gold/50 outline-none"
+                                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white w-24 focus:border-gold/50 krome-outline"
                                 />
                               ) : <span className="font-bold">{entry.bodyFat}<span className="text-xs font-normal text-white/40">%</span></span>}
                             </td>
@@ -553,7 +552,7 @@ Goal: ${data.primaryGoal}
                             <td className="p-4 text-white/60 font-mono">{entry.fatMass}</td>
                             {isEditing && (
                               <td className="p-4 text-right">
-                                <button onClick={() => deleteBodyCompEntry(entry.id)} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
+                                <button onClick={() => deleteBodyCompEntry(entry.id)} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all krome-outline">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </td>
@@ -565,7 +564,7 @@ Goal: ${data.primaryGoal}
                   </div>
                   {isEditing && (
                     <div className="p-4 border-t border-white/5 bg-white/[0.02]">
-                      <button onClick={addBodyCompEntry} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/40 hover:text-gold hover:border-gold/50 hover:bg-gold/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                      <button onClick={addBodyCompEntry} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/40 hover:text-gold hover:border-gold/50 hover:bg-gold/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 krome-outline">
                         <Plus className="w-4 h-4" /> Add New Entry
                       </button>
                     </div>
@@ -579,7 +578,7 @@ Goal: ${data.primaryGoal}
 
       {/* 2. Metabolic Profile */}
       <div>
-        <SectionHeader title="Metabolic Profile" icon={Calculator} id="metabolic" />
+        <SectionHeader title="Metabolic Profile" icon={Calculator} id="metabolic" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
           {expandedSection === 'metabolic' && (
             <motion.div 
@@ -606,7 +605,7 @@ Goal: ${data.primaryGoal}
                         disabled={!isEditing}
                         value={data.gender}
                         onChange={(e) => setData({...data, gender: e.target.value as any})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
                       >
                         <option value="male">Male</option>
                         <option value="female">Female</option>
@@ -619,7 +618,7 @@ Goal: ${data.primaryGoal}
                         type="number"
                         value={data.age}
                         onChange={(e) => setData({...data, age: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                       />
                     </div>
                     <div>
@@ -636,7 +635,7 @@ Goal: ${data.primaryGoal}
                               const inches = (data.height || 0) % 12;
                               setData({...data, height: (ft * 12) + inches});
                             }}
-                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">ft</span>
                         </div>
@@ -652,7 +651,7 @@ Goal: ${data.primaryGoal}
                               const ft = Math.floor((data.height || 0) / 12);
                               setData({...data, height: (ft * 12) + inches});
                             }}
-                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">in</span>
                         </div>
@@ -665,7 +664,7 @@ Goal: ${data.primaryGoal}
                         type="number"
                         value={data.initialWeight}
                         onChange={(e) => setData({...data, initialWeight: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50"
                       />
                     </div>
                   </div>
@@ -675,7 +674,7 @@ Goal: ${data.primaryGoal}
                       disabled={!isEditing}
                       value={data.activityLevel}
                       onChange={(e) => setData({...data, activityLevel: e.target.value as any})}
-                      className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                      className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
                     >
                       <option value="sedentary">Sedentary (Little or no exercise)</option>
                       <option value="light">Light Activity (1-3 days/week)</option>
@@ -683,6 +682,31 @@ Goal: ${data.primaryGoal}
                       <option value="very_active">Very Active (6-7 days/week)</option>
                       <option value="extra_active">Extra Active (Very hard exercise/physical job)</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">VO2 Max</label>
+                      <input 
+                        disabled={!isEditing}
+                        type="number"
+                        value={data.vo2Max || ''}
+                        onChange={(e) => setData({...data, vo2Max: Number(e.target.value)})}
+                        placeholder="e.g. 45"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Resting HR</label>
+                      <input 
+                        disabled={!isEditing}
+                        type="number"
+                        value={data.restingHR || ''}
+                        onChange={(e) => setData({...data, restingHR: Number(e.target.value)})}
+                        placeholder="e.g. 60"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                      />
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4 mt-4">
@@ -732,7 +756,7 @@ Goal: ${data.primaryGoal}
                         type="number"
                         value={data.actualRMR}
                         onChange={(e) => setData({...data, actualRMR: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                       />
                     </div>
                     <div>
@@ -742,7 +766,7 @@ Goal: ${data.primaryGoal}
                         type="number"
                         value={data.fatBurnPercent}
                         onChange={(e) => setData({...data, fatBurnPercent: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                       />
                     </div>
                     <div>
@@ -752,7 +776,7 @@ Goal: ${data.primaryGoal}
                         type="number"
                         value={data.carbBurnPercent}
                         onChange={(e) => setData({...data, carbBurnPercent: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
                       />
                     </div>
                   </div>
@@ -774,7 +798,7 @@ Goal: ${data.primaryGoal}
                           <select 
                             value={value as string}
                             onChange={(e) => setData({...data, metabolicPriority: {...data.metabolicPriority, [key]: e.target.value}})}
-                            className="bg-black/50 border border-white/10 rounded-lg text-xs p-2 focus:border-gold/50 outline-none"
+                            className="bg-black/50 border border-white/10 rounded-lg text-xs p-2 text-white focus:border-gold/50"
                           >
                             <option value="High concern (7+ symptoms)">High</option>
                             <option value="Moderate concern (5-7 symptoms)">Moderate</option>
@@ -799,7 +823,7 @@ Goal: ${data.primaryGoal}
 
       {/* 3. Goals & Strategy */}
       <div>
-        <SectionHeader title="Goals & Strategy" icon={Target} id="goals" />
+        <SectionHeader title="Goals & Strategy" icon={Target} id="goals" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
           {expandedSection === 'goals' && (
             <motion.div 
@@ -824,7 +848,7 @@ Goal: ${data.primaryGoal}
                           else if (newPrimaryGoal === 'Muscle Gain') newGoalStrategy = 'high-cho';
                           setData({...data, primaryGoal: newPrimaryGoal, goalStrategy: newGoalStrategy});
                         }}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-gold/50"
                       >
                         <option value="Weight/Fat Loss">Weight/Fat Loss</option>
                         <option value="Muscle Gain">Muscle Gain</option>
@@ -848,7 +872,7 @@ Goal: ${data.primaryGoal}
                           type="text"
                           value={(data as any)[field.key]}
                           onChange={(e) => setData({...data, [field.key]: e.target.value})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                          className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50"
                         />
                       ) : (
                         <div className="text-sm font-medium text-white">{(data as any)[field.key] || '-'}</div>
@@ -862,7 +886,7 @@ Goal: ${data.primaryGoal}
                       <textarea 
                         value={data.notes}
                         onChange={(e) => setData({...data, notes: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50 outline-none h-24"
+                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50  h-24"
                       />
                     ) : (
                       <div className="text-sm font-medium text-white/60">{data.notes || '-'}</div>
@@ -888,7 +912,7 @@ Goal: ${data.primaryGoal}
                           <select 
                             value={(data as any)[field.key]}
                             onChange={(e) => setData({...data, [field.key]: e.target.value})}
-                            className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                            className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50"
                           >
                             {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
@@ -906,7 +930,7 @@ Goal: ${data.primaryGoal}
                         type="text"
                         value={data.behaviorFocus}
                         onChange={(e) => setData({...data, behaviorFocus: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50 outline-none"
+                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50"
                       />
                     ) : (
                       <div className="text-sm font-medium text-white">{data.behaviorFocus || '-'}</div>
@@ -921,7 +945,7 @@ Goal: ${data.primaryGoal}
 
       {/* 4. Assessments */}
       <div>
-        <SectionHeader title="Assessments" icon={Calendar} id="assessments" />
+        <SectionHeader title="Assessments" icon={Calendar} id="assessments" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
           {expandedSection === 'assessments' && (
             <motion.div 
@@ -933,51 +957,54 @@ Goal: ${data.primaryGoal}
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-gold mb-4">Metabolic Assessments</h4>
-                  {['activeMetabolic', 'restingMetabolic', 'symptomQuestionnaire'].map((key) => (
-                    <div key={key} className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                      <div className="text-xs font-bold uppercase mb-4 text-white/60">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Date</label>
-                          {isEditing ? (
-                            <input 
-                              type="date"
-                              value={(data.assessments as any)[key].date}
-                              onChange={(e) => setData({
-                                ...data, 
-                                assessments: {
-                                  ...data.assessments, 
-                                  [key]: { ...(data.assessments as any)[key], date: e.target.value }
-                                }
-                              })}
-                              className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50 outline-none"
-                            />
-                          ) : (
-                            <div className="text-sm font-mono">{(data.assessments as any)[key].date || '-'}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Re-Test</label>
-                          {isEditing ? (
-                            <input 
-                              type="date"
-                              value={(data.assessments as any)[key].retestDate}
-                              onChange={(e) => setData({
-                                ...data, 
-                                assessments: {
-                                  ...data.assessments, 
-                                  [key]: { ...(data.assessments as any)[key], retestDate: e.target.value }
-                                }
-                              })}
-                              className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50 outline-none"
-                            />
-                          ) : (
-                            <div className="text-sm font-mono">{(data.assessments as any)[key].retestDate || '-'}</div>
-                          )}
+                  {['activeMetabolic', 'restingMetabolic', 'symptomQuestionnaire'].map((key) => {
+                    const assessment = data.assessments?.[key as keyof typeof data.assessments] as { date: string; retestDate: string } | undefined;
+                    return (
+                      <div key={key} className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                        <div className="text-xs font-bold uppercase mb-4 text-white/60">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Date</label>
+                            {isEditing ? (
+                              <input 
+                                type="date"
+                                value={assessment?.date || ''}
+                                onChange={(e) => setData({
+                                  ...data, 
+                                  assessments: {
+                                    ...data.assessments, 
+                                    [key]: { ...assessment, date: e.target.value }
+                                  }
+                                })}
+                                className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50"
+                              />
+                            ) : (
+                              <div className="text-sm font-mono">{assessment?.date || '-'}</div>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Re-Test</label>
+                            {isEditing ? (
+                              <input 
+                                type="date"
+                                value={assessment?.retestDate || ''}
+                                onChange={(e) => setData({
+                                  ...data, 
+                                  assessments: {
+                                    ...data.assessments, 
+                                    [key]: { ...assessment, retestDate: e.target.value }
+                                  }
+                                })}
+                                className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50"
+                              />
+                            ) : (
+                              <div className="text-sm font-mono">{assessment?.retestDate || '-'}</div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 
                 <div className="space-y-4">
@@ -988,18 +1015,18 @@ Goal: ${data.primaryGoal}
                       {isEditing ? (
                         <input 
                           type="date"
-                          value={(data.assessments.labTesting as any)[key]}
+                          value={data.assessments?.labTesting?.[key as keyof typeof data.assessments.labTesting] || ''}
                           onChange={(e) => setData({
                             ...data, 
                             assessments: {
                               ...data.assessments, 
-                              labTesting: { ...data.assessments.labTesting, [key]: e.target.value }
+                              labTesting: { ...data.assessments?.labTesting, [key]: e.target.value }
                             }
                           })}
-                          className="bg-black/50 border border-white/10 rounded-xl p-2 text-xs w-32 focus:border-gold/50 outline-none"
+                          className="bg-black/50 border border-white/10 rounded-xl p-2 text-xs w-32 focus:border-gold/50"
                         />
                       ) : (
-                        <span className="text-sm font-mono text-white/80">{(data.assessments.labTesting as any)[key] || '-'}</span>
+                        <span className="text-sm font-mono text-white/80">{data.assessments?.labTesting?.[key as keyof typeof data.assessments.labTesting] || '-'}</span>
                       )}
                     </div>
                   ))}
@@ -1012,7 +1039,7 @@ Goal: ${data.primaryGoal}
 
       {/* 5. Nutrition Recommendations */}
       <div>
-        <SectionHeader title="Nutrition Targets" icon={Pill} id="nutrition" />
+        <SectionHeader title="Nutrition Targets" icon={Pill} id="nutrition" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
           {expandedSection === 'nutrition' && (
             <motion.div 

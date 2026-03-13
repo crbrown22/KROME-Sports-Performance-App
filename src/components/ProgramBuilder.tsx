@@ -31,6 +31,7 @@ import {
   Area,
   Legend
 } from 'recharts';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { EXERCISE_LIBRARY, CATEGORIES } from '../data/exerciseLibrary';
 import { FullProgramTemplate } from '../data/workoutTemplates';
 
@@ -52,6 +53,7 @@ interface ExerciseEntry {
   nameOverride?: string;
   videoLinkOverride?: string;
   canGenerateVideo?: boolean;
+  collapsed?: boolean;
 }
 
 interface DayEntry {
@@ -147,7 +149,7 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [activeView, setActiveView] = useState<'builder' | 'analytics'>('builder');
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'week' | 'exercise', weekId: string, dayId?: string, exerciseId?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'week' | 'day' | 'exercise', weekId: string, dayId?: string, exerciseId?: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [isAddingWorkout, setIsAddingWorkout] = useState(false);
@@ -156,6 +158,50 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
   const [isAddingExercise, setIsAddingExercise] = useState<{weekId: string, dayId: string} | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [exerciseCategory, setExerciseCategory] = useState('All');
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination, type } = result;
+
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+
+    if (type === 'day') {
+      const weekId = source.droppableId.replace('week-', '');
+      setWeeks(weeks.map(w => {
+        if (w.id === weekId) {
+          const newDays = Array.from(w.days);
+          const [removed] = newDays.splice(source.index, 1);
+          newDays.splice(destination.index, 0, removed);
+          return { ...w, days: newDays };
+        }
+        return w;
+      }));
+    } else if (type === 'exercise') {
+      const weekId = source.droppableId.split('-')[1];
+      const dayId = source.droppableId.split('-')[3];
+      
+      setWeeks(weeks.map(w => {
+        if (w.id === weekId) {
+          return {
+            ...w,
+            days: w.days.map(d => {
+              if (d.id === dayId) {
+                const newExercises = Array.from(d.exercises);
+                const [removed] = newExercises.splice(source.index, 1);
+                newExercises.splice(destination.index, 0, removed);
+                return { ...d, exercises: newExercises };
+              }
+              return d;
+            })
+          };
+        }
+        return w;
+      }));
+    }
+  };
 
   const handleWeekToggle = (weekId: string) => {
     if (activeWeekId === weekId) {
@@ -249,6 +295,21 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
     }));
   };
 
+  const removeDay = (weekId: string, dayId: string) => {
+    setWeeks(weeks.map(w => {
+      if (w.id === weekId) {
+        return {
+          ...w,
+          days: w.days.filter(d => d.id !== dayId)
+        };
+      }
+      return w;
+    }));
+    if (activeDayId === dayId) setActiveDayId(null);
+    setShowDeleteConfirm(false);
+    setDeleteTarget(null);
+  };
+
   const removeExercise = (weekId: string, dayId: string, exerciseId: string) => {
     setWeeks(weeks.map(w => {
       if (w.id === weekId) {
@@ -268,10 +329,37 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
     setDeleteTarget(null);
   };
 
+  const toggleExerciseCollapse = (weekId: string, dayId: string, exerciseId: string) => {
+    setWeeks(weeks.map(w => {
+      if (w.id === weekId) {
+        return {
+          ...w,
+          days: w.days.map(d => {
+            if (d.id === dayId) {
+              return {
+                ...d,
+                exercises: d.exercises.map(ex => {
+                  if (ex.id === exerciseId) {
+                    return { ...ex, collapsed: !ex.collapsed };
+                  }
+                  return ex;
+                })
+              };
+            }
+            return d;
+          })
+        };
+      }
+      return w;
+    }));
+  };
+
   const handleDelete = () => {
     if (!deleteTarget) return;
     if (deleteTarget.type === 'week') {
       removeWeek(deleteTarget.weekId);
+    } else if (deleteTarget.type === 'day' && deleteTarget.dayId) {
+      removeDay(deleteTarget.weekId, deleteTarget.dayId);
     } else if (deleteTarget.type === 'exercise' && deleteTarget.dayId && deleteTarget.exerciseId) {
       removeExercise(deleteTarget.weekId, deleteTarget.dayId, deleteTarget.exerciseId);
     }
@@ -405,6 +493,28 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
     });
   }, [weeks]);
 
+  const analyticsStats = useMemo(() => {
+    const totalWeeks = weeks.length;
+    const totalDays = weeks.reduce((acc, w) => acc + w.days.length, 0);
+    const totalVolume = volumeData.reduce((acc, d) => acc + d.volume, 0);
+    const totalSets = volumeData.reduce((acc, d) => acc + d.sets, 0);
+    
+    const averageSetsPerWorkout = totalDays > 0 ? Math.round(totalSets / totalDays) : 0;
+    
+    // Mock completion rate based on program length (shorter programs have higher completion rates)
+    const baseRate = 85;
+    const lengthPenalty = Math.min(totalWeeks * 0.5, 20);
+    const completionRate = Math.max(Math.round(baseRate - lengthPenalty), 0);
+
+    return {
+      totalWeeks,
+      totalDays,
+      totalVolume,
+      averageSetsPerWorkout,
+      completionRate
+    };
+  }, [weeks, volumeData]);
+
   const allEquipment = useMemo(() => {
     return Array.from(new Set(EXERCISE_LIBRARY.flatMap(ex => ex.equipment))).sort();
   }, []);
@@ -471,13 +581,13 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
             <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 w-full sm:w-auto">
               <button 
                 onClick={() => setActiveView('builder')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'builder' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'}`}
+                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'builder' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
               >
                 <Dumbbell className="w-3.5 h-3.5" /> Builder
               </button>
               <button 
                 onClick={() => setActiveView('analytics')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'analytics' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'}`}
+                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeView === 'analytics' ? 'bg-gold text-black' : 'text-white/40 hover:text-white'} krome-outline`}
               >
                 <TrendingUp className="w-3.5 h-3.5" /> Analytics
               </button>
@@ -485,7 +595,7 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
             <button 
               onClick={handleSave}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-3 bg-gold text-black font-black uppercase tracking-widest text-[10px] rounded-xl flex items-center justify-center gap-2 hover:bg-gold/90 transition-all disabled:opacity-50 shadow-lg shadow-gold/10"
+              className="w-full sm:w-auto px-6 py-3 bg-gold text-black font-black uppercase tracking-widest text-[10px] rounded-xl flex items-center justify-center gap-2 hover:bg-gold/90 transition-all disabled:opacity-50 shadow-lg shadow-gold/10 krome-outline"
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Saving...' : 'Save Program'}
@@ -543,14 +653,14 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                       setNewWorkoutTitle('');
                       setTargetWeekId(null);
                     }}
-                    className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all"
+                    className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all krome-outline"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={() => targetWeekId && addDay(targetWeekId, newWorkoutTitle)}
                     disabled={!newWorkoutTitle.trim()}
-                    className="flex-1 py-4 bg-gold text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gold/90 transition-all disabled:opacity-50"
+                    className="flex-1 py-4 bg-gold text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gold/90 transition-all disabled:opacity-50 krome-outline"
                   >
                     Add Workout
                   </button>
@@ -622,14 +732,15 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
 
       <AnimatePresence mode="wait">
         {activeView === 'builder' ? (
-          <motion.div 
-            key="builder"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col gap-8"
-          >
-            {/* Program Structure - Moved up */}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <motion.div 
+              key="builder"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex flex-col gap-8"
+            >
+              {/* Program Structure - Moved up */}
             <div className="space-y-6">
               <div className="flex items-center justify-between bg-zinc-900/30 p-6 rounded-[32px] border border-white/5">
                 <div className="flex items-center gap-4">
@@ -643,7 +754,7 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                     console.log("Add Week button clicked");
                     addWeek();
                   }}
-                  className="flex items-center gap-2 bg-gold text-black font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-gold/90 px-6 py-3 rounded-xl transition-all shadow-lg shadow-gold/10"
+                  className="flex items-center gap-2 bg-gold text-black font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-gold/90 px-6 py-3 rounded-xl transition-all shadow-lg shadow-gold/10 krome-outline"
                 >
                   <Plus className="w-4 h-4" /> Add Week
                 </button>
@@ -699,30 +810,48 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                           exit={{ height: 0, opacity: 0 }}
                           className="px-6 md:px-8 pb-8 space-y-8"
                         >
-                          <div className="flex flex-wrap gap-2 pt-4 border-t border-white/5">
-                            {week.days.map((day) => (
-                              <button
-                                key={day.id}
-                                onClick={() => setActiveDayId(day.id)}
-                                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeDayId === day.id ? 'bg-accent text-black shadow-lg shadow-accent/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                          <Droppable droppableId={`week-${week.id}`} direction="horizontal" type="day">
+                            {(provided) => (
+                              <div 
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className="flex flex-wrap gap-2 pt-4 border-t border-white/5"
                               >
-                                {day.title}
-                                <span className="w-4 h-4 rounded bg-black/20 flex items-center justify-center text-[8px]">{day.exercises.length}</span>
-                              </button>
-                            ))}
-                              {week.days.length < 7 && (
-                                <button 
-                                  onClick={() => {
-                                    console.log("Add Day button clicked");
-                                    setTargetWeekId(week.id);
-                                    setIsAddingWorkout(true);
-                                  }}
-                                  className="px-5 py-2.5 rounded-xl bg-white/5 text-gold hover:bg-gold/10 transition-all flex items-center gap-2 font-black uppercase text-[10px] tracking-widest border border-gold/20 border-dashed"
-                                >
-                                  <Plus className="w-3 h-3" /> Add Day
-                                </button>
-                              )}
-                          </div>
+                                {week.days.map((day, index) => (
+                                  <Draggable key={day.id} draggableId={`day-${day.id}`} index={index}>
+                                    {(provided) => (
+                                      <div
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                      >
+                                        <button
+                                          onClick={() => setActiveDayId(day.id)}
+                                          className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeDayId === day.id ? 'bg-accent text-black shadow-lg shadow-accent/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                                        >
+                                          {day.title}
+                                          <span className="w-4 h-4 rounded bg-black/20 flex items-center justify-center text-[8px]">{day.exercises.length}</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                                {week.days.length < 7 && (
+                                  <button 
+                                    onClick={() => {
+                                      console.log("Add Day button clicked");
+                                      setTargetWeekId(week.id);
+                                      setIsAddingWorkout(true);
+                                    }}
+                                    className="px-5 py-2.5 rounded-xl bg-white/5 text-gold hover:bg-gold/10 transition-all flex items-center gap-2 font-black uppercase text-[10px] tracking-widest border border-gold/20 border-dashed"
+                                  >
+                                    <Plus className="w-3 h-3" /> Add Day
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </Droppable>
 
                           {week.days.map((day) => activeDayId === day.id && (
                             <div key={day.id} className="space-y-6">
@@ -740,92 +869,122 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                                 />
                                 <div className="flex items-center gap-4">
                                   <div className="text-[10px] font-black uppercase tracking-widest text-white/20">Day Configuration</div>
+                                  <button 
+                                    onClick={() => { setDeleteTarget({ type: 'day', weekId: week.id, dayId: day.id }); setShowDeleteConfirm(true); }}
+                                    className="w-8 h-8 rounded-lg bg-rose-500/5 text-rose-500/30 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0"
+                                    aria-label="Delete Day"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </div>
 
-                              <div className="space-y-4">
-                                {day.exercises.length === 0 && (
-                                  <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-[24px] bg-black/20">
-                                    <Dumbbell className="w-10 h-10 text-white/5 mx-auto mb-4" />
-                                    <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">No exercises added yet</p>
+                              <Droppable droppableId={`exercises-${week.id}-day-${day.id}`} type="exercise">
+                                {(provided) => (
+                                  <div 
+                                    ref={provided.innerRef}
+                                    {...provided.droppableProps}
+                                    className="space-y-4"
+                                  >
+                                    {day.exercises.length === 0 && (
+                                      <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-[24px] bg-black/20">
+                                        <Dumbbell className="w-10 h-10 text-white/5 mx-auto mb-4" />
+                                        <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">No exercises added yet</p>
+                                      </div>
+                                    )}
+                                    {day.exercises.map((ex, index) => (
+                                      <Draggable key={ex.id} draggableId={`exercise-${ex.id}`} index={index}>
+                                        {(provided) => (
+                                          <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                          >
+                                            <motion.div 
+                                              layout
+                                              className="bg-zinc-900 border border-white/10 p-6 rounded-2xl space-y-4 hover:border-gold/50 transition-all group relative cursor-pointer"
+                                            >
+                                              <div className="flex items-center justify-between gap-4">
+                                                  <div className="flex items-center gap-4">
+                                                    <button 
+                                                      onClick={() => toggleExerciseCollapse(week.id, day.id, ex.id)}
+                                                      className="w-10 h-10 rounded-xl bg-gold/5 flex items-center justify-center text-gold shrink-0 hover:bg-gold/10 transition-all"
+                                                    >
+                                                      {ex.collapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                                                    </button>
+                                                    <div>
+                                                      <span className="text-sm font-black uppercase italic text-white">{ex.nameOverride || EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.name || 'Unknown Exercise'}</span>
+                                                      <div className="text-[10px] font-black uppercase tracking-widest text-white/30">{EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.category || 'General'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <button 
+                                                    onClick={() => { setDeleteTarget({ type: 'exercise', weekId: week.id, dayId: day.id, exerciseId: ex.id }); setShowDeleteConfirm(true); }}
+                                                    className="w-8 h-8 rounded-lg bg-rose-500/5 text-rose-500/30 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0"
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </button>
+                                                </div>
+
+                                                {!ex.collapsed && (
+                                                  <div className="flex flex-col gap-4">
+                                                  <div className="space-y-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Sets</label>
+                                                    <input 
+                                                      type="text" 
+                                                      value={ex.sets}
+                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'sets', e.target.value)}
+                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
+                                                    />
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Reps</label>
+                                                    <input 
+                                                      type="text" 
+                                                      value={ex.reps}
+                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'reps', e.target.value)}
+                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
+                                                    />
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Tempo</label>
+                                                    <input 
+                                                      type="text" 
+                                                      value={ex.tempo}
+                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'tempo', e.target.value)}
+                                                      placeholder="3-1-1"
+                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
+                                                    />
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Rest</label>
+                                                    <input 
+                                                      type="text" 
+                                                      value={ex.rest}
+                                                      onChange={(e) => updateExercise(week.id, day.id, ex.id, 'rest', e.target.value)}
+                                                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
+                                                    />
+                                                  </div>
+                                                </div>
+                                                )}
+                                              <div className="space-y-1">
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Coaching Cues & Notes</label>
+                                                <input 
+                                                  type="text" 
+                                                  value={ex.notes}
+                                                  onChange={(e) => updateExercise(week.id, day.id, ex.id, 'notes', e.target.value)}
+                                                  placeholder="Add specific cues or personal performance notes..."
+                                                  className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
+                                                />
+                                              </div>
+                                            </motion.div>
+                                          </div>
+                                        )}
+                                      </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                   </div>
                                 )}
-                                {day.exercises.map((ex) => (
-                                  <motion.div 
-                                    layout
-                                    key={ex.id} 
-                                    className="bg-black/20 border border-white/5 p-6 rounded-2xl space-y-4 hover:border-white/10 transition-all group relative"
-                                  >
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                          <div className="w-10 h-10 rounded-xl bg-gold/5 flex items-center justify-center text-gold shrink-0">
-                                            <Dumbbell className="w-5 h-5" />
-                                          </div>
-                                          <div>
-                                            <span className="text-sm font-black uppercase italic text-white">{ex.nameOverride || EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.name || 'Unknown Exercise'}</span>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-white/30">{EXERCISE_LIBRARY.find(e => e.id === ex.exerciseId)?.category || 'General'}</div>
-                                          </div>
-                                        </div>
-                                        <button 
-                                          onClick={() => { setDeleteTarget({ type: 'exercise', weekId: week.id, dayId: day.id, exerciseId: ex.id }); setShowDeleteConfirm(true); }}
-                                          className="w-8 h-8 rounded-lg bg-rose-500/5 text-rose-500/30 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-
-                                      <div className="flex flex-col gap-4">
-                                        <div className="space-y-1">
-                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Sets</label>
-                                          <input 
-                                            type="text" 
-                                            value={ex.sets}
-                                            onChange={(e) => updateExercise(week.id, day.id, ex.id, 'sets', e.target.value)}
-                                            className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Reps</label>
-                                          <input 
-                                            type="text" 
-                                            value={ex.reps}
-                                            onChange={(e) => updateExercise(week.id, day.id, ex.id, 'reps', e.target.value)}
-                                            className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Tempo</label>
-                                          <input 
-                                            type="text" 
-                                            value={ex.tempo}
-                                            onChange={(e) => updateExercise(week.id, day.id, ex.id, 'tempo', e.target.value)}
-                                            placeholder="3-1-1"
-                                            className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Rest</label>
-                                          <input 
-                                            type="text" 
-                                            value={ex.rest}
-                                            onChange={(e) => updateExercise(week.id, day.id, ex.id, 'rest', e.target.value)}
-                                            className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                          />
-                                        </div>
-                                      </div>
-                                    <div className="space-y-1">
-                                      <label className="text-[9px] font-black uppercase tracking-widest text-white/30">Coaching Cues & Notes</label>
-                                      <input 
-                                        type="text" 
-                                        value={ex.notes}
-                                        onChange={(e) => updateExercise(week.id, day.id, ex.id, 'notes', e.target.value)}
-                                        placeholder="Add specific cues or personal performance notes..."
-                                        className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-gold outline-none transition-all"
-                                      />
-                                    </div>
-                                  </motion.div>
-                                ))}
-                              </div>
+                              </Droppable>
                             </div>
                           ))}
                         </motion.div>
@@ -957,7 +1116,7 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
                       <div className="flex flex-col gap-1">
                         <div className="text-sm font-black uppercase italic text-white group-hover:text-gold transition-colors line-clamp-2 leading-tight">{ex.name}</div>
                         {ex.videoUrl && (
-                          <a href={ex.videoUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] font-black uppercase tracking-widest text-gold hover:underline">
+                          <a href={ex.videoUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] font-black uppercase tracking-widest text-gold hover:underline !outline-none">
                             Watch Demo
                           </a>
                         )}
@@ -982,6 +1141,7 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
               )}
             </div>
           </motion.div>
+          </DragDropContext>
         ) : (
           <motion.div 
             key="analytics"
@@ -990,18 +1150,26 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
             exit={{ opacity: 0, y: -20 }}
             className="space-y-10"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-[40px] shadow-xl">
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Total Program Weeks</div>
-                <div className="text-5xl font-black italic text-gold">{weeks.length}</div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Total Weeks</div>
+                <div className="text-4xl font-black italic text-gold">{analyticsStats.totalWeeks}</div>
               </div>
-              <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-[40px] shadow-xl">
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Total Training Days</div>
-                <div className="text-5xl font-black italic text-accent">{weeks.reduce((acc, w) => acc + w.days.length, 0)}</div>
+              <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Training Days</div>
+                <div className="text-4xl font-black italic text-accent">{analyticsStats.totalDays}</div>
               </div>
-              <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-[40px] shadow-xl">
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Total Exercise Volume</div>
-                <div className="text-5xl font-black italic text-white">{weeks.reduce((acc, w) => acc + w.days.reduce((dAcc, d) => dAcc + d.exercises.length, 0), 0)}</div>
+              <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Total Volume</div>
+                <div className="text-4xl font-black italic text-white">{analyticsStats.totalVolume}</div>
+              </div>
+              <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Avg Sets/Day</div>
+                <div className="text-4xl font-black italic text-emerald-500">{analyticsStats.averageSetsPerWorkout}</div>
+              </div>
+              <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Est. Completion</div>
+                <div className="text-4xl font-black italic text-rose-500">{analyticsStats.completionRate}%</div>
               </div>
             </div>
 
@@ -1196,13 +1364,13 @@ export default function ProgramBuilder({ userId, onSave, onBack, initialProgram,
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={handleDelete}
-                  className="w-full py-4 bg-red-500 text-white rounded-full font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                  className="w-full py-4 bg-red-500 text-white rounded-full font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 krome-outline"
                 >
                   Confirm Delete
                 </button>
                 <button 
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="w-full py-4 bg-white/5 text-white rounded-full font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                  className="w-full py-4 bg-white/5 text-white rounded-full font-black uppercase tracking-widest hover:bg-white/10 transition-all krome-outline"
                 >
                   Cancel
                 </button>

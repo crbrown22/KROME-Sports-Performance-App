@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Lock, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Lock, CheckCircle2, Dumbbell } from 'lucide-react';
 import { FullProgramTemplate } from '../data/workoutTemplates';
 
 interface ProductDescriptionProps {
@@ -10,6 +10,20 @@ interface ProductDescriptionProps {
 }
 
 export default function ProductDescription({ program, onBack, onPurchase }: ProductDescriptionProps) {
+  const uniqueExercises = useMemo(() => {
+    const exercises = new Set<string>();
+    program.phases.forEach(phase => {
+      phase.weeks.forEach(week => {
+        week.workouts.forEach(workout => {
+          workout.exercises.forEach(ex => {
+            exercises.add(ex.nameOverride || ex.exerciseId);
+          });
+        });
+      });
+    });
+    return Array.from(exercises).sort();
+  }, [program]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -43,6 +57,21 @@ export default function ProductDescription({ program, onBack, onPurchase }: Prod
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-gold" /> Progress Tracking</li>
             </ul>
           </div>
+
+          {uniqueExercises.length > 0 && (
+            <div className="mb-10">
+              <h3 className="font-bold uppercase italic mb-4 flex items-center gap-2">
+                <Dumbbell className="w-5 h-5 text-gold" /> Included Exercises:
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {uniqueExercises.map((ex, idx) => (
+                  <span key={idx} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs text-white/70">
+                    {ex.replace(/-/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button 
             onClick={onPurchase}

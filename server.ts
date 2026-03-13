@@ -9,6 +9,7 @@ import multer from 'multer';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
 import webpush from 'web-push';
+import bcrypt from 'bcryptjs';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -293,15 +294,69 @@ async function startServer() {
     }
   });
 
+  // Leads: Get all leads
+  app.get("/api/leads", (req, res) => {
+    try {
+      const leads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
+      res.json(leads);
+    } catch (err) {
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Leads: Add lead
+  app.post("/api/leads", (req, res) => {
+    const { name, email, status } = req.body;
+    try {
+      const insert = db.prepare('INSERT INTO leads (name, email, status) VALUES (?, ?, ?)');
+      const result = insert.run(name, email, status || 'New Lead');
+      res.json({ id: result.lastInsertRowid, name, email, status });
+    } catch (err) {
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Leads: Update lead
+  app.patch("/api/leads/:id", (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    try {
+      db.prepare('UPDATE leads SET status = ? WHERE id = ?').run(status, id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Leads: Delete lead
+  app.delete("/api/leads/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare('DELETE FROM leads WHERE id = ?').run(id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // Auth: Login
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     try {
-      const user = db.prepare('SELECT * FROM users WHERE email = ? AND password = ?').get(email, password);
+      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
       if (user) {
-        // Remove password from response
-        const { password, ...safeUser } = user as any;
-        res.json(safeUser);
+        if (await bcrypt.compare(password, user.password)) {
+          const { password: _, ...safeUser } = user;
+          res.json(safeUser);
+        } else if (password === user.password) {
+          // Plain text password match, hash it and update
+          const hashedPassword = await bcrypt.hash(password, 10);
+          db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, user.id);
+          const { password: _, ...safeUser } = user;
+          res.json(safeUser);
+        } else {
+          res.status(401).json({ error: "Invalid email or password" });
+        }
       } else {
         res.status(401).json({ error: "Invalid email or password" });
       }
@@ -311,12 +366,45 @@ async function startServer() {
   });
 
   // Auth: Register
-  app.post("/api/auth/register", (req, res) => {
-    const { username, email, password, first_name, last_name } = req.body;
+  app.post("/api/auth/register", async (req, res) => {
+    const { username, email, password, first_name, last_name, firstName, lastName, role, status, uid } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO users (username, email, password, first_name, last_name) VALUES (?, ?, ?, ?, ?)');
-      const result = insert.run(username, email, password, first_name || "", last_name || "");
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const insert = db.prepare('INSERT INTO users (username, email, password, first_name, last_name, role, status, uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      const result = insert.run(username, email, hashedPassword, first_name || firstName || "", last_name || lastName || "", role || 'user', status || 'active', uid || null);
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
+      
+      // Add to leads
+      db.prepare('INSERT INTO leads (name, email, status) VALUES (?, ?, ?)').run(`${user.first_name} ${user.last_name}`, user.email, 'New Lead');
+
+      // Send email notifications
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465',
+        requireTLS: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      // Email to Admin
+      await transporter.sendMail({
+        from: '"KROME Fitness" <kromefitness@gmail.com>',
+        to: 'kromefitness@gmail.com',
+        subject: 'New Athlete Registered',
+        text: `A new athlete has registered:\n\nName: ${user.first_name} ${user.last_name}\nEmail: ${user.email}`,
+      });
+
+      // Email to Athlete
+      await transporter.sendMail({
+        from: '"KROME Fitness" <kromefitness@gmail.com>',
+        to: user.email,
+        subject: 'Welcome to KROME Fitness',
+        text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nBest regards,\nThe KROME Team`,
+      });
+
       console.log("Registered user:", user);
       res.json(user);
     } catch (err: any) {
@@ -404,16 +492,20 @@ async function startServer() {
   // User: Update profile
   app.patch("/api/users/:id", (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, email, avatar_url, role, status } = req.body;
+    const { first_name, last_name, email, avatar_url, firstName, lastName, avatarUrl, role, status } = req.body;
     try {
       // Build dynamic update query
       const fields = [];
       const params = [];
       
-      if (first_name !== undefined) { fields.push('first_name = ?'); params.push(first_name); }
-      if (last_name !== undefined) { fields.push('last_name = ?'); params.push(last_name); }
+      const finalFirstName = first_name !== undefined ? first_name : firstName;
+      const finalLastName = last_name !== undefined ? last_name : lastName;
+      const finalAvatarUrl = avatar_url !== undefined ? avatar_url : avatarUrl;
+
+      if (finalFirstName !== undefined) { fields.push('first_name = ?'); params.push(finalFirstName); }
+      if (finalLastName !== undefined) { fields.push('last_name = ?'); params.push(finalLastName); }
       if (email !== undefined) { fields.push('email = ?'); params.push(email); }
-      if (avatar_url !== undefined) { fields.push('avatar_url = ?'); params.push(avatar_url); }
+      if (finalAvatarUrl !== undefined) { fields.push('avatar_url = ?'); params.push(finalAvatarUrl); }
       if (role !== undefined) { fields.push('role = ?'); params.push(role); }
       if (status !== undefined) { fields.push('status = ?'); params.push(status); }
       
@@ -794,6 +886,12 @@ async function startServer() {
   app.post("/api/activity", (req, res) => {
     const { user_id, action, details } = req.body;
     try {
+      if (user_id) {
+        const user = db.prepare('SELECT id FROM users WHERE id = ?').get(user_id);
+        if (!user) {
+          return res.status(400).json({ error: "Invalid user_id" });
+        }
+      }
       const insert = db.prepare('INSERT INTO user_activity_logs (user_id, action, details) VALUES (?, ?, ?)');
       insert.run(user_id, action, JSON.stringify(details));
       res.json({ success: true });
@@ -910,10 +1008,13 @@ async function startServer() {
   // Users: Update notification settings
   app.patch("/api/users/:id/notifications", (req, res) => {
     const { id } = req.params;
-    const { email_notifications, push_notifications } = req.body;
+    const { email_notifications, push_notifications, emailNotifications, pushNotifications } = req.body;
     try {
+      const finalEmailNotifications = email_notifications !== undefined ? email_notifications : emailNotifications;
+      const finalPushNotifications = push_notifications !== undefined ? push_notifications : pushNotifications;
+      
       const update = db.prepare('UPDATE users SET email_notifications = ?, push_notifications = ? WHERE id = ?');
-      update.run(email_notifications ? 1 : 0, push_notifications ? 1 : 0, id);
+      update.run(finalEmailNotifications ? 1 : 0, finalPushNotifications ? 1 : 0, id);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Database error" });

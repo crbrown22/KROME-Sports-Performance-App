@@ -23,6 +23,7 @@ import {
 import AICoach from './AICoach';
 import WorkoutFeedback from './WorkoutFeedback';
 import VolumeProgressionChart from './VolumeProgressionChart';
+import VideoModal from './VideoModal';
 import { ALL_PROGRAMS, FullProgramTemplate, WorkoutTemplate, ExerciseTemplate } from '../data/workoutTemplates';
 import { EXERCISE_LIBRARY, CATEGORIES } from '../data/exerciseLibrary';
 import { getCurrentDate } from '../utils/date';
@@ -61,7 +62,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
   const [editForm, setEditForm] = useState<Partial<ExerciseTemplate>>({});
   const [workoutStartTime, setWorkoutStartTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'list' | 'program' | 'workout'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'program' | 'workout' | 'exercises'>('list');
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
@@ -72,6 +73,22 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
   const [isAddingWorkout, setIsAddingWorkout] = useState(false);
   const [newWorkoutTitle, setNewWorkoutTitle] = useState('');
   const [savingCustom, setSavingCustom] = useState(false);
+  const [videoModal, setVideoModal] = useState<{isOpen: boolean, url: string, title: string}>({isOpen: false, url: '', title: ''});
+
+  const uniqueExercises = useMemo(() => {
+    if (!selectedProgram) return [];
+    const exercises = new Set<string>();
+    selectedProgram.phases.forEach(phase => {
+      phase.weeks.forEach(week => {
+        week.workouts.forEach(workout => {
+          workout.exercises.forEach(ex => {
+            exercises.add(ex.nameOverride || ex.exerciseId);
+          });
+        });
+      });
+    });
+    return Array.from(exercises).sort();
+  }, [selectedProgram]);
 
   const availablePrograms = useMemo(() => {
     const filteredAll = isAdmin ? ALL_PROGRAMS : ALL_PROGRAMS.filter(p => purchasedPrograms.includes(p.name));
@@ -492,7 +509,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                     setViewMode('program'); 
                   }
                 }}
-                className={`cursor-pointer text-left bg-zinc-900/30 border ${customPrograms.find(p => p.id === program.id) ? 'border-gold/10' : 'border-white/5'} p-8 md:p-10 rounded-[40px] hover:border-gold/30 transition-all group relative overflow-hidden`}
+                className={`cursor-pointer text-left bg-zinc-900/30 border ${customPrograms.find(p => p.id === program.id) ? 'border-gold/10' : 'border-white/5'} p-8 md:p-10 rounded-[40px] hover:border-gold/30 transition-all group relative overflow-hidden krome-outline`}
               >
                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                   {locked ? <Lock className="w-24 h-24 text-white" /> : (customPrograms.find(p => p.id === program.id) ? <Edit2 className="w-24 h-24 text-gold" /> : <Dumbbell className="w-24 h-24" />)}
@@ -573,7 +590,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
           <div className="flex flex-col sm:flex-row gap-3">
             <button 
               onClick={() => onEdit?.(selectedProgram, !!customPrograms.find(p => p.id === selectedProgram.id))}
-              className="flex items-center justify-center gap-2 bg-gold/10 border border-gold/20 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gold hover:bg-gold hover:text-black transition-all shadow-lg shadow-gold/5"
+              className="flex items-center justify-center gap-2 bg-gold/10 border border-gold/20 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gold hover:bg-gold hover:text-black transition-all shadow-lg shadow-gold/5 krome-outline"
             >
               <Edit2 className="w-4 h-4" /> Customize Program
             </button>
@@ -655,7 +672,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
         <div className="lg:col-span-4 space-y-6">
           <button 
             onClick={() => setIsCoachOpen(true)}
-            className="w-full bg-zinc-900/50 border border-gold/20 rounded-3xl p-6 flex items-center justify-between hover:bg-gold/10 transition-all group"
+            className="w-full bg-zinc-900/50 border border-gold/20 rounded-3xl p-6 flex items-center justify-between hover:bg-gold/10 transition-all group krome-outline"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center text-gold">
@@ -699,7 +716,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                   <button
                     key={idx}
                     onClick={() => { setCurrentPhaseIdx(idx); setCurrentWeekIdx(0); setSelectedWorkout(null); setViewMode('program'); }}
-                    className={`w-full text-left p-4 rounded-2xl text-sm font-bold transition-all flex justify-between items-center ${currentPhaseIdx === idx ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                    className={`w-full text-left p-4 rounded-2xl text-sm font-bold transition-all flex justify-between items-center ${currentPhaseIdx === idx ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
                   >
                     <span>{phase.name}</span>
                     {currentPhaseIdx === idx && <ChevronRight className="w-4 h-4" />}
@@ -715,20 +732,27 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                   <button
                     key={idx}
                     onClick={() => { setCurrentWeekIdx(idx); setSelectedWorkout(null); setViewMode('program'); }}
-                    className={`aspect-square flex items-center justify-center rounded-xl text-xs font-black transition-all ${currentWeekIdx === idx ? 'bg-accent text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                    className={`aspect-square flex items-center justify-center rounded-xl text-xs font-black transition-all ${currentWeekIdx === idx && viewMode !== 'exercises' ? 'bg-accent text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'} krome-outline`}
                   >
                     {week.week}
                   </button>
                 ))}
               </div>
             </div>
+
+            <button
+              onClick={() => setViewMode('exercises')}
+              className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${viewMode === 'exercises' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'} krome-outline`}
+            >
+              <Dumbbell className="w-4 h-4" /> View All Exercises
+            </button>
           </div>
         </div>
 
         {/* Workout Content */}
         <div className="lg:col-span-8 space-y-6">
           <AnimatePresence mode="wait">
-            {viewMode === 'program' ? (
+            {viewMode === 'program' && (
               <motion.div
                 key="weekly-breakdown"
                 initial={{ opacity: 0, x: 20 }}
@@ -769,7 +793,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                     ))}
                     <button 
                       onClick={() => setIsAddingWorkout(true)}
-                      className="flex items-center justify-center gap-3 p-6 bg-gold/5 border-2 border-dashed border-gold/20 rounded-3xl hover:bg-gold/10 transition-all group"
+                      className="flex items-center justify-center gap-3 p-6 bg-gold/5 border-2 border-dashed border-gold/20 rounded-3xl hover:bg-gold/10 transition-all group krome-outline"
                     >
                       <Plus className="w-6 h-6 text-gold group-hover:scale-110 transition-transform" />
                       <span className="text-sm font-black uppercase tracking-widest text-gold">Add Workout to Week {currentWeek.week}</span>
@@ -780,7 +804,8 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                 {/* Volume Progression Chart */}
                 <VolumeProgressionChart program={selectedProgram} />
               </motion.div>
-            ) : selectedWorkout && (
+            )}
+            {viewMode === 'workout' && selectedWorkout && (
               <motion.div
                 key={selectedWorkout.id}
                 initial={{ opacity: 0, x: 20 }}
@@ -868,9 +893,12 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                               </motion.h4>
                               {displayData.notes && <p className="text-sm text-white/40 mt-2 italic">{displayData.notes}</p>}
                               {displayData.videoUrl && (
-                                <a href={displayData.videoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-gold hover:underline mt-2 block">
-                                  Watch Demo
-                                </a>
+                                <button 
+                                  onClick={() => setVideoModal({ isOpen: true, url: displayData.videoUrl, title: displayData.name })}
+                                  className="text-xs text-gold hover:underline mt-2 flex items-center gap-1 !outline-none"
+                                >
+                                  <PlayCircle className="w-3 h-3" /> Watch Demo
+                                </button>
                               )}
                             </div>
                           </div>
@@ -971,6 +999,39 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                     </div>
                     <p className="text-[10px] text-white/20 uppercase tracking-[0.2em] font-bold">Submit your performance data to the elite system</p>
                   </div>
+                </div>
+              </motion.div>
+            )}
+            {viewMode === 'exercises' && (
+              <motion.div
+                key="exercises-view"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-zinc-900/50 border border-white/5 rounded-[40px] overflow-hidden p-8"
+              >
+                <div className="flex items-center gap-4 mb-8">
+                  <button 
+                    onClick={() => setViewMode('program')}
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gold"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <div>
+                    <h3 className="text-2xl font-black uppercase italic">Program <span className="text-gold">Exercises</span></h3>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{uniqueExercises.length} Unique Movements</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {uniqueExercises.map((ex, idx) => (
+                    <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold shrink-0">
+                        <Dumbbell className="w-5 h-5" />
+                      </div>
+                      <span className="font-bold text-sm text-white/90">{ex.replace(/-/g, ' ')}</span>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}
@@ -1131,6 +1192,13 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
           </motion.div>
         )}
       </AnimatePresence>
+
+      <VideoModal 
+        isOpen={videoModal.isOpen}
+        onClose={() => setVideoModal({ ...videoModal, isOpen: false })}
+        videoUrl={videoModal.url}
+        title={videoModal.title}
+      />
     </div>
   );
 }

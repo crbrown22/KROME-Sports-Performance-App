@@ -33,6 +33,9 @@ export interface FullProgramTemplate {
   id: string;
   name: string;
   description: string;
+  sport?: string;
+  goal?: string;
+  trainer?: string;
   phases: PhaseTemplate[];
 }
 
@@ -40,6 +43,9 @@ export const SOCCER_52_WEEK: FullProgramTemplate = {
   id: 'soccer-52-week',
   name: 'KSP Soccer 52-Week Elite Performance',
   description: 'A comprehensive 52-week program for soccer athletes, focusing on strength, power, speed, and conditioning.',
+  sport: 'Soccer',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'MEE (Metabolic Efficiency & Endurance)',
@@ -283,6 +289,9 @@ export const SOFTBALL_WINTER: FullProgramTemplate = {
   id: 'softball-winter',
   name: 'KSP Softball Winter Break',
   description: 'Winter-specific program for softball athletes focusing on speed, conditioning, and strength.',
+  sport: 'Softball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Winter Phase (Weeks 1-8)',
@@ -344,6 +353,9 @@ export const BASEBALL_WINTER: FullProgramTemplate = {
   id: 'baseball-winter',
   name: 'KSP Baseball Winter Break',
   description: 'Winter-specific program for baseball athletes focusing on strength and conditioning.',
+  sport: 'Baseball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Winter Phase (Weeks 1-8)',
@@ -404,6 +416,9 @@ export const LOWER_BACK_REHAB: FullProgramTemplate = {
   id: 'lower-back-rehab',
   name: '6-Week Lower Back Rehabilitation',
   description: 'Designed for collegiate & professional soccer players to correct lumbar curvature and muscular imbalance.',
+  sport: 'Soccer',
+  goal: 'Rehab',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Mobility & Core Activation (Weeks 1-2)',
@@ -461,6 +476,9 @@ export const SOFTBALL_52_WEEK: FullProgramTemplate = {
   id: 'softball-52-week',
   name: 'KSP Softball 52-Week Elite Performance',
   description: 'A comprehensive 52-week program for softball athletes, focusing on rotational power, speed, and durability.',
+  sport: 'Softball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'MEE (Metabolic Efficiency & Endurance)',
@@ -565,6 +583,9 @@ export const BASEBALL_52_WEEK: FullProgramTemplate = {
   id: 'baseball-52-week',
   name: 'KSP Baseball 52-Week Elite Performance',
   description: 'A comprehensive 52-week program for baseball athletes, focusing on explosive power, arm health, and speed. Includes 5 phases of development with 4-5 workouts per week.',
+  sport: 'Baseball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'MEE (Metabolic Efficiency & Endurance)',
@@ -789,6 +810,9 @@ export const SOFTBALL_SUMMER: FullProgramTemplate = {
   id: 'softball-summer',
   name: 'KSP Softball Summer Break',
   description: 'Summer-specific program for softball athletes focusing on power, speed, and durability.',
+  sport: 'Softball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Summer Phase (Weeks 1-8)',
@@ -814,6 +838,9 @@ export const BASEBALL_SUMMER: FullProgramTemplate = {
   id: 'baseball-summer',
   name: 'KSP Baseball Summer Break',
   description: 'Summer-specific program for baseball athletes focusing on explosive power and arm health.',
+  sport: 'Baseball',
+  goal: 'Performance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Summer Phase (Weeks 1-8)',
@@ -839,6 +866,9 @@ export const STRENGTH_POWER_PROGRAM: FullProgramTemplate = {
   id: 'strength-power',
   name: 'Strength & Power',
   description: 'A specialized track focusing on maximal strength and explosive power development.',
+  sport: 'General',
+  goal: 'Strength',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Phase 1: Hypertrophy Foundation',
@@ -899,6 +929,9 @@ export const SPEED_AGILITY_PROGRAM: FullProgramTemplate = {
   id: 'speed-agility',
   name: 'Speed & Agility',
   description: 'Develop elite-level linear speed and multi-directional agility.',
+  sport: 'General',
+  goal: 'Speed',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Phase 1: Acceleration Mechanics',
@@ -959,6 +992,9 @@ export const AEROBIC_CAPACITY_PROGRAM: FullProgramTemplate = {
   id: 'aerobic-capacity',
   name: 'Aerobic Capacity Foundation',
   description: 'Build your aerobic base with elite conditioning protocols.',
+  sport: 'General',
+  goal: 'Endurance',
+  trainer: 'Coach Krome',
   phases: [
     {
       name: 'Phase 1',

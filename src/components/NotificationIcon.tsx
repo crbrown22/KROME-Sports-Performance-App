@@ -15,7 +15,7 @@ export default function NotificationIcon({ userId, onOpenChat, onOpenAdminChat, 
     <div className="flex items-center gap-4">
       <button 
         onClick={isAdmin ? onOpenAdminChat : onOpenChat}
-        className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-white/60 hover:text-gold transition-colors relative"
+        className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-white/60 hover:text-gold transition-colors relative krome-outline"
         aria-label="Open Chat"
       >
         <MessageSquare className="w-5 h-5" />

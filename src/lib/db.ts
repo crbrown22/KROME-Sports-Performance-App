@@ -153,6 +153,14 @@ try {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    email TEXT,
+    status TEXT DEFAULT 'New Lead',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS custom_programs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -194,6 +202,17 @@ try {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE INDEX IF NOT EXISTS idx_progress_user_id ON progress(user_id);
+  CREATE INDEX IF NOT EXISTS idx_progress_metric_name ON progress(metric_name);
+  CREATE INDEX IF NOT EXISTS idx_nutrition_logs_user_id ON nutrition_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date ON nutrition_logs(date);
+  CREATE INDEX IF NOT EXISTS idx_workout_logs_user_id ON workout_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_workout_logs_date ON workout_logs(date);
+  CREATE INDEX IF NOT EXISTS idx_program_progress_user_id ON program_progress(user_id);
+  CREATE INDEX IF NOT EXISTS idx_program_progress_date ON program_progress(date);
+  CREATE INDEX IF NOT EXISTS idx_body_comp_history_user_id ON body_comp_history(user_id);
+  CREATE INDEX IF NOT EXISTS idx_body_comp_history_date ON body_comp_history(date);
 `);
 } catch (err) {
   console.error("Failed to initialize tables:", err);
@@ -214,6 +233,14 @@ try {
   console.log('Adding is_deleted and updated_at columns to messages table...');
   db.exec('ALTER TABLE messages ADD COLUMN is_deleted INTEGER DEFAULT 0');
   db.exec('ALTER TABLE messages ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+}
+
+// Migration: Add uid column if it doesn't exist
+try {
+  db.prepare('SELECT uid FROM users LIMIT 1').get();
+} catch (err) {
+  console.log('Adding uid column to users table...');
+  db.exec('ALTER TABLE users ADD COLUMN uid TEXT');
 }
 
 // Migration: Add avatar_url column if it doesn't exist

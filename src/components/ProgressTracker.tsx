@@ -179,7 +179,7 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
           {!isAdmin && (
             <button 
               onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-gold text-black p-3 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-gold/20"
+              className="bg-gold text-black p-3 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-gold/20 krome-outline"
               aria-label={showAddForm ? "Close add entry form" : "Add new performance entry"}
               aria-expanded={showAddForm}
             >
@@ -228,7 +228,7 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
               </div>
               <button 
                 type="submit"
-                className="w-full md:w-auto bg-white text-black px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-gold transition-colors"
+                className="w-full md:w-auto bg-white text-black px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-gold transition-colors krome-outline"
                 aria-label="Log performance entry"
               >
                 Log Entry
@@ -373,7 +373,7 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
                   {!isAdmin && (
                     <button 
                       onClick={() => deleteEntry(entry.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/10 hover:text-red-500 transition-all"
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/10 hover:text-red-500 transition-all krome-outline"
                       aria-label={`Delete entry for ${entry.metric_name} on ${entry.fullDate}`}
                     >
                       <Trash2 className="w-4 h-4" aria-hidden="true" />

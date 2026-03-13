@@ -9,8 +9,8 @@ interface AthleteSettingsProps {
 export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    first_name: user.first_name || "",
-    last_name: user.last_name || "",
+    firstName: user.firstName || "",
+    lastName: user.lastName || "",
     email: user.email || "",
     username: user.username || ""
   });
@@ -81,11 +81,11 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">First Name</label>
-              <input type="text" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors" />
+              <input type="text" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Last Name</label>
-              <input type="text" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors" />
+              <input type="text" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Username</label>
@@ -101,7 +101,7 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Full Name</p>
               <p className="text-lg font-bold uppercase italic">
-                {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : 'Athlete Name Not Set'}
+                {user.firstName || user.lastName ? `${user.firstName} ${user.lastName}` : 'Athlete Name Not Set'}
               </p>
             </div>
             <div className="space-y-1">
@@ -115,7 +115,7 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Member Since</p>
               <p className="text-lg font-bold uppercase italic">
-                {new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </p>
             </div>
           </div>

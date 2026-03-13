@@ -5,6 +5,8 @@ export interface BodyMetricsData {
   height: number;
   age: number;
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'very_active' | 'extra_active';
+  vo2Max?: number;
+  restingHR?: number;
   actualRMR: number;
   fatBurnPercent: number;
   carbBurnPercent: number;
@@ -55,6 +57,8 @@ export const INITIAL_DATA: BodyMetricsData = {
   height: 0,
   age: 0,
   activityLevel: 'moderate',
+  vo2Max: 0,
+  restingHR: 0,
   actualRMR: 0,
   fatBurnPercent: 0,
   carbBurnPercent: 0,

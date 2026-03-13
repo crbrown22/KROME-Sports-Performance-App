@@ -23,6 +23,9 @@ interface ProgramCatalogProps {
 
 export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSelectProgram, type = 'all' }: ProgramCatalogProps) {
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
+  const [filterSport, setFilterSport] = useState<string>('all');
+  const [filterGoal, setFilterGoal] = useState<string>('all');
+  const [filterTrainer, setFilterTrainer] = useState<string>('all');
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -45,17 +48,24 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
     ? ['softball-winter', 'baseball-winter', 'softball-summer', 'baseball-summer']
     : type === 'movement'
     ? ['lower-back-rehab']
-    : [
-        'soccer-52-week',
-        'softball-52-week',
-        'baseball-52-week'
-      ];
+    : ALL_PROGRAMS.map(p => p.id);
 
   const isPurchased = (programName: string) => purchasedPrograms.includes(programName);
 
-  const catalogPrograms = catalogIds
+  const basePrograms = catalogIds
     .map(id => ALL_PROGRAMS.find(p => p.id === id))
     .filter((p): p is FullProgramTemplate => p !== undefined);
+
+  const catalogPrograms = basePrograms.filter(p => {
+    if (filterSport !== 'all' && p.sport !== filterSport) return false;
+    if (filterGoal !== 'all' && p.goal !== filterGoal) return false;
+    if (filterTrainer !== 'all' && p.trainer !== filterTrainer) return false;
+    return true;
+  });
+
+  const uniqueSports = Array.from(new Set(basePrograms.map(p => p.sport).filter(Boolean)));
+  const uniqueGoals = Array.from(new Set(basePrograms.map(p => p.goal).filter(Boolean)));
+  const uniqueTrainers = Array.from(new Set(basePrograms.map(p => p.trainer).filter(Boolean)));
 
   const getIcon = (id: string) => {
     if (id.includes('soccer')) return <Activity className="w-6 h-6" />;
@@ -89,7 +99,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
         {/* Header */}
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all"
+          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all !outline-none"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Home
         </button>
@@ -128,6 +138,46 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap gap-4 mb-8">
+          {uniqueSports.length > 0 && (
+            <select 
+              value={filterSport} 
+              onChange={(e) => setFilterSport(e.target.value)}
+              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+            >
+              <option value="all">All Sports</option>
+              {uniqueSports.map(sport => (
+                <option key={sport} value={sport}>{sport}</option>
+              ))}
+            </select>
+          )}
+          {uniqueGoals.length > 0 && (
+            <select 
+              value={filterGoal} 
+              onChange={(e) => setFilterGoal(e.target.value)}
+              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+            >
+              <option value="all">All Goals</option>
+              {uniqueGoals.map(goal => (
+                <option key={goal} value={goal}>{goal}</option>
+              ))}
+            </select>
+          )}
+          {uniqueTrainers.length > 0 && (
+            <select 
+              value={filterTrainer} 
+              onChange={(e) => setFilterTrainer(e.target.value)}
+              className="bg-zinc-900 border border-white/10 text-white text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-gold"
+            >
+              <option value="all">All Trainers</option>
+              {uniqueTrainers.map(trainer => (
+                <option key={trainer} value={trainer}>{trainer}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
         {/* Programs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {catalogPrograms.map((program) => {
@@ -138,7 +188,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
                 whileHover={{ y: -8, scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onSelectProgram(program, locked)}
-                className="group relative text-left bg-zinc-900/30 border border-white/5 p-8 md:p-10 rounded-[40px] hover:border-gold/30 transition-all overflow-hidden"
+                className="group relative text-left bg-zinc-900/30 border border-white/5 p-8 md:p-10 rounded-[40px] hover:border-gold/30 transition-all overflow-hidden krome-outline"
               >
                 {/* Decorative background icon */}
                 <div className="absolute -top-4 -right-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
@@ -149,7 +199,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
 
                 <div className="relative z-10 flex flex-col h-full">
                   <div className="flex items-center justify-between mb-8">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${getAccentColor(program.id, locked)}`}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500 krome-outline ${getAccentColor(program.id, locked)}`}>
                       {locked ? <Lock className="w-6 h-6 text-white/40" /> : getIcon(program.id)}
                     </div>
                     <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10">
@@ -171,14 +221,24 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
 
                   <div className="flex items-center justify-between pt-6 border-t border-white/5">
                     <div className="flex items-center gap-4">
-                      <div className="flex -space-x-2">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="w-6 h-6 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center">
-                            <Target className="w-3 h-3 text-white/20" />
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-2 text-white/40">
+                        <Dumbbell className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-widest">
+                          {(() => {
+                            const exercises = new Set<string>();
+                            program.phases.forEach(phase => {
+                              phase.weeks.forEach(week => {
+                                week.workouts.forEach(workout => {
+                                  workout.exercises.forEach(ex => {
+                                    exercises.add(ex.nameOverride || ex.exerciseId);
+                                  });
+                                });
+                              });
+                            });
+                            return exercises.size;
+                          })()} Unique Movements
+                        </span>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Elite Trackers Active</span>
                     </div>
                     <div className="flex items-center gap-2 text-gold font-black uppercase text-xs tracking-widest group-hover:gap-4 transition-all">
                       {locked ? 'Purchase Access' : 'Access Program'} <ChevronRight className="w-4 h-4" />
@@ -196,7 +256,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
           <p className="text-white/40 text-sm max-w-xl mx-auto mb-8 uppercase tracking-widest font-bold">
             We are constantly developing new elite protocols. Contact our performance team for custom programming or upcoming releases.
           </p>
-          <button className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+          <button className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all krome-outline">
             Request Custom Protocol
           </button>
         </div>

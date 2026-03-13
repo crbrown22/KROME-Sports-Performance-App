@@ -1,3 +1,4 @@
+import { InstallPrompt } from "./components/InstallPrompt";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Dumbbell, 
@@ -14,7 +15,8 @@ import {
   User,
   Shield,
   ChevronLeft,
-  Lock
+  Lock,
+  LogOut
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -42,6 +44,17 @@ import ProgramBuilder from "./components/ProgramBuilder";
 import ProgramViewer from "./components/ProgramViewer";
 import ProgramCatalog from "./components/ProgramCatalog";
 import ProductDescription from "./components/ProductDescription";
+import WorkoutTracker from "./components/WorkoutTracker";
+import FitnessOverview from "./components/FitnessOverview";
+import ProgressTracker from "./components/ProgressTracker";
+import NutritionDashboard from "./components/NutritionDashboard";
+import BodyCompositionTracker from "./components/BodyCompositionTracker";
+import BodyMetrics from "./components/BodyMetrics";
+import { BodyMetricsData, INITIAL_DATA } from "./types";
+import VideoAnalyzer from "./components/VideoAnalyzer";
+import PARQ from "./components/PARQ";
+import ProgramCalendar from "./components/ProgramCalendar";
+import AccountSettings from "./components/AccountSettings";
 import { ALL_PROGRAMS } from "./data/workoutTemplates";
 import { logActivity } from "./utils/activity";
 import Chatbot from "./components/Chatbot";
@@ -81,7 +94,7 @@ const programs = [
   }
 ];
 
-type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding';
+type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings';
 
 const programPrices: Record<string, number> = {
   'soccer-52-week': 99.99,
@@ -100,8 +113,29 @@ const programPrices: Record<string, number> = {
 export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<View>('home');
-  const [previousView, setPreviousView] = useState<View>('home');
+  const [viewStack, setViewStack] = useState<View[]>(['home']);
+  const currentView = viewStack[viewStack.length - 1];
+
+  const navigateTo = (view: View) => {
+    if (viewStack[viewStack.length - 1] === view) return;
+    setViewStack(prev => [...prev, view]);
+  };
+
+  const goBack = () => {
+    if (viewStack.length > 1) {
+      setViewStack(prev => prev.slice(0, -1));
+    } else {
+      setViewStack(['home']);
+    }
+  };
+
+  const resetToView = (view: View) => {
+    setViewStack([view]);
+  };
+
+  // For compatibility with existing code during refactor
+  const setCurrentView = (view: View) => navigateTo(view);
+
   const [selectedProgramId, setSelectedProgramId] = useState<string | undefined>(undefined);
   const [selectedProgram, setSelectedProgram] = useState<any | undefined>(undefined);
   const [isCustomProgram, setIsCustomProgram] = useState(false);
@@ -109,20 +143,22 @@ export default function App() {
   const [programsDropdownOpen, setProgramsDropdownOpen] = useState(false);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [shopCategory, setShopCategory] = useState<'all' | 'programs' | 'apparel'>('all');
-  const [user, setUser] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem('krome_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch (err) {
-      console.error("Failed to parse saved user", err);
-      return null;
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('krome_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
-  });
+    setLoading(false);
+  }, []);
   const [showChat, setShowChat] = useState(false);
   const [adminInitialTab, setAdminInitialTab] = useState<'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback'>('progress');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [specializedType, setSpecializedType] = useState<'movement' | 'speed' | 'strength' | 'nutrition'>('movement');
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
+  const [bodyMetricsData, setBodyMetricsData] = useState<BodyMetricsData>(INITIAL_DATA);
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadSenderIds, setUnreadSenderIds] = useState<Set<number>>(new Set());
@@ -175,11 +211,30 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
+      const fetchMetrics = async () => {
+        try {
+          const res = await fetch(`/api/metrics/${user.id}`);
+          if (res.ok) {
+            const dbData = await res.json();
+            if (dbData) {
+              setBodyMetricsData(dbData);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to load metrics", err);
+        }
+      };
+      fetchMetrics();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
       console.log("App user effect, parq_completed:", user.parq_completed, typeof user.parq_completed);
       if (user.parq_completed == 0) {
-        setCurrentView('profile');
+        resetToView('profile');
       } else {
-        setCurrentView('home');
+        resetToView('home');
       }
     }
   }, [user]);
@@ -236,17 +291,17 @@ export default function App() {
     console.log("Login success, user:", userData);
     setUser(userData);
     localStorage.setItem('krome_user', JSON.stringify(userData));
-    setCurrentView('profile');
+    resetToView('profile');
     logActivity(userData.id, 'login', { username: userData.username });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (user) {
       logActivity(user?.id, 'logout', { username: user?.username });
     }
     setUser(null);
     localStorage.removeItem('krome_user');
-    setCurrentView('home');
+    resetToView('home');
   };
 
   return (
@@ -267,7 +322,7 @@ export default function App() {
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentView('home'); }}
           >
-            <div className="w-10 h-10 gold-gradient rounded-sm flex items-center justify-center font-black text-black text-xl italic">K</div>
+            <img src="/logo.png" alt="KROME Sports Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
             <span className="text-xl font-black tracking-tighter uppercase italic">
               KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
             </span>
@@ -275,7 +330,7 @@ export default function App() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-widest">
-            <a href="#" onClick={() => setCurrentView('home')} className="hover:text-gold transition-colors">Home</a>
+            <a href="#" onClick={() => setCurrentView('home')} className="hover:text-gold transition-colors !outline-none hover:krome-outline px-2 py-1 rounded-lg">Home</a>
             
             <div 
               className="relative group"
@@ -283,7 +338,7 @@ export default function App() {
               onMouseLeave={() => setProgramsDropdownOpen(false)}
             >
               <button 
-                className="flex items-center gap-1 hover:text-gold transition-colors uppercase tracking-widest"
+                className="flex items-center gap-1 hover:text-gold transition-colors uppercase tracking-widest !outline-none hover:krome-outline px-2 py-1 rounded-lg"
                 aria-expanded={programsDropdownOpen}
                 aria-haspopup="true"
                 aria-label="Programs menu"
@@ -303,7 +358,7 @@ export default function App() {
                     <div className="flex flex-col gap-1 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
                       <button 
                         onClick={() => { setCurrentView('programCatalog'); setProgramsDropdownOpen(false); }}
-                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">52 Week Program</div>
                         <div className="text-[10px] text-white/40 mt-1">Complete athlete development system</div>
@@ -311,7 +366,7 @@ export default function App() {
 
                       <button 
                         onClick={() => { setCurrentView('specializedLanding'); setProgramsDropdownOpen(false); }}
-                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Specialized Training</div>
                         <div className="text-[10px] text-white/40 mt-1">Targeted protocols for specific goals</div>
@@ -329,7 +384,7 @@ export default function App() {
             >
               <button 
                 onClick={() => { setShopCategory('all'); setCurrentView('shop'); setShopDropdownOpen(false); }}
-                className="flex items-center gap-1 hover:text-gold transition-colors uppercase tracking-widest"
+                className="flex items-center gap-1 hover:text-gold transition-colors uppercase tracking-widest !outline-none hover:krome-outline px-2 py-1 rounded-lg"
                 aria-expanded={shopDropdownOpen}
                 aria-haspopup="true"
                 aria-label="Shop menu"
@@ -349,13 +404,13 @@ export default function App() {
                     <div className="flex flex-col gap-1">
                       <button 
                         onClick={() => { setShopCategory('programs'); setCurrentView('shop'); setShopDropdownOpen(false); }}
-                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Programs</div>
                       </button>
                       <button 
                         onClick={() => { setShopCategory('apparel'); setCurrentView('shop'); setShopDropdownOpen(false); }}
-                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                        className="text-left p-3 rounded-xl hover:bg-white/5 transition-colors group !outline-none"
                       >
                         <div className="text-sm font-bold group-hover:text-gold transition-colors uppercase italic">Apparel</div>
                       </button>
@@ -371,7 +426,7 @@ export default function App() {
                 e.preventDefault();
                 setCurrentView('contact');
               }} 
-              className="hover:text-gold transition-colors"
+              className="hover:text-gold transition-colors !outline-none hover:krome-outline px-2 py-1 rounded-lg"
             >
               Contact KSP
             </a>
@@ -380,7 +435,7 @@ export default function App() {
             {user?.role === 'admin' && (
               <button 
                 onClick={() => setCurrentView('admin')}
-                className="text-gold hover:text-white transition-colors flex items-center gap-2"
+                className="text-gold hover:text-white transition-colors flex items-center gap-2 !outline-none hover:krome-outline px-2 py-1 rounded-lg"
               >
                 <Shield className="w-4 h-4" /> Admin
               </button>
@@ -397,7 +452,7 @@ export default function App() {
             {user ? (
               <button 
                 onClick={() => setCurrentView('profile')}
-                className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-full hover:bg-white/10 transition-all group"
+                className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-full hover:bg-white/10 transition-all group krome-outline"
               >
                 <div className="w-6 h-6 rounded-full gold-gradient flex items-center justify-center text-black overflow-hidden relative">
                   {user.avatar_url ? (
@@ -422,7 +477,7 @@ export default function App() {
             ) : (
               <button 
                 onClick={() => { setAuthMode('login'); setCurrentView('auth'); }}
-                className="btn-gold !py-2 !px-6 !text-xs"
+                className="btn-gold !py-2 !px-6 !text-xs !outline-none"
               >
                 Login
               </button>
@@ -431,7 +486,7 @@ export default function App() {
 
           {/* Mobile Toggle */}
           <button 
-            className="md:hidden text-white p-2" 
+            className="md:hidden text-white p-2 !outline-none" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
@@ -449,20 +504,23 @@ export default function App() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden absolute top-full left-0 w-full bg-black/95 border-b border-white/10 p-6 flex flex-col gap-4 text-center uppercase font-bold tracking-widest overflow-y-auto max-h-[80vh]"
             >
-              <a href="#" onClick={() => { setCurrentView('home'); setMobileMenuOpen(false); }}>About</a>
-              <a href="#" onClick={() => { setCurrentView('contact'); setMobileMenuOpen(false); }}>Contact</a>
+              <a href="#" onClick={() => { setCurrentView('home'); setMobileMenuOpen(false); }} className="!outline-none">About</a>
+              <a href="#" onClick={() => { setCurrentView('contact'); setMobileMenuOpen(false); }} className="!outline-none">Contact</a>
               
               <div className="text-[10px] text-white/30 mt-4 border-b border-white/5 pb-2">Programs</div>
-              <a href="#" onClick={() => { setCurrentView('programCatalog'); setMobileMenuOpen(false); }} className="text-gold">52 Week Program</a>
-              <a href="#" onClick={() => { setCurrentView('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold">Specialized Training</a>
+              <a href="#" onClick={() => { setCurrentView('programCatalog'); setMobileMenuOpen(false); }} className="text-gold !outline-none">52 Week Program</a>
+              <a href="#" onClick={() => { setCurrentView('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Specialized Training</a>
 
               <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-4">
-              <a href="#" onClick={() => { setShopCategory('all'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold">Shop</a>
-              <a href="#" onClick={() => { setShopCategory('programs'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold">Programs</a>
-              <a href="#" onClick={() => { setShopCategory('apparel'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold">Apparel</a>
+              <a href="#" onClick={() => { setShopCategory('all'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Shop</a>
+              <a href="#" onClick={() => { setShopCategory('programs'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Programs</a>
+              <a href="#" onClick={() => { setShopCategory('apparel'); setCurrentView('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Apparel</a>
 
+                {user?.role === 'admin' && (
+                  <button onClick={() => { setCurrentView('admin'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Admin Dashboard</button>
+                )}
                 {user ? (
-                  <button onClick={() => { setCurrentView('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto">
+                  <button onClick={() => { setCurrentView('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto !outline-none">
                     Profile
                     {unreadCount > 0 && (
                       <span className="flex h-2 w-2">
@@ -472,7 +530,7 @@ export default function App() {
                     )}
                   </button>
                 ) : (
-                  <button onClick={() => { setAuthMode('login'); setCurrentView('auth'); setMobileMenuOpen(false); }} className="btn-gold">Login</button>
+                  <button onClick={() => { setAuthMode('login'); setCurrentView('auth'); setMobileMenuOpen(false); }} className="btn-gold !outline-none">Login</button>
                 )}
               </div>
             </motion.div>
@@ -689,7 +747,7 @@ export default function App() {
             userId={user?.id || 'guest'}
             isAdmin={user?.role === 'admin'}
             type="all"
-            onBack={() => setCurrentView('home')}
+            onBack={goBack}
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
@@ -713,7 +771,7 @@ export default function App() {
             userId={user?.id || 'guest'}
             isAdmin={user?.role === 'admin'}
             type="breaks"
-            onBack={() => setCurrentView('specializedLanding')}
+            onBack={goBack}
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
@@ -737,7 +795,7 @@ export default function App() {
             userId={user?.id || 'guest'}
             isAdmin={user?.role === 'admin'}
             type="movement"
-            onBack={() => setCurrentView('specializedLanding')}
+            onBack={goBack}
             onSelectProgram={(program, locked) => {
               if (locked && !user) {
                 setAuthMode('login');
@@ -758,7 +816,7 @@ export default function App() {
         {currentView === 'programIntro' && (
           <ProgramIntro 
             key="programIntro" 
-            onBack={() => setCurrentView('home')} 
+            onBack={goBack} 
             onSelectPhase={(num) => {
               if (num <= 5) {
                 setSelectedProgramId('soccer-52-week');
@@ -781,7 +839,7 @@ export default function App() {
         {currentView === 'movementLanding' && (
           <MovementLanding 
             key="movementLanding"
-            onBack={() => setCurrentView('specializedLanding')}
+            onBack={goBack}
             onStartProgram={() => {
               setCurrentView('movementPrograms');
             }}
@@ -791,7 +849,7 @@ export default function App() {
         {currentView === 'nutritionLanding' && (
           <NutritionLanding 
             key="nutritionLanding"
-            onBack={() => setCurrentView('specializedLanding')}
+            onBack={goBack}
             onStartProgram={() => {
               setSpecializedType('nutrition');
               setCurrentView('specialized');
@@ -802,7 +860,7 @@ export default function App() {
         {currentView === 'breakProgramsLanding' && (
           <BreakProgramsLanding 
             key="breakProgramsLanding"
-            onBack={() => setCurrentView('specializedLanding')}
+            onBack={goBack}
             onStartProgram={() => {
               setCurrentView('breakPrograms');
             }}
@@ -812,7 +870,7 @@ export default function App() {
         {currentView === 'specializedLanding' && (
           <SpecializedTrainingLanding 
             key="specializedLanding"
-            onBack={() => setCurrentView('home')}
+            onBack={goBack}
             onNavigate={(view) => {
               setCurrentView(view as View);
             }}
@@ -823,7 +881,7 @@ export default function App() {
           <SpecializedProgram 
             key={`specialized-${specializedType}`}
             type={specializedType} 
-            onBack={() => setCurrentView('specializedLanding')} 
+            onBack={goBack} 
             onNavigate={(view) => setCurrentView(view as View)}
           />
         )}
@@ -832,7 +890,7 @@ export default function App() {
           <Auth 
             key="auth" 
             initialMode={authMode}
-            onBack={() => setCurrentView('home')} 
+            onBack={goBack} 
             onLoginSuccess={handleLoginSuccess}
           />
         )}
@@ -842,7 +900,7 @@ export default function App() {
             key="profile" 
             user={user} 
             onLogout={handleLogout}
-            onBack={() => setCurrentView('home')}
+            onBack={goBack}
             onUpdate={(updated) => {
               setUser(updated);
               localStorage.setItem('krome_user', JSON.stringify(updated));
@@ -850,7 +908,6 @@ export default function App() {
             onDelete={handleLogout}
             onNavigate={(view) => setCurrentView(view as View)}
             onProgramSelect={(programId) => {
-              setPreviousView('profile');
               setSelectedProgramId(programId);
               setCurrentView('programViewer');
             }}
@@ -858,11 +915,253 @@ export default function App() {
           />
         )}
 
+        {currentView === 'workoutTracker' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={() => setCurrentView('profile')}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back to Profile
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <WorkoutTracker 
+              userId={user.id.toString()} 
+            />
+          </div>
+        )}
+
+        {currentView === 'fitnessOverview' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={() => setCurrentView('profile')}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back to Profile
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <FitnessOverview 
+              userId={user.id.toString()} 
+            />
+          </div>
+        )}
+
+        {currentView === 'progressTracker' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <ProgressTracker 
+              userId={user.id.toString()} 
+            />
+          </div>
+        )}
+
+        {currentView === 'nutritionDashboard' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <NutritionDashboard 
+              user={user} 
+              onBack={goBack} 
+              onLogout={handleLogout}
+            />
+          </div>
+        )}
+
+        {currentView === 'bodyComposition' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <BodyCompositionTracker 
+              userId={user.id.toString()} 
+              onBack={goBack} 
+            />
+          </div>
+        )}
+
+        {currentView === 'bodyMetrics' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <BodyMetrics 
+              userId={user.id.toString()} 
+              data={bodyMetricsData} 
+              setData={setBodyMetricsData} 
+            />
+          </div>
+        )}
+
+        {currentView === 'videoAnalysis' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <VideoAnalyzer 
+              userId={user.id.toString()} 
+            />
+          </div>
+        )}
+
+        {currentView === 'parq' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <PARQ 
+              userId={user.id.toString()} 
+              initialReadOnly={user.parq_completed === 1}
+              onComplete={() => {
+                const updatedUser = { ...user, parq_completed: 1 };
+                setUser(updatedUser);
+                localStorage.setItem('krome_user', JSON.stringify(updatedUser));
+                resetToView('profile');
+              }}
+            />
+          </div>
+        )}
+
+        {currentView === 'programCalendar' && user && (
+          <div className="pt-24 px-6 max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <ProgramCalendar 
+              userId={user.id.toString()} 
+              programId={selectedProgramId || ''} 
+              programData={selectedProgram}
+            />
+          </div>
+        )}
+
+        {currentView === 'accountSettings' && user && (
+          <div className="pt-24 px-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <AccountSettings 
+              user={user} 
+              onUpdate={(updated) => {
+                setUser(updated);
+                localStorage.setItem('krome_user', JSON.stringify(updated));
+              }}
+              onDelete={handleLogout}
+              onBack={goBack}
+              onLogout={handleLogout}
+            />
+          </div>
+        )}
+
         {currentView === 'admin' && user?.role === 'admin' && (
           <AdminDashboard 
             key="admin"
             adminId={user.id}
-            onBack={() => setCurrentView('home')}
+            user={user}
+            onBack={goBack}
             initialTab={adminInitialTab}
             unreadSenderIds={unreadSenderIds}
           />
@@ -871,7 +1170,7 @@ export default function App() {
         {currentView === 'shop' && (
           <Shop 
             key={`shop-${shopCategory}`} 
-            onBack={() => setCurrentView('home')} 
+            onBack={goBack} 
             userId={user?.id || ''} 
             onRedirectToLogin={() => {
               setAuthMode('login');
@@ -883,7 +1182,7 @@ export default function App() {
 
         {currentView === 'contact' && (
           <Contact 
-            onBack={() => setCurrentView('home')} 
+            onBack={goBack} 
             onNavigateToRegister={() => { setAuthMode('register'); setCurrentView('auth'); }}
             user={user}
           />
@@ -893,7 +1192,7 @@ export default function App() {
           user ? (
             <FlexibilityMobility 
               key="flexibilityMobility"
-              onBack={() => setCurrentView('specializedLanding')}
+              onBack={goBack}
               onStartProgram={() => {
                 const program = ALL_PROGRAMS.find(p => p.id === 'lower-back-rehab');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
@@ -919,7 +1218,7 @@ export default function App() {
           user ? (
             <StrengthPower 
               key="strengthPower"
-              onBack={() => setCurrentView('specializedLanding')}
+              onBack={goBack}
               onStartProgram={() => {
                 const program = ALL_PROGRAMS.find(p => p.id === 'strength-power');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
@@ -945,7 +1244,7 @@ export default function App() {
           user ? (
             <ConditioningSpeed 
               key="conditioningSpeed"
-              onBack={() => setCurrentView('specializedLanding')}
+              onBack={goBack}
               onStartProgram={() => {
                 const program = ALL_PROGRAMS.find(p => p.id === 'speed-agility');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
@@ -1006,13 +1305,13 @@ export default function App() {
               return (
                 <AerobicCapacityFoundation 
                   key="aerobicCapacityFoundation"
-                  onBack={() => setCurrentView('home')}
+                  onBack={goBack}
                   userId={user.id.toString()}
                 />
               );
             })()
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
         )}
 
@@ -1021,10 +1320,10 @@ export default function App() {
             <PerformanceMacroNutrients 
               key="performanceMacroNutrients"
               userId={user.id.toString()}
-              onBack={() => setCurrentView('specialized')}
+              onBack={goBack}
             />
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
         )}
 
@@ -1032,10 +1331,10 @@ export default function App() {
           user ? (
             <MicronutrientOptimization 
               key="micronutrientOptimization"
-              onBack={() => setCurrentView('specialized')}
+              onBack={goBack}
             />
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
         )}
 
@@ -1044,33 +1343,49 @@ export default function App() {
             <RecipeLibrary 
               key="recipeLibrary"
               userId={user.id.toString()}
-              onBack={() => setCurrentView('specialized')}
+              onBack={goBack}
             />
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
         )}
 
         {currentView === 'programBuilder' && user && (
-          <ProgramBuilder 
-            key={selectedProgram?.id || 'programBuilder'}
-            userId={user.id.toString()}
-            initialProgram={selectedProgram}
-            initialPhaseIdx={selectedPhaseIdx}
-            isCustom={isCustomProgram}
-            onSave={() => {
-              setSelectedProgram(undefined);
-              setIsCustomProgram(false);
-              setCurrentView('programViewer');
-            }}
-          />
+          <div className="pt-24 px-6 max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <button 
+                onClick={goBack}
+                className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:text-red-400 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+            </div>
+            <ProgramBuilder 
+              key={selectedProgram?.id || 'programBuilder'}
+              userId={user.id.toString()}
+              initialProgram={selectedProgram}
+              initialPhaseIdx={selectedPhaseIdx}
+              isCustom={isCustomProgram}
+              onSave={() => {
+                setSelectedProgram(undefined);
+                setIsCustomProgram(false);
+                setCurrentView('programViewer');
+              }}
+            />
+          </div>
         )}
 
         {currentView === 'productDescription' && selectedProgram && (
           <ProductDescription
             key="productDescription"
             program={selectedProgram}
-            onBack={() => setCurrentView('programCatalog')}
+            onBack={goBack}
             onPurchase={async () => {
               if (!user) {
                 setAuthMode('login');
@@ -1103,45 +1418,44 @@ export default function App() {
 
         {currentView === 'programViewer' && (
           user ? (
-            <ProgramViewer 
-              key="programViewer"
-              userId={user.id.toString()}
-              isAdmin={user?.role === 'admin'}
-              initialProgramId={selectedProgramId}
-              initialPhaseIdx={selectedPhaseIdx}
-              onBack={() => {
-                setCurrentView(previousView);
-                setPreviousView('home'); // Reset
-              }}
-              onSelectLockedProgram={(program) => {
-                setSelectedProgram(program);
-                setCurrentView('productDescription');
-              }}
-              onEdit={(program, isCustom) => {
-                setSelectedProgram(program);
-                setIsCustomProgram(isCustom);
-                setCurrentView('programBuilder');
-              }}
-              onCreateNew={() => {
-                setSelectedProgram(undefined);
-                setIsCustomProgram(true);
-                setCurrentView('programBuilder');
-              }}
-              onDelete={async (programId) => {
-                if (confirm('Are you sure you want to delete this custom program?')) {
-                  try {
-                    await fetch(`/api/custom-programs/${user.id}/${programId}`, { method: 'DELETE' });
-                    // Refresh the view to update the list
-                    setCurrentView('home');
-                    setTimeout(() => setCurrentView('programViewer'), 100);
-                  } catch (err) {
-                    console.error('Failed to delete program', err);
+            <div className="pt-24 px-6 max-w-7xl mx-auto">
+              <ProgramViewer 
+                key="programViewer"
+                userId={user.id.toString()}
+                isAdmin={user?.role === 'admin'}
+                initialProgramId={selectedProgramId}
+                initialPhaseIdx={selectedPhaseIdx}
+                onBack={goBack}
+                onSelectLockedProgram={(program) => {
+                  setSelectedProgram(program);
+                  setCurrentView('productDescription');
+                }}
+                onEdit={(program, isCustom) => {
+                  setSelectedProgram(program);
+                  setIsCustomProgram(isCustom);
+                  setCurrentView('programBuilder');
+                }}
+                onCreateNew={() => {
+                  setSelectedProgram(undefined);
+                  setIsCustomProgram(true);
+                  setCurrentView('programBuilder');
+                }}
+                onDelete={async (programId) => {
+                  if (confirm('Are you sure you want to delete this custom program?')) {
+                    try {
+                      await fetch(`/api/custom-programs/${user.id}/${programId}`, { method: 'DELETE' });
+                      // Refresh the view to update the list
+                      resetToView('home');
+                      setTimeout(() => setCurrentView('programViewer'), 100);
+                    } catch (err) {
+                      console.error('Failed to delete program', err);
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </div>
           ) : (
-            <Auth key="auth" initialMode="login" onBack={() => setCurrentView('home')} onLoginSuccess={handleLoginSuccess} />
+            <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
         )}
       </AnimatePresence>
@@ -1159,7 +1473,7 @@ export default function App() {
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentView('home'); }}
               >
-                <div className="w-8 h-8 gold-gradient rounded-sm flex items-center justify-center font-black text-black italic">K</div>
+                <img src="/logo.png" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
                 <span className="text-lg font-black tracking-tighter uppercase italic">
                   KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
                 </span>
@@ -1168,13 +1482,13 @@ export default function App() {
                 The ultimate destination for sports performance training, mobility, and strength development.
               </p>
               <div className="flex gap-4">
-                <a href="https://instagram.com/kromesports" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all">
+                <a href="https://instagram.com/ksp_2407" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all krome-outline">
                   <Instagram className="w-5 h-5" aria-hidden="true" />
                 </a>
-                <a href="https://youtube.com/@kromesports" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all">
+                <a href="https://youtube.com/@kromesports" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all krome-outline">
                   <Youtube className="w-5 h-5" aria-hidden="true" />
                 </a>
-                <a href="https://facebook.com/kromesports" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all">
+                <a href="https://facebook.com/kromesports" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-gold hover:text-black transition-all krome-outline">
                   <Facebook className="w-5 h-5" aria-hidden="true" />
                 </a>
               </div>
@@ -1183,7 +1497,7 @@ export default function App() {
             <div className="grid grid-cols-1 gap-16">
               <div>
                 <h5 className="font-bold uppercase tracking-widest text-xs text-white/60 mb-6">Quick Links</h5>
-                <ul className="flex flex-col gap-4 text-sm font-medium">
+                <ul className="flex flex-row gap-6 text-sm font-medium">
                   <li><a href="#" onClick={() => setCurrentView('home')} className="hover:text-accent transition-colors">About Us</a></li>
                   <li><a href="#" onClick={() => setCurrentView('programCatalog')} className="hover:text-accent transition-colors">Programs</a></li>
                   <li><a href="#" onClick={() => { setShopCategory('all'); setCurrentView('shop'); }} className="hover:text-accent transition-colors">Shop</a></li>
@@ -1208,6 +1522,7 @@ export default function App() {
       </footer>
       {/* Chatbot */}
       <Chatbot user={user} />
+      <InstallPrompt />
     </div>
     </NotificationProvider>
   );

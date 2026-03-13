@@ -354,7 +354,7 @@ export default function AICoach({ userId, onClose, initialTab = 'ai' }: AICoachP
       {onClose && (
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors z-10"
+          className="absolute top-4 right-4 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors z-10 krome-outline"
         >
           <X className="w-4 h-4" />
         </button>
@@ -380,13 +380,13 @@ export default function AICoach({ userId, onClose, initialTab = 'ai' }: AICoachP
       <div className="flex gap-2 mb-4">
         <button 
           onClick={() => setActiveTab('ai')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest ${activeTab === 'ai' ? 'bg-gold text-black' : 'bg-zinc-800 text-white'}`}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest ${activeTab === 'ai' ? 'bg-gold text-black' : 'bg-zinc-800 text-white'} krome-outline`}
         >
           AI Coach
         </button>
         <button 
           onClick={() => setActiveTab('admin')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest relative ${activeTab === 'admin' ? 'bg-gold text-black' : 'bg-zinc-800 text-white'}`}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest relative ${activeTab === 'admin' ? 'bg-gold text-black' : 'bg-zinc-800 text-white'} krome-outline`}
         >
           Admin Chat
           {hasNewMessage && (
@@ -448,7 +448,7 @@ export default function AICoach({ userId, onClose, initialTab = 'ai' }: AICoachP
             <video src={videoPreview} className="w-full max-h-32 object-contain" controls />
             <button 
               onClick={clearVideo}
-              className="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-red-500 transition-colors"
+              className="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-red-500 transition-colors krome-outline"
             >
               <X className="w-4 h-4" />
             </button>
@@ -469,7 +469,7 @@ export default function AICoach({ userId, onClose, initialTab = 'ai' }: AICoachP
           {activeTab === 'ai' && (
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 bg-white/5 hover:bg-white/10 transition-colors rounded-xl text-white/60 hover:text-white border border-dashed border-white/20"
+              className="p-3 bg-white/5 hover:bg-white/10 transition-colors rounded-xl text-white/60 hover:text-white border border-dashed border-white/20 krome-outline"
               title="Upload Video for Form Analysis"
             >
               <Video className="w-5 h-5" />

@@ -81,7 +81,7 @@ const Shop = (props: ShopProps) => {
       <h2 className="text-2xl font-light tracking-widest uppercase text-zinc-400 mb-12 text-center">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
         {items.map((item, idx) => (
-          <div key={idx} className="bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 flex flex-col hover:border-zinc-600 transition-colors">
+          <div key={idx} className="bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 flex flex-col hover:border-zinc-600 transition-colors krome-outline">
             <img src={item.img} alt={item.title} className="w-full h-56 object-cover opacity-90" referrerPolicy="no-referrer" />
             <div className="p-8 flex flex-col flex-1">
               <h5 className="text-lg font-medium text-zinc-100 mb-3 flex-1">{item.title}</h5>

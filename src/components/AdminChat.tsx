@@ -9,20 +9,21 @@ interface Message {
   created_at: string;
 }
 
-export default function AdminChat({ userId, adminId }: { userId: number, adminId: number }) {
+export default function AdminChat({ userId, adminId }: { userId: string, adminId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
+    if (!userId || !adminId) return;
     try {
-      const response = await fetch(`${window.location.origin}/api/messages/${userId}`);
+      const response = await fetch(`/api/messages/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
       }
     } catch (err) {
-      console.error("Failed to load messages", err);
+      console.error("Failed to fetch messages", err);
     }
   };
 
@@ -30,19 +31,23 @@ export default function AdminChat({ userId, adminId }: { userId: number, adminId
     fetchMessages();
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, adminId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !userId || !adminId) return;
     try {
-      await fetch(`${window.location.origin}/api/messages`, {
+      await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender_id: adminId, receiver_id: userId, message: newMessage })
+        body: JSON.stringify({
+          sender_id: adminId,
+          receiver_id: userId,
+          message: newMessage
+        })
       });
       setNewMessage('');
       fetchMessages();
@@ -53,7 +58,7 @@ export default function AdminChat({ userId, adminId }: { userId: number, adminId
 
   const deleteMessage = async (messageId: number) => {
     try {
-      await fetch(`${window.location.origin}/api/messages/${messageId}`, { method: 'DELETE' });
+      await fetch(`/api/messages/${messageId}`, { method: 'DELETE' });
       fetchMessages();
     } catch (err) {
       console.error("Failed to delete message", err);
@@ -64,11 +69,11 @@ export default function AdminChat({ userId, adminId }: { userId: number, adminId
     <div className="flex flex-col h-[500px] bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
       <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 mb-4">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.sender_id === adminId ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.sender_id === adminId ? 'bg-gold text-black' : 'bg-zinc-800 text-white'}`}>
-              {msg.sender_id === adminId ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+          <div key={msg.id} className={`flex gap-3 ${msg.sender_id.toString() === adminId ? 'flex-row-reverse' : ''}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.sender_id.toString() === adminId ? 'bg-gold text-black' : 'bg-zinc-800 text-white'}`}>
+              {msg.sender_id.toString() === adminId ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
             </div>
-            <div className={`p-3 rounded-2xl text-sm shadow-md relative group ${msg.sender_id === adminId ? 'bg-gold text-black rounded-tr-sm' : 'bg-zinc-800 text-white rounded-tl-sm'}`}>
+            <div className={`p-3 rounded-2xl text-sm shadow-md relative group ${msg.sender_id.toString() === adminId ? 'bg-gold text-black rounded-tr-sm' : 'bg-zinc-800 text-white rounded-tl-sm'}`}>
               {msg.message}
               <button 
                 onClick={() => deleteMessage(msg.id)}

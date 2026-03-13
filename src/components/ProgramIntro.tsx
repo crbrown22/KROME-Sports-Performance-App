@@ -49,7 +49,7 @@ export default function ProgramIntro({ onBack, onSelectPhase }: ProgramIntroProp
         {/* Header */}
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all"
+          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all !outline-none"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Home
         </button>

@@ -1,22 +1,141 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenAI } from '@google/genai';
-import { Loader2, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, TrendingUp, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface FitnessOverviewProps {
   userId: string;
   showGenerationCard?: boolean;
 }
 
+const WorkoutStatistics = ({ userId }: { userId: string }) => {
+  const [data, setData] = useState<any[]>([]);
+  const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
+
+  useEffect(() => {
+    // In a real app, fetch statistics from backend
+    // Mocking data for now
+    setData([
+      { category: 'Strength', volume: 4000, sets: 20, reps: 100, duration: 45 },
+      { category: 'Conditioning', volume: 2000, sets: 10, reps: 50, duration: 30 },
+      { category: 'Mobility', volume: 500, sets: 5, reps: 20, duration: 20 },
+    ]);
+  }, [userId, period]);
+
+  return (
+    <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
+      <div className="flex justify-between items-center mb-8">
+        <h3 className="font-bold uppercase italic flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gold" />
+          Workout Statistics
+        </h3>
+        <select 
+          value={period} 
+          onChange={(e) => setPeriod(e.target.value as any)}
+          className="bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-gold"
+        >
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
+            <XAxis dataKey="category" stroke="#ffffff20" fontSize={10} />
+            <YAxis stroke="#ffffff20" fontSize={10} />
+            <Tooltip contentStyle={{ backgroundColor: '#18181b', border: 'none' }} />
+            <Legend />
+            <Bar dataKey="volume" fill="#D4AF37" name="Volume" />
+            <Bar dataKey="sets" fill="#008080" name="Sets" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
+const MetricsGrid = ({ userId }: { userId: string }) => {
+  const [metrics, setMetrics] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [metricsRes, historyRes] = await Promise.all([
+          fetch(`/api/metrics/${userId}`),
+          fetch(`/api/body-comp/${userId}`)
+        ]);
+
+        if (!metricsRes.ok || !historyRes.ok) throw new Error('Failed to fetch data');
+
+        const metricsData = await metricsRes.json();
+        const historyData = await historyRes.json();
+
+        setMetrics(metricsData);
+        setHistory(historyData);
+        setLoading(false);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId]);
+
+  if (loading) return <div className="text-white/40 text-xs">Loading metrics...</div>;
+  if (error) return <div className="text-rose-500 text-xs">Error loading metrics: {error}</div>;
+  if (!metrics) return <div className="text-white/40 text-xs">No metrics available.</div>;
+
+  const latestComp = history.length > 0 ? history[history.length - 1] : null;
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {[
+        { label: 'Weight', value: latestComp ? `${latestComp.weight} lbs` : (metrics.initialWeight ? `${metrics.initialWeight} lbs` : 'N/A') },
+        { label: 'Body Fat', value: latestComp ? `${latestComp.bodyFat}%` : 'N/A' },
+        { label: 'VO2 Max', value: metrics.vo2Max ? `${metrics.vo2Max}` : 'N/A' },
+        { label: 'Resting HR', value: metrics.restingHR ? `${metrics.restingHR} bpm` : 'N/A' },
+      ].map((m, i) => (
+        <div key={i} className="bg-zinc-900/50 border border-white/10 p-4 rounded-2xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">{m.label}</p>
+          <p className="text-xl font-black italic text-gold">{m.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function FitnessOverview({ userId, showGenerationCard = true }: FitnessOverviewProps) {
   const [overview, setOverview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
+  const [metrics, setMetrics] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     fetchLogs();
+    fetchDashboardData();
   }, [userId]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [metricsRes, historyRes] = await Promise.all([
+        fetch(`/api/metrics/${userId}`),
+        fetch(`/api/body-comp/${userId}`)
+      ]);
+      if (metricsRes.ok) setMetrics(await metricsRes.json());
+      if (historyRes.ok) setHistory(await historyRes.json());
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
 
   const fetchLogs = async () => {
     try {
@@ -51,7 +170,7 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       
-      const metricsSummary = metrics ? `Weight: ${metrics.weight}kg, Body Fat: ${metrics.body_fat}%` : 'No metrics available';
+      const metricsSummary = metrics ? `Weight: ${metrics.initialWeight}lbs, VO2 Max: ${metrics.vo2Max}` : 'No metrics available';
       const nutritionSummary = nutrition.length > 0 ? `Recent average calories: ${Math.round(nutrition.reduce((acc: number, curr: any) => acc + curr.calories, 0) / nutrition.length)}` : 'No nutrition data';
       const workoutsSummary = workouts.slice(-10).map((w: any) => `${w.workout_id || 'Unknown'}`).join('; ');
       const analysisSummary = logs.slice(-3).map((l: any) => l.analysis.substring(0, 100)).join('; ');
@@ -87,8 +206,56 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
     }
   };
 
+  const getComparativeData = () => {
+    if (history.length < 2) {
+      const latest = history.length > 0 ? history[history.length - 1] : null;
+      return {
+        weight: { current: latest ? `${latest.weight} lbs` : (metrics?.initialWeight ? `${metrics.initialWeight} lbs` : 'N/A'), previous: 'N/A', trend: 'down' as const },
+        bodyFat: { current: latest ? `${latest.bodyFat}%` : 'N/A', previous: 'N/A', trend: 'down' as const },
+        vo2Max: { current: metrics?.vo2Max ? `${metrics.vo2Max}` : 'N/A', previous: 'N/A', trend: 'up' as const }
+      };
+    }
+
+    const latest = history[history.length - 1];
+    const previous = history[history.length - 2];
+
+    return {
+      weight: { 
+        current: `${latest.weight} lbs`, 
+        previous: `${previous.weight} lbs`, 
+        trend: latest.weight <= previous.weight ? 'down' as const : 'up' as const 
+      },
+      bodyFat: { 
+        current: `${latest.bodyFat}%`, 
+        previous: `${previous.bodyFat}%`, 
+        trend: latest.bodyFat <= previous.bodyFat ? 'down' as const : 'up' as const 
+      },
+      vo2Max: { 
+        current: metrics?.vo2Max ? `${metrics.vo2Max}` : 'N/A', 
+        previous: 'N/A', 
+        trend: 'up' as const 
+      }
+    };
+  };
+
+  const compData = getComparativeData();
+
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-black italic uppercase tracking-tighter">Athlete <span className="text-gold">Dashboard</span></h2>
+      </div>
+      
+      {/* Comparative Metrics Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <ComparativeMetricCard title="Weight" current={compData.weight.current} previous={compData.weight.previous} trend={compData.weight.trend} />
+        <ComparativeMetricCard title="Body Fat" current={compData.bodyFat.current} previous={compData.bodyFat.previous} trend={compData.bodyFat.trend} />
+        <ComparativeMetricCard title="VO2 Max" current={compData.vo2Max.current} previous={compData.vo2Max.previous} trend={compData.vo2Max.trend} />
+      </div>
+
+      <MetricsGrid userId={userId} />
+
+      <WorkoutStatistics userId={userId} />
       {showGenerationCard && (
         <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
           <h3 className="font-bold uppercase italic flex items-center gap-2 mb-2">
@@ -146,6 +313,21 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ComparativeMetricCard({ title, current, previous, trend }: { title: string, current: string, previous: string, trend: 'up' | 'down' }) {
+  return (
+    <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-xl">
+      <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-2">{title}</div>
+      <div className="flex items-end justify-between">
+        <div className="text-2xl font-black italic">{current}</div>
+        <div className={`flex items-center gap-1 text-xs font-bold ${trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>
+          {trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingUp className="w-4 h-4 rotate-180" />}
+          {previous}
+        </div>
+      </div>
     </div>
   );
 }

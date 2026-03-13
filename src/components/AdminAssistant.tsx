@@ -87,7 +87,7 @@ export default function AdminAssistant({ kpiData, users, leads, purchases }: Adm
       const model = "gemini-3.1-pro-preview"; // Using pro model for complex admin tasks
       
       const kpiContext = kpiData ? `\n\nCURRENT KPI DATA:\n${JSON.stringify(kpiData, null, 2)}` : '';
-      const usersContext = users ? `\n\nUSERS DATA:\n${JSON.stringify(users.map(u => ({ id: u.id, name: `${u.first_name} ${u.last_name}`, email: u.email, role: u.role })), null, 2)}` : '';
+      const usersContext = users ? `\n\nUSERS DATA:\n${JSON.stringify(users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email, role: u.role })), null, 2)}` : '';
       const leadsContext = leads ? `\n\nLEADS DATA:\n${JSON.stringify(leads, null, 2)}` : '';
       const purchasesContext = purchases ? `\n\nPURCHASES DATA:\n${JSON.stringify(purchases, null, 2)}` : '';
 
@@ -202,12 +202,26 @@ CRITICAL INSTRUCTIONS FOR TONE AND LENGTH:
         for (const call of functionCalls) {
           if (call.name === 'sendMessageToAthlete') {
             const { athleteId, message } = call.args as any;
-            const athlete = users?.find(u => u.id === athleteId || u.id.toString() === athleteId);
-            const athleteName = athlete ? `${athlete.first_name} ${athlete.last_name}` : athleteId;
-            setMessages(prev => [...prev, { 
-              role: 'model', 
-              text: `**Action Executed:** Sent message to ${athleteName}.\n\n*Message Content:*\n> ${message}` 
-            }]);
+            try {
+              await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sender_id: 'admin',
+                  receiver_id: athleteId,
+                  message: message
+                })
+              });
+              const athlete = users?.find(u => u.id === athleteId || u.id.toString() === athleteId);
+              const athleteName = athlete ? `${athlete.firstName} ${athlete.lastName}` : athleteId;
+              setMessages(prev => [...prev, { 
+                role: 'model', 
+                text: `**Action Executed:** Sent message to ${athleteName}.\n\n*Message Content:*\n> ${message}` 
+              }]);
+            } catch (err) {
+              console.error("Failed to send message", err);
+              setMessages(prev => [...prev, { role: 'model', text: `Failed to send message to athlete: ${err}` }]);
+            }
           } else if (call.name === 'createMarketingCampaign') {
             const { campaignName, targetAudience, content } = call.args as any;
             setMessages(prev => [...prev, { 

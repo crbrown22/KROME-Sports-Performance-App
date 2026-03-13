@@ -7,16 +7,20 @@ export default function PurchaseCRM() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/purchases')
-      .then(res => res.json())
-      .then(data => {
-        setPurchases(data);
+    const fetchPurchases = async () => {
+      try {
+        const response = await fetch('/api/purchases');
+        if (response.ok) {
+          const data = await response.json();
+          setPurchases(data);
+        }
         setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
+      } catch (err) {
+        console.error("Failed to fetch purchases", err);
         setLoading(false);
-      });
+      }
+    };
+    fetchPurchases();
   }, []);
 
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-gold" /></div>;
@@ -42,13 +46,13 @@ export default function PurchaseCRM() {
           <tbody>
             {purchases.map((p) => (
               <tr key={p.id} className="border-b border-white/5">
-                <td className="p-4">{p.user_id}</td>
-                <td className="p-4">{p.first_name || p.last_name ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'N/A'}</td>
+                <td className="p-4">{p.userId}</td>
+                <td className="p-4">{p.name || 'N/A'}</td>
                 <td className="p-4">{p.username || 'N/A'}</td>
                 <td className="p-4">{p.email || 'N/A'}</td>
-                <td className="p-4">{p.item_name}</td>
+                <td className="p-4">{p.itemName}</td>
                 <td className="p-4">${p.price.toFixed(2)}</td>
-                <td className="p-4">{new Date(p.created_at).toLocaleDateString()}</td>
+                <td className="p-4">{new Date(p.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>

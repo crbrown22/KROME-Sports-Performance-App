@@ -25,6 +25,7 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -54,7 +55,8 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
             email, 
             password,
             first_name: firstName,
-            last_name: lastName
+            last_name: lastName,
+            role: role
           })
         });
         const data = await response.json();
@@ -85,8 +87,9 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
       } else {
         setSuccess("A reset link has been sent to your email.");
       }
-    } catch (err) {
-      setError("Network error. Please try again.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Network error. Please try again.");
     }
   };
 
@@ -177,6 +180,34 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
                       required
                       aria-required="true"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 ml-1">Account Type</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setRole('user')}
+                      className={`py-3 px-4 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all ${
+                        role === 'user' 
+                          ? 'bg-gold text-black border-gold' 
+                          : 'bg-black/50 text-white/60 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      Athlete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole('admin')}
+                      className={`py-3 px-4 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all ${
+                        role === 'admin' 
+                          ? 'bg-gold text-black border-gold' 
+                          : 'bg-black/50 text-white/60 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      Coach
+                    </button>
                   </div>
                 </div>
               </>

@@ -73,12 +73,9 @@ export const calculateKPIs = (users: any[], purchases: any[], leads: Lead[]) => 
 };
 
 export default function SalesAndGrowthCRM() {
-  const [leads, setLeads] = useState<Lead[]>(() => {
-    const saved = localStorage.getItem('krome_crm_leads');
-    return saved ? JSON.parse(saved) : initialLeads;
-  });
-
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'kpis'>('pipeline');
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'kpis'>('kpis');
   const [users, setUsers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -94,44 +91,50 @@ export default function SalesAndGrowthCRM() {
   const [editingCardData, setEditingCardData] = useState<Partial<Lead>>({});
 
   useEffect(() => {
-    localStorage.setItem('krome_crm_leads', JSON.stringify(leads));
-  }, [leads]);
-
-  useEffect(() => {
-    const handleLeadsUpdated = () => {
-      const saved = localStorage.getItem('krome_crm_leads');
-      if (saved) setLeads(JSON.parse(saved));
+    const fetchData = async () => {
+      try {
+        const [leadsRes, usersRes, purchasesRes] = await Promise.all([
+          fetch('/api/leads'),
+          fetch('/api/users'),
+          fetch('/api/purchases')
+        ]);
+        
+        if (leadsRes.ok) setLeads(await leadsRes.json());
+        if (usersRes.ok) setUsers(await usersRes.json());
+        if (purchasesRes.ok) setPurchases(await purchasesRes.json());
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch data", err);
+        setLoading(false);
+      }
     };
-    window.addEventListener('crm-leads-updated', handleLeadsUpdated);
-    return () => window.removeEventListener('crm-leads-updated', handleLeadsUpdated);
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    fetch('/api/admin/users')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setUsers(data); })
-      .catch(err => console.error(err));
-
-    fetch('/api/admin/purchases')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setPurchases(data); })
-      .catch(err => console.error(err));
-  }, []);
-
-  const handleAddLead = () => {
+  const handleAddLead = async () => {
     if (!newLead.name || !newLead.email) return;
-    const lead: Lead = {
-      id: `lead-${Date.now()}`,
-      name: newLead.name,
-      email: newLead.email,
-      status: newLead.status as Lead['status'] || 'New Lead',
-      value: Number(newLead.value) || 0,
-      dateAdded: getCurrentDate(),
-      lastContact: getCurrentDate()
-    };
-    setLeads([...leads, lead]);
-    setShowAddModal(false);
-    setNewLead({ name: '', email: '', value: 0, status: 'New Lead' });
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newLead.name,
+          email: newLead.email,
+          status: newLead.status || 'New Lead',
+          value: Number(newLead.value) || 0,
+          dateAdded: getCurrentDate(),
+          lastContact: getCurrentDate(),
+        })
+      });
+      if (response.ok) {
+        const newLeadData = await response.json();
+        setLeads(prev => [newLeadData, ...prev]);
+        setShowAddModal(false);
+        setNewLead({ name: '', email: '', value: 0, status: 'New Lead' });
+      }
+    } catch (err) {
+      console.error("Failed to add lead", err);
+    }
   };
 
   const handleEditLead = (lead: Lead) => {
@@ -139,21 +142,64 @@ export default function SalesAndGrowthCRM() {
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingLead) return;
-    setLeads(leads.map(l => l.id === editingLead.id ? editingLead : l));
-    setShowEditModal(false);
-    setEditingLead(null);
+    try {
+      const response = await fetch(`/api/leads/${editingLead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingLead)
+      });
+      if (response.ok) {
+        setLeads(prev => prev.map(l => l.id === editingLead.id ? editingLead : l));
+        setShowEditModal(false);
+        setEditingLead(null);
+      }
+    } catch (err) {
+      console.error("Failed to update lead", err);
+    }
   };
 
-  const updateLeadStatus = (leadId: string, newStatus: Lead['status']) => {
-    setLeads(leads.map(lead => 
-      lead.id === leadId ? { ...lead, status: newStatus, lastContact: getCurrentDate() } : lead
-    ));
+  const updateLeadStatus = async (leadId: string, newStatus: Lead['status']) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, lastContact: getCurrentDate() })
+      });
+      if (response.ok) {
+        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus, lastContact: getCurrentDate() } : l));
+      }
+    } catch (err) {
+      console.error("Failed to update lead status", err);
+    }
   };
 
-  const deleteLead = (leadId: string) => {
-    setLeads(leads.filter(lead => lead.id !== leadId));
+  const deleteLead = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+      if (response.ok) {
+        setLeads(prev => prev.filter(l => l.id !== leadId));
+      }
+    } catch (err) {
+      console.error("Failed to delete lead", err);
+    }
+  };
+
+  const handleSaveCardEdit = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCardData)
+      });
+      if (response.ok) {
+        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...editingCardData } : l));
+        setEditingCardId(null);
+      }
+    } catch (err) {
+      console.error("Failed to update lead", err);
+    }
   };
 
   const getLeadsByStatus = (status: string) => leads.filter(lead => lead.status === status);
@@ -321,10 +367,7 @@ export default function SalesAndGrowthCRM() {
                               Cancel
                             </button>
                             <button 
-                              onClick={() => {
-                                setLeads(leads.map(l => l.id === lead.id ? { ...l, ...editingCardData } : l));
-                                setEditingCardId(null);
-                              }}
+                              onClick={() => handleSaveCardEdit(lead.id)}
                               className="flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest bg-gold text-black hover:bg-white transition-colors"
                             >
                               Save

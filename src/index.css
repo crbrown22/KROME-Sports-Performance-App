@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;700;900&display=swap');
 @import "tailwindcss";
+@import 'react-calendar/dist/Calendar.css';
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -15,6 +16,16 @@
   body {
     @apply bg-black text-white font-sans antialiased;
   }
+
+  input, select, textarea {
+    outline: 1px solid #61b5b8;
+    outline-offset: 2px;
+  }
+}
+
+@utility krome-outline {
+  outline: 1px solid #61b5b8;
+  outline-offset: 2px;
 }
 
 @utility glass {
@@ -34,19 +45,19 @@
 }
 
 @utility btn-gold {
-  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 gold-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-gold/20;
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 gold-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-gold/20 krome-outline;
 }
 
 @utility btn-accent {
-  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 accent-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-accent/20;
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 accent-gradient text-black hover:scale-105 active:scale-95 shadow-lg shadow-accent/20 krome-outline;
 }
 
 @utility btn-outline-gold {
-  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-gold text-gold hover:bg-gold hover:text-black active:scale-95;
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-gold text-gold hover:bg-gold hover:text-black active:scale-95 krome-outline;
 }
 
 @utility btn-outline-accent {
-  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-accent text-accent hover:bg-accent hover:text-black active:scale-95;
+  @apply px-6 py-3 rounded-full font-bold uppercase tracking-wider transition-all duration-300 border-2 border-accent text-accent hover:bg-accent hover:text-black active:scale-95 krome-outline;
 }
 
 /* Custom Scrollbar */
