@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState } from 'react';
 import { Star, Send, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

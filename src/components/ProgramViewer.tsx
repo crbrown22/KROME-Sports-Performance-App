@@ -1,3 +1,5 @@
+import { haptics, share } from '../utils/nativeBridge';
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -19,8 +21,7 @@ import {
   Dumbbell,
   Lock,
   Bot,
-  MoreHorizontal,
-  Activity
+  Share2
 } from 'lucide-react';
 import AICoach from './AICoach';
 import WorkoutFeedback from './WorkoutFeedback';
@@ -171,6 +172,13 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
     const key = `${workoutId}-${exerciseInstanceId}`;
     const isCompleted = !completedExercises[key];
     
+    // Trigger haptic feedback
+    if (isCompleted) {
+      haptics.success();
+    } else {
+      haptics.light();
+    }
+
     setCompletedExercises(prev => ({ ...prev, [key]: isCompleted }));
 
     if (userId !== 'guest') {
@@ -465,6 +473,19 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
            nameStr.toLowerCase().includes(exerciseSearch.toLowerCase());
   });
 
+  const handleShare = async () => {
+    if (!selectedProgram) return;
+    haptics.light();
+    const result = await share(
+      `Check out my KROME Program: ${selectedProgram.name}`,
+      selectedProgram.description,
+      window.location.href
+    );
+    if (result === 'copied') {
+      alert("Link copied to clipboard!");
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-20 text-center">
@@ -605,6 +626,12 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                 <CheckCircle2 className="w-4 h-4" /> Assign Program
               </button>
             )}
+            <button 
+              onClick={handleShare}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white/5 border border-white/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10 transition-all krome-outline"
+            >
+              <Share2 className="w-4 h-4" /> Share
+            </button>
             <div className="flex gap-2 w-full sm:w-auto">
               <div className="flex-1 sm:flex-none bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
                 <div className="text-[10px] font-black text-white/30 uppercase tracking-widest">Phase</div>
@@ -771,9 +798,9 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-4 md:p-8">
-                  <h3 className="text-xl font-black uppercase italic mb-6 px-4">Week {currentWeek.week} <span className="text-gold">Breakdown</span></h3>
-                  <div className="flex gap-6 overflow-x-auto pb-6 px-4 custom-scrollbar">
+                <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8">
+                  <h3 className="text-xl font-black uppercase italic mb-6">Week {currentWeek.week} <span className="text-gold">Breakdown</span></h3>
+                  <div className="grid grid-cols-1 gap-4">
                     {currentWeek.workouts.map((workout) => (
                       <button
                         key={workout.id}
@@ -782,39 +809,32 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                           setViewMode('workout');
                           if (!workoutStartTime) setWorkoutStartTime(new Date().toISOString());
                         }}
-                        className="flex-none w-72 group flex flex-col p-6 bg-white/5 rounded-[32px] border border-white/5 hover:border-gold/30 transition-all text-left relative overflow-hidden"
+                        className="group flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:border-gold/30 transition-all text-left"
                       >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-gold/20 group-hover:bg-gold transition-colors" />
-                        
-                        <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-6">
                           <div className="w-12 h-12 rounded-2xl bg-gold/10 flex items-center justify-center text-gold font-black italic">
                             D{workout.day}
                           </div>
-                          <div className="text-right">
-                            <div className="text-xl font-black text-accent">{getWorkoutProgress(workout)}%</div>
-                            <div className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Progress</div>
+                          <div>
+                            <h4 className="font-bold text-lg uppercase italic group-hover:text-gold transition-colors">{workout.title}</h4>
+                            <p className="text-xs text-white/40 uppercase tracking-widest">{workout.exercises.length} Exercises</p>
                           </div>
                         </div>
-
-                        <div className="flex-1">
-                          <h4 className="font-bold text-lg uppercase italic group-hover:text-gold transition-colors mb-1">{workout.title}</h4>
-                          <p className="text-[10px] text-white/40 uppercase tracking-widest font-black">{workout.exercises.length} Exercises</p>
-                        </div>
-
-                        <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-gold/60">Start Session</span>
-                          <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-xl font-black text-accent">{getWorkoutProgress(workout)}%</div>
+                            <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Complete</div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-gold transition-colors" />
                         </div>
                       </button>
                     ))}
                     <button 
                       onClick={() => setIsAddingWorkout(true)}
-                      className="flex-none w-72 flex flex-col items-center justify-center gap-4 p-6 bg-gold/5 border-2 border-dashed border-gold/20 rounded-[32px] hover:bg-gold/10 transition-all group krome-outline min-h-[200px]"
+                      className="flex items-center justify-center gap-3 p-6 bg-gold/5 border-2 border-dashed border-gold/20 rounded-3xl hover:bg-gold/10 transition-all group krome-outline"
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-gold group-hover:scale-110 transition-transform">
-                        <Plus className="w-6 h-6" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gold text-center">Add Workout to Week {currentWeek.week}</span>
+                      <Plus className="w-6 h-6 text-gold group-hover:scale-110 transition-transform" />
+                      <span className="text-sm font-black uppercase tracking-widest text-gold">Add Workout to Week {currentWeek.week}</span>
                     </button>
                   </div>
                 </div>
@@ -863,172 +883,141 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                     };
 
                     return (
-                      <div key={`${key}-${idx}`} className="px-4 py-2">
-                        <motion.div 
-                          layout
-                          className={`transition-all rounded-[32px] border ${isCompleted ? 'bg-emerald-500/5 border-emerald-500/20' : isEditing ? 'bg-zinc-900 border-gold/30 shadow-2xl shadow-gold/5' : 'bg-zinc-900/30 border-white/5 hover:border-gold/20'}`}
-                        >
-                          <div 
-                            className="p-6 cursor-pointer"
-                            onClick={() => isEditing ? setEditingId(null) : startEditing(selectedWorkout.id, exercise, idx)}
-                          >
-                            <div className="flex items-start gap-4">
-                              <motion.button 
-                                whileTap={{ scale: 0.8 }}
-                                whileHover={{ scale: 1.1 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleExercise(selectedWorkout.id, exercise.id, idx);
-                                }}
-                                className={`mt-1 flex-shrink-0 transition-all relative ${isCompleted ? 'text-emerald-500' : 'text-white/20 hover:text-white/40'}`}
-                              >
-                                <AnimatePresence mode="wait">
-                                  {isCompleted ? (
+                      <div key={`${key}-${idx}`} className={`p-8 transition-colors rounded-[40px] border ${isCompleted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-zinc-900/30 border-white/5 hover:border-gold/30'}`}>
+                        <div className="flex flex-col md:flex-row gap-8 md:items-center justify-between">
+                          <div className="flex items-start gap-6 flex-1">
+                            <motion.button 
+                              whileTap={{ scale: 0.8 }}
+                              whileHover={{ scale: 1.1 }}
+                              onClick={() => toggleExercise(selectedWorkout.id, exercise.id, idx)}
+                              className={`mt-1 flex-shrink-0 transition-all relative ${isCompleted ? 'text-emerald-500' : 'text-white/20 hover:text-white/40'}`}
+                            >
+                              <AnimatePresence mode="wait">
+                                {isCompleted ? (
+                                  <motion.div
+                                    key="completed"
+                                    initial={{ scale: 0, rotate: -45 }}
+                                    animate={{ scale: 1.1, rotate: 0 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                                  >
+                                    <CheckCircle2 className="w-8 h-8" />
+                                    {/* Success burst effect */}
                                     <motion.div
-                                      key="completed"
-                                      initial={{ scale: 0, rotate: -45 }}
-                                      animate={{ scale: 1.1, rotate: 0 }}
-                                      transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                                    >
-                                      <CheckCircle2 className="w-6 h-6" />
-                                      <motion.div
-                                        initial={{ scale: 0, opacity: 1 }}
-                                        animate={{ scale: 2, opacity: 0 }}
-                                        className="absolute inset-0 bg-emerald-500 rounded-full -z-10"
-                                      />
-                                    </motion.div>
-                                  ) : (
-                                    <motion.div
-                                      key="incomplete"
-                                      initial={{ scale: 0.8, opacity: 0 }}
-                                      animate={{ scale: 1, opacity: 1 }}
-                                    >
-                                      <Circle className="w-6 h-6" />
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </motion.button>
-
-                              <div className="flex-1">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <motion.h4 
-                                      animate={{ 
-                                        color: isCompleted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,1)",
-                                        textDecoration: isCompleted ? "line-through" : "none"
-                                      }}
-                                      className="text-base font-black uppercase italic"
-                                    >
-                                      {displayData.name}
-                                    </motion.h4>
-                                    <div className="text-[9px] font-black uppercase tracking-widest text-white/30 mt-0.5">
-                                      {exerciseDetails?.category || 'General'}
-                                    </div>
-                                  </div>
-                                  {!isEditing && (
-                                    <div className="flex items-center gap-3">
-                                      <div className="text-right">
-                                        <div className="text-[10px] font-black text-white/60">{displayData.sets} x {displayData.reps}</div>
-                                        <div className="text-[8px] font-black uppercase tracking-widest text-white/20">Target</div>
-                                      </div>
-                                      <ChevronDown className="w-4 h-4 text-white/20" />
-                                    </div>
-                                  )}
-                                </div>
-
-                                {displayData.notes && !isEditing && (
-                                  <p className="text-[10px] text-white/40 mt-2 italic line-clamp-1">{displayData.notes}</p>
+                                      initial={{ scale: 0, opacity: 1 }}
+                                      animate={{ scale: 2, opacity: 0 }}
+                                      className="absolute inset-0 bg-emerald-500 rounded-full -z-10"
+                                    />
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    key="incomplete"
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                  >
+                                    <Circle className="w-8 h-8" />
+                                  </motion.div>
                                 )}
-                              </div>
-                            </div>
-
-                            {isEditing && (
-                              <motion.div 
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                className="mt-6 pt-6 border-t border-white/10 space-y-6"
-                                onClick={e => e.stopPropagation()}
+                              </AnimatePresence>
+                            </motion.button>
+                            <div>
+                              <motion.h4 
+                                animate={{ 
+                                  color: isCompleted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,1)",
+                                  textDecoration: isCompleted ? "line-through" : "none"
+                                }}
+                                className="text-xl font-black uppercase italic"
                               >
+                                {displayData.name}
+                              </motion.h4>
+                              {displayData.notes && <p className="text-sm text-white/40 mt-2 italic">{displayData.notes}</p>}
+                              {displayData.videoUrl && (
+                                <button 
+                                  onClick={() => setVideoModal({ isOpen: true, url: displayData.videoUrl, title: displayData.name })}
+                                  className="text-xs text-gold hover:underline mt-2 flex items-center gap-1 !outline-none"
+                                >
+                                  <PlayCircle className="w-3 h-3" /> Watch Demo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="md:w-1/2">
+                            {isEditing ? (
+                              <div className="bg-black/40 p-6 rounded-3xl border border-white/10 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-1">
-                                    <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Actual Sets</label>
+                                  <div>
+                                    <label className="text-[10px] font-black uppercase text-white/30 block mb-1">Sets</label>
                                     <input 
                                       type="text" 
                                       value={editForm.sets || ''} 
                                       onChange={(e) => setEditForm({...editForm, sets: e.target.value})}
-                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-gold transition-all"
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
                                     />
                                   </div>
-                                  <div className="space-y-1">
-                                    <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Actual Reps</label>
+                                  <div>
+                                    <label className="text-[10px] font-black uppercase text-white/30 block mb-1">Reps</label>
                                     <input 
                                       type="text" 
                                       value={editForm.reps || ''} 
                                       onChange={(e) => setEditForm({...editForm, reps: e.target.value})}
-                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-gold transition-all"
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
                                     />
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-1">
-                                    <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Tempo Used</label>
+                                  <div>
+                                    <label className="text-[10px] font-black uppercase text-white/30 block mb-1">Tempo</label>
                                     <input 
                                       type="text" 
                                       value={editForm.tempo || ''} 
                                       onChange={(e) => setEditForm({...editForm, tempo: e.target.value})}
-                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-gold transition-all"
-                                      placeholder={displayData.tempo || "3-0-1-0"}
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                                      placeholder="e.g. 3-0-1-0"
                                     />
                                   </div>
-                                  <div className="space-y-1">
-                                    <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Rest Taken</label>
+                                  <div>
+                                    <label className="text-[10px] font-black uppercase text-white/30 block mb-1">Rest</label>
                                     <input 
                                       type="text" 
                                       value={editForm.rest || ''} 
                                       onChange={(e) => setEditForm({...editForm, rest: e.target.value})}
-                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-gold transition-all"
-                                      placeholder={displayData.rest || "60s"}
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                                      placeholder="e.g. 60s"
                                     />
                                   </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <label className="text-[8px] font-black uppercase tracking-widest text-white/30">Performance Notes</label>
+                                <div>
+                                  <label className="text-[10px] font-black uppercase text-white/30 block mb-1">Notes</label>
                                   <textarea 
                                     value={editForm.notes || ''} 
                                     onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-gold h-24 resize-none transition-all"
-                                    placeholder="How did it feel? Any pain or PRs?"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold h-20 resize-none"
+                                    placeholder="Add custom notes for this exercise..."
                                   />
                                 </div>
-
-                                <div className="flex items-center justify-between gap-4 pt-2">
-                                  {displayData.videoUrl && (
-                                    <button 
-                                      onClick={() => setVideoModal({ isOpen: true, url: displayData.videoUrl, title: displayData.name })}
-                                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gold hover:text-white transition-colors"
-                                    >
-                                      <PlayCircle className="w-4 h-4" /> Watch Demo
-                                    </button>
-                                  )}
-                                  <div className="flex gap-2 ml-auto">
-                                    <button 
-                                      onClick={() => setEditingId(null)} 
-                                      className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button 
-                                      onClick={() => saveEdit(selectedWorkout.id, exercise.id, idx)} 
-                                      className="px-6 py-2 bg-gold text-black rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-gold/90 transition-all"
-                                    >
-                                      Log Data
-                                    </button>
-                                  </div>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setEditingId(null)} className="p-3 text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
+                                  <button onClick={() => saveEdit(selectedWorkout.id, exercise.id, idx)} className="p-3 bg-gold text-black rounded-xl font-bold uppercase text-xs tracking-widest">Save</button>
                                 </div>
-                              </motion.div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-6">
+                                <div className="flex flex-wrap gap-6 text-sm font-mono text-white/60">
+                                  <div><span className="text-[10px] font-sans uppercase text-white/30 mr-2">Sets</span>{displayData.sets}</div>
+                                  <div><span className="text-[10px] font-sans uppercase text-white/30 mr-2">Reps</span>{displayData.reps}</div>
+                                  {displayData.tempo && <div><span className="text-[10px] font-sans uppercase text-white/30 mr-2">Tempo</span>{displayData.tempo}</div>}
+                                  {displayData.rest && <div><span className="text-[10px] font-sans uppercase text-white/30 mr-2">Rest</span>{displayData.rest}</div>}
+                                </div>
+                                <button 
+                                  onClick={() => startEditing(selectedWorkout.id, exercise, idx)}
+                                  className="p-3 text-white/20 hover:text-gold transition-colors"
+                                >
+                                  <Edit2 className="w-5 h-5" />
+                                </button>
+                              </div>
                             )}
                           </div>
-                        </motion.div>
+                        </div>
                       </div>
                     );
                   })}

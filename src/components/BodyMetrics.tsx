@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -141,7 +142,7 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
             const dbData = await res.json();
             if (dbData) {
               setData(dbData);
-              localStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(dbData));
+              safeStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(dbData));
             }
           }
         } catch (err) {
@@ -155,10 +156,10 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
             const dbHistory = await res.json();
             if (dbHistory && dbHistory.length > 0) {
               setBodyCompHistory(dbHistory);
-              localStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(dbHistory));
+              safeStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(dbHistory));
             } else {
               // Fallback to local storage if DB is empty
-              const savedHistory = localStorage.getItem(`krome_bodycomp_${userId}`);
+              const savedHistory = safeStorage.getItem(`krome_bodycomp_${userId}`);
               if (savedHistory) {
                 setBodyCompHistory(JSON.parse(savedHistory));
               }
@@ -169,10 +170,10 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
         }
       } else {
         // Fallback to local storage for guest
-        const savedData = localStorage.getItem(`krome_metrics_${userId}`);
+        const savedData = safeStorage.getItem(`krome_metrics_${userId}`);
         if (savedData) setData(JSON.parse(savedData));
         
-        const savedHistory = localStorage.getItem(`krome_bodycomp_${userId}`);
+        const savedHistory = safeStorage.getItem(`krome_bodycomp_${userId}`);
         if (savedHistory) {
           setBodyCompHistory(JSON.parse(savedHistory));
         }
@@ -185,14 +186,14 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
   // Auto-save history to local storage whenever it changes
   useEffect(() => {
     if (bodyCompHistory.length > 0) {
-      localStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(bodyCompHistory));
+      safeStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(bodyCompHistory));
     }
   }, [bodyCompHistory, userId]);
 
   // Save data
   const handleSave = async () => {
-    localStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(data));
-    localStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(bodyCompHistory));
+    safeStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(data));
+    safeStorage.setItem(`krome_bodycomp_${userId}`, JSON.stringify(bodyCompHistory));
     
     if (userId !== 'guest') {
       try {

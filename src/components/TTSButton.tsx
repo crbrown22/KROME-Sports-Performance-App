@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useRef } from 'react';
 import { Volume2, Loader2, Square } from 'lucide-react';
 import { GoogleGenAI, Modality } from '@google/genai';

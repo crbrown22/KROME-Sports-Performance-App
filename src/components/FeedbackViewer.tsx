@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { Star, MessageSquare, User, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';

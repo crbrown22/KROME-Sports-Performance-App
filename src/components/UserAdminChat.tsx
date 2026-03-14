@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, User, Bot, Paperclip, ImageIcon, Video, Download, Trash2 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';

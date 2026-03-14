@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Camera, Edit3, Trash2, ShieldAlert, CheckCircle2, AlertCircle, ChevronLeft, LogOut, Bell, BellOff } from 'lucide-react';

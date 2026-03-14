@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Loader2, Send, Sparkles, Video, X, User, BookOpen, GraduationCap, Download, Mic } from 'lucide-react';

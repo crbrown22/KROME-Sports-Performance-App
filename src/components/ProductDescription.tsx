@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Lock, CheckCircle2, Dumbbell } from 'lucide-react';

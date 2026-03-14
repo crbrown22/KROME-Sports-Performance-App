@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentDate } from '../utils/date';
@@ -32,7 +33,8 @@ import {
   History,
   Video,
   Zap,
-  Settings
+  Settings,
+  Image as ImageIcon
 } from "lucide-react";
 import ProgressTracker from "./ProgressTracker";
 import BodyMetrics from "./BodyMetrics";
@@ -56,6 +58,7 @@ import AthleteSettings from "./AthleteSettings";
 import AITools from "./AITools";
 import AdminMessageDashboard from "./AdminMessageDashboard";
 import FeedbackViewer from "./FeedbackViewer";
+import BrandAssets from "./BrandAssets";
 
 interface UserRecord {
   id: number;
@@ -64,7 +67,7 @@ interface UserRecord {
   first_name: string;
   last_name: string;
   avatar_url?: string;
-  role: 'user' | 'admin';
+  role: 'athlete' | 'coach' | 'admin';
   status: 'active' | 'inactive' | 'pending';
   created_at: string;
 }
@@ -74,7 +77,7 @@ interface AdminDashboardProps {
   adminId?: number;
   user: any;
   onBack: () => void;
-  initialTab?: 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback';
+  initialTab?: 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand';
   unreadSenderIds?: Set<number>;
 }
 
@@ -82,14 +85,14 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(() => {
-    return localStorage.getItem('krome_admin_search_term') || "";
+    return safeStorage.getItem('krome_admin_search_term') || "";
   });
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(() => {
-    const saved = localStorage.getItem('krome_admin_selected_user');
+    const saved = safeStorage.getItem('krome_admin_selected_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback'>(() => {
-    const saved = localStorage.getItem('krome_admin_active_tab');
+  const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand'>(() => {
+    const saved = safeStorage.getItem('krome_admin_active_tab');
     if (window.innerWidth < 1024) return 'menu';
     return initialTab || (saved as any) || 'workouts';
   });
@@ -101,9 +104,10 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback'>(() => {
+  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback' | 'brand'>(() => {
     if (initialTab === 'chat') return 'chat';
     if (initialTab === 'feedback') return 'feedback';
+    if (initialTab === 'brand') return 'brand';
     return 'sales';
   });
 
@@ -138,7 +142,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     });
   const [isEditingNutrition, setIsEditingNutrition] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
-    const saved = localStorage.getItem('krome_admin_selected_date');
+    const saved = safeStorage.getItem('krome_admin_selected_date');
     if (saved) return saved;
     return getCurrentDate();
   });
@@ -151,7 +155,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     password: '',
     first_name: '',
     last_name: '',
-    role: 'user' as 'user' | 'admin'
+    role: 'athlete' as 'athlete' | 'coach' | 'admin'
   });
   const [selectedProgram, setSelectedProgram] = useState<FullProgramTemplate | undefined>(undefined);
   const [isCustomProgram, setIsCustomProgram] = useState(false);
@@ -160,7 +164,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     first_name: '', 
     last_name: '', 
     email: '', 
-    role: 'user' as 'user' | 'admin',
+    role: 'athlete' as 'athlete' | 'coach' | 'admin',
     status: 'active' as 'active' | 'inactive' | 'pending'
   });
 
@@ -207,7 +211,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
           password: '',
           first_name: '',
           last_name: '',
-          role: 'user'
+          role: 'athlete'
         });
         fetchUsers();
       } else {
@@ -223,7 +227,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     const loadActivityLogs = async () => {
       if (!selectedUser) return;
       
-      const cached = localStorage.getItem(`krome_admin_activity_${selectedUser.id}`);
+      const cached = safeStorage.getItem(`krome_admin_activity_${selectedUser.id}`);
       if (cached) setActivityLogs(JSON.parse(cached));
 
       try {
@@ -231,7 +235,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
         if (response.ok) {
           const data = await response.json();
           setActivityLogs(data);
-          localStorage.setItem(`krome_admin_activity_${selectedUser.id}`, JSON.stringify(data));
+          safeStorage.setItem(`krome_admin_activity_${selectedUser.id}`, JSON.stringify(data));
         } else {
           showError("Failed to load activity logs");
         }
@@ -271,29 +275,29 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
 
   useEffect(() => {
     if (selectedUser) {
-      localStorage.setItem('krome_admin_selected_user', JSON.stringify(selectedUser));
+      safeStorage.setItem('krome_admin_selected_user', JSON.stringify(selectedUser));
     } else {
-      localStorage.removeItem('krome_admin_selected_user');
+      safeStorage.removeItem('krome_admin_selected_user');
     }
   }, [selectedUser]);
 
   useEffect(() => {
-    localStorage.setItem('krome_admin_active_tab', activeTab);
+    safeStorage.setItem('krome_admin_active_tab', activeTab);
   }, [activeTab]);
 
   useEffect(() => {
-    localStorage.setItem('krome_admin_selected_date', selectedDate);
+    safeStorage.setItem('krome_admin_selected_date', selectedDate);
   }, [selectedDate]);
 
   useEffect(() => {
-    localStorage.setItem('krome_admin_search_term', searchTerm);
+    safeStorage.setItem('krome_admin_search_term', searchTerm);
   }, [searchTerm]);
 
   useEffect(() => {
     const loadNutrition = async () => {
       if (!selectedUser) return;
       
-      const cached = localStorage.getItem(`krome_admin_nutrition_${selectedUser.id}`);
+      const cached = safeStorage.getItem(`krome_admin_nutrition_${selectedUser.id}`);
       if (cached) setNutritionLogs(JSON.parse(cached));
 
       try {
@@ -318,7 +322,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
             per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 }
           }));
           setNutritionLogs(formattedLogs);
-          localStorage.setItem(`krome_admin_nutrition_${selectedUser.id}`, JSON.stringify(formattedLogs));
+          safeStorage.setItem(`krome_admin_nutrition_${selectedUser.id}`, JSON.stringify(formattedLogs));
         } else {
           showError("Failed to load nutrition logs");
         }
@@ -336,7 +340,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     const loadMetrics = async () => {
       if (!selectedUser) return;
       
-      const cached = localStorage.getItem(`krome_admin_metrics_${selectedUser.id}`);
+      const cached = safeStorage.getItem(`krome_admin_metrics_${selectedUser.id}`);
       if (cached) setBodyMetricsData(JSON.parse(cached));
 
       try {
@@ -345,7 +349,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
           const dbData = await res.json();
           if (dbData) {
             setBodyMetricsData(dbData);
-            localStorage.setItem(`krome_admin_metrics_${selectedUser.id}`, JSON.stringify(dbData));
+            safeStorage.setItem(`krome_admin_metrics_${selectedUser.id}`, JSON.stringify(dbData));
           }
         } else {
           showError("Failed to load metrics");
@@ -425,12 +429,15 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
   };
 
   const toggleRole = async (id: number, currentRole: string) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    const roles: ('athlete' | 'coach' | 'admin')[] = ['athlete', 'coach', 'admin'];
+    const currentIndex = roles.indexOf(currentRole as any);
+    const newRole = roles[(currentIndex + 1) % roles.length];
+    
     try {
       await fetch(`/api/admin/users/${id}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole })
+        body: JSON.stringify({ role: newRole, adminId: user.id })
       });
       fetchUsers();
     } catch (err) {
@@ -485,7 +492,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
   const [error, setError] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>(() => {
-    const saved = localStorage.getItem('krome_crm_leads');
+    const saved = safeStorage.getItem('krome_crm_leads');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -631,10 +638,22 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
               <Star className="w-4 h-4" aria-hidden="true" />
               Feedback
             </button>
+            <button 
+              onClick={() => setTopLevelTab('brand')}
+              className={`px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2 ${topLevelTab === 'brand' ? 'bg-gold text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]' : 'bg-zinc-900 border border-white/10 text-white hover:border-gold'} krome-outline`}
+              role="tab"
+              aria-selected={topLevelTab === 'brand'}
+              aria-label="Brand Assets section"
+            >
+              <ImageIcon className="w-4 h-4" aria-hidden="true" />
+              Brand
+            </button>
           </div>
         )}
 
-        {topLevelTab === 'purchases' && !selectedUser ? (
+        {topLevelTab === 'brand' && !selectedUser ? (
+          <BrandAssets onBack={() => setTopLevelTab('sales')} />
+        ) : topLevelTab === 'purchases' && !selectedUser ? (
           <PurchaseCRM />
         ) : topLevelTab === 'sales' && !selectedUser ? (
           <SalesAndGrowthCRM />
@@ -697,8 +716,14 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                     </td>
                     <td className="p-6 text-sm text-white/70">{user.email}</td>
                     <td className="p-6">
-                      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-gold/10 text-gold border border-gold/20' : 'bg-white/5 text-white/60 border border-white/10'}`}>
-                        {user.role === 'admin' ? <ShieldCheck className="w-3 h-3" aria-hidden="true" /> : <Users className="w-3 h-3" aria-hidden="true" />}
+                      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                        user.role === 'admin' ? 'bg-gold/10 text-gold border border-gold/20' : 
+                        user.role === 'coach' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                        'bg-white/5 text-white/60 border border-white/10'
+                      }`}>
+                        {user.role === 'admin' ? <ShieldCheck className="w-3 h-3" aria-hidden="true" /> : 
+                         user.role === 'coach' ? <Zap className="w-3 h-3" aria-hidden="true" /> :
+                         <Users className="w-3 h-3" aria-hidden="true" />}
                         {user.role}
                       </div>
                     </td>
@@ -750,10 +775,12 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                         <button 
                           onClick={() => toggleRole(user.id, user.role)}
                           className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-gold hover:text-black transition-all text-white/60 hover:text-black"
-                          aria-label={user.role === 'admin' ? `Demote ${user.username} to User` : `Promote ${user.username} to Admin`}
-                          title={user.role === 'admin' ? "Demote to User" : "Promote to Admin"}
+                          aria-label={`Cycle role for ${user.username}`}
+                          title={`Current: ${user.role}. Click to cycle.`}
                         >
-                          {user.role === 'admin' ? <ShieldAlert className="w-5 h-5" aria-hidden="true" /> : <ShieldCheck className="w-5 h-5" aria-hidden="true" />}
+                          {user.role === 'admin' ? <ShieldCheck className="w-5 h-5" aria-hidden="true" /> : 
+                           user.role === 'coach' ? <Zap className="w-5 h-5" aria-hidden="true" /> :
+                           <Users className="w-5 h-5" aria-hidden="true" />}
                         </button>
                         <button 
                           onClick={() => sendTestNotification(user.id)}
@@ -1574,8 +1601,9 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                 <input type="text" value={editFormData.first_name} onChange={e => setEditFormData({...editFormData, first_name: e.target.value})} placeholder="First Name" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm" />
                 <input type="text" value={editFormData.last_name} onChange={e => setEditFormData({...editFormData, last_name: e.target.value})} placeholder="Last Name" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm" />
                 <input type="email" value={editFormData.email} onChange={e => setEditFormData({...editFormData, email: e.target.value})} placeholder="Email" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm" />
-                <select value={editFormData.role} onChange={e => setEditFormData({...editFormData, role: e.target.value as 'user' | 'admin'})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm">
-                  <option value="user">User</option>
+                <select value={editFormData.role} onChange={e => setEditFormData({...editFormData, role: e.target.value as 'athlete' | 'coach' | 'admin'})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm">
+                  <option value="athlete">Athlete</option>
+                  <option value="coach">Coach</option>
                   <option value="admin">Admin</option>
                 </select>
                 <select value={editFormData.status} onChange={e => setEditFormData({...editFormData, status: e.target.value as 'active' | 'inactive' | 'pending'})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm">
@@ -1613,8 +1641,9 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                 <input required type="password" value={addFormData.password} onChange={e => setAddFormData({...addFormData, password: e.target.value})} placeholder="Password" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-gold outline-none transition-colors" />
                 <input type="text" value={addFormData.first_name} onChange={e => setAddFormData({...addFormData, first_name: e.target.value})} placeholder="First Name" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-gold outline-none transition-colors" />
                 <input type="text" value={addFormData.last_name} onChange={e => setAddFormData({...addFormData, last_name: e.target.value})} placeholder="Last Name" className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-gold outline-none transition-colors" />
-                <select value={addFormData.role} onChange={e => setAddFormData({...addFormData, role: e.target.value as 'user' | 'admin'})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-gold outline-none transition-colors">
-                  <option value="user">User</option>
+                <select value={addFormData.role} onChange={e => setAddFormData({...addFormData, role: e.target.value as 'athlete' | 'coach' | 'admin'})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-gold outline-none transition-colors">
+                  <option value="athlete">Athlete</option>
+                  <option value="coach">Coach</option>
                   <option value="admin">Admin</option>
                 </select>
                 <div className="flex gap-4 mt-10">

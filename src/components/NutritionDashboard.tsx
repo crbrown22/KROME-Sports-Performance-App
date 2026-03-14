@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, LogOut, Apple, Calendar, ChevronRight, Flame, Beef, Wheat, Droplets } from 'lucide-react';

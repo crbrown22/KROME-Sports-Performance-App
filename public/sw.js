@@ -1,27 +1,25 @@
-const CACHE_NAME = 'krome-cache-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+const CACHE_NAME = 'krome-cache-v3';
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          return caches.delete(cacheName);
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
+// Minimal fetch listener to satisfy PWA requirements
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
+  // Network-only strategy: let the browser handle the request normally.
+  // We must not call event.respondWith() if we want the browser to handle it natively.
 });
 
 self.addEventListener('push', function(event) {
@@ -29,8 +27,8 @@ self.addEventListener('push', function(event) {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=192&h=192&fit=crop',
-      badge: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=72&h=72&fit=crop',
+      icon: '/logo.jpg',
+      badge: '/logo.jpg',
       data: {
         url: data.url || '/'
       }

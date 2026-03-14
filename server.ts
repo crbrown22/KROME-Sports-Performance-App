@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import db from "./src/lib/db.ts";
+import db from "./src/lib/db";
 import path from "path";
 import { SquareClient, SquareEnvironment } from 'square';
 import crypto from 'crypto';
@@ -10,6 +10,7 @@ import fs from 'fs';
 import nodemailer from 'nodemailer';
 import webpush from 'web-push';
 import bcrypt from 'bcryptjs';
+import cors from 'cors';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -36,6 +37,7 @@ export function getSquare(): SquareClient {
 }
 
 console.log("Starting server script...");
+console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
 
 // Web Push Setup
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -102,19 +104,39 @@ async function sendNotification(userId: number, title: string, body: string, url
 }
 
 async function startServer() {
+  console.log("startServer() called");
   console.log("Initializing express app...");
   const app = express();
   const PORT = 3000;
 
+  // Trust proxy for correct protocol/IP detection behind nginx
+  app.set('trust proxy', true);
+
   console.log("Setting up middleware...");
+  app.use(cors());
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
-  app.use(express.static('public'));
-
+  
+  // Logging middleware
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
+    console.log(`${req.method} ${req.url} - Host: ${req.headers.host}`);
     next();
   });
+
+  console.log(`APP_URL: ${process.env.APP_URL}`);
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV,
+      appUrl: process.env.APP_URL
+    });
+  });
+
+  // Serve uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Square Webhook
   app.post('/api/webhook', async (req, res) => {
@@ -144,7 +166,7 @@ async function startServer() {
 
               // Auto-update user role if they bought a program
               if (itemName.toLowerCase().includes('program') || itemName.toLowerCase().includes('plan')) {
-                db.prepare('UPDATE users SET role = ? WHERE id = ? AND role = ?').run('client', userId, 'user');
+                db.prepare('UPDATE users SET role = ? WHERE id = ? AND role = ?').run('athlete', userId, 'athlete');
               }
             }
           }
@@ -376,7 +398,12 @@ async function startServer() {
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
       const insert = db.prepare('INSERT INTO users (username, email, password, first_name, last_name, role, status, uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-      const result = insert.run(username, email, hashedPassword, first_name || firstName || "", last_name || lastName || "", role || 'user', status || 'active', uid || null);
+      
+      // Map 'user' to 'athlete' if coming from old client
+      let finalRole = role || 'athlete';
+      if (finalRole === 'user') finalRole = 'athlete';
+      
+      const result = insert.run(username, email, hashedPassword, first_name || firstName || "", last_name || lastName || "", finalRole, status || 'active', uid || null);
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
       
       // Add to leads
@@ -403,11 +430,30 @@ async function startServer() {
       });
 
       // Email to Athlete
+      const appUrl = process.env.APP_URL || 'https://www.kromesport.com';
       await transporter.sendMail({
         from: '"KROME Fitness" <kromefitness@gmail.com>',
         to: user.email,
         subject: 'Welcome to KROME Fitness',
-        text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nBest regards,\nThe KROME Team`,
+        text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nTo get the best experience, we invite you to download our app directly to your phone:\n\n1. Visit ${appUrl} on your mobile browser.\n2. Tap the "Share" button (iOS) or the menu icon (Android).\n3. Select "Add to Home Screen".\n\nThis will give you instant access to your training programs and performance tracking right from your home screen.\n\nBest regards,\nThe KROME Team`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #000;">Welcome to KROME Fitness!</h2>
+            <p>Hello ${user.first_name},</p>
+            <p>We are excited to have you on board. KROME is your premium platform for elite athletic training and performance tracking.</p>
+            <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">📲 Download the App</h3>
+              <p>For the best experience, install KROME directly on your phone:</p>
+              <ol>
+                <li>Open <strong>${appUrl}</strong> in your mobile browser.</li>
+                <li>Tap the <strong>Share</strong> button (iOS) or <strong>Menu</strong> icon (Android).</li>
+                <li>Select <strong>"Add to Home Screen"</strong>.</li>
+              </ol>
+              <a href="${appUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Open KROME App</a>
+            </div>
+            <p>Best regards,<br>The KROME Team</p>
+          </div>
+        `
       });
 
       console.log("Registered user:", user);
@@ -458,7 +504,16 @@ async function startServer() {
   // Admin: Update user role
   app.patch("/api/admin/users/:id/role", (req, res) => {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, adminId } = req.body;
+    
+    // Basic authorization check
+    if (adminId) {
+      const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(adminId) as any;
+      if (admin?.role !== 'admin') {
+        return res.status(403).json({ error: "Forbidden: Only admins can change roles" });
+      }
+    }
+
     try {
       db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
       res.json({ success: true });
@@ -1225,36 +1280,101 @@ async function startServer() {
     }
   });
 
-  // --- VITE MIDDLEWARE ---
-  if (process.env.NODE_ENV !== "production") {
+  // --- VITE / PRODUCTION MIDDLEWARE ---
+  const distPath = path.resolve(process.cwd(), "dist");
+  const indexPath = path.resolve(distPath, "index.html");
+  
+  // Explicitly check NODE_ENV
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  console.log(`[Server] Environment: ${process.env.NODE_ENV}`);
+  console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  console.log(`[Server] Dist Path: ${distPath}`);
+  console.log(`[Server] Index Path: ${indexPath}`);
+  console.log(`[Server] Index Path Exists: ${fs.existsSync(indexPath)}`);
+
+  if (isProduction || fs.existsSync(indexPath)) {
+    console.log("[Server] Serving static files from dist...");
+    
+    // Serve static files from dist
+    app.use(express.static(distPath, { 
+      index: 'index.html', // Let express-static handle the root index.html if it exists
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.json')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          if (filePath.endsWith('manifest.json')) {
+            res.setHeader('Content-Type', 'application/manifest+json');
+          }
+        }
+      }
+    }));
+    
+    // SPA fallback for routes that don't match a static file
+    app.get("*", (req, res) => {
+      // Don't serve index.html for API routes
+      if (req.url.startsWith('/api/')) {
+        console.log(`[Server] 404 on API route: ${req.url}`);
+        return res.status(404).json({ error: "API route not found" });
+      }
+      
+      console.log(`[Server] SPA Fallback for: ${req.url}`);
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error(`[Server] Error sending index.html: ${err}`);
+          res.status(500).send("Server Error: index.html not found. Please ensure the app is built.");
+        }
+      });
+    });
+  } else {
+    // Development mode: Use Vite
+    console.log("Starting in DEVELOPMENT mode with Vite...");
     try {
-      console.log("Creating Vite server...");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
       });
       app.use(vite.middlewares);
-      console.log("Vite middleware applied.");
+      
+      app.get("*", async (req, res, next) => {
+        if (req.url.startsWith('/api/') || req.url.includes('.')) {
+          return next();
+        }
+        try {
+          const template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+          const html = await vite.transformIndexHtml(req.originalUrl, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(html);
+        } catch (e) {
+          vite.ssrFixStacktrace(e as Error);
+          next(e);
+        }
+      });
     } catch (viteErr) {
-      console.error("Failed to create Vite server:", viteErr);
+      console.error("Vite failed, falling back to static:", viteErr);
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => res.sendFile(indexPath));
     }
-  } else {
-    app.use(express.static(path.join(process.cwd(), "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(process.cwd(), "dist", "index.html"));
-    });
   }
 
-  app.use((req, res, next) => {
-    console.log(`Request fell through: ${req.method} ${req.url}`);
-    res.status(404).send("Not Found");
-  });
-
   console.log(`Attempting to listen on port ${PORT}...`);
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Local access: http://localhost:${PORT}`);
+  });
+  
+  server.on('error', (err) => {
+    console.error('Server listen error:', err);
   });
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 console.log("Calling startServer()...");
 startServer().catch(err => {

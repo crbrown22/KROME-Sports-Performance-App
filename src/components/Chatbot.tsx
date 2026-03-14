@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, X, Send, Loader2, Minimize2, Maximize2, Paperclip, Download, Mic } from "lucide-react";
@@ -31,7 +32,7 @@ export default function Chatbot({ user }: ChatbotProps) {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [usageCount, setUsageCount] = useState(() => {
-    const saved = localStorage.getItem('chatbot_usage');
+    const saved = safeStorage.getItem('chatbot_usage');
     return saved ? parseInt(saved) : 0;
   });
   const [showVoiceChat, setShowVoiceChat] = useState(false);
@@ -50,7 +51,7 @@ export default function Chatbot({ user }: ChatbotProps) {
     if (!user) {
       const newCount = usageCount + 1;
       setUsageCount(newCount);
-      localStorage.setItem('chatbot_usage', newCount.toString());
+      safeStorage.setItem('chatbot_usage', newCount.toString());
     }
   };
 

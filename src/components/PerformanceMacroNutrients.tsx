@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentDate } from '../utils/date';
@@ -128,7 +129,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
         }
       } else {
         // Fallback to local storage for guest
-        const savedLog = localStorage.getItem(`krome_nutrition_log_${userId}`);
+        const savedLog = safeStorage.getItem(`krome_nutrition_log_${userId}`);
         if (savedLog) {
           const parsed = JSON.parse(savedLog);
           const migrated = parsed.map((item: any) => ({
@@ -159,7 +160,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
                 carbs: recommendations.carbsGrams,
                 fat: recommendations.fatGrams
               });
-              localStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(dbData));
+              safeStorage.setItem(`krome_metrics_${userId}`, JSON.stringify(dbData));
               return;
             }
           }
@@ -168,7 +169,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
         }
       }
 
-      const savedMetrics = localStorage.getItem(`krome_metrics_${userId}`);
+      const savedMetrics = safeStorage.getItem(`krome_metrics_${userId}`);
       if (savedMetrics) {
         try {
           const parsedMetrics = JSON.parse(savedMetrics);
@@ -188,7 +189,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
     loadTargets();
 
     // Load user recipes from local storage
-    const savedRecipes = localStorage.getItem('krome_user_recipes');
+    const savedRecipes = safeStorage.getItem('krome_user_recipes');
     if (savedRecipes) {
       try {
         setUserRecipes(JSON.parse(savedRecipes));
@@ -202,7 +203,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
   useEffect(() => {
     if (!isLoaded) return;
     
-    localStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(allLogs));
+    safeStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(allLogs));
     
     // Auto-save to database
     if (userId !== 'guest') {
@@ -235,7 +236,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
     setAllLogs(updatedLogs);
 
     // Save to local storage
-    localStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(updatedLogs));
+    safeStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(updatedLogs));
 
     // Save to database
     if (userId !== 'guest') {
@@ -345,7 +346,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
         console.error("Failed to save nutrition logs to database:", error);
       }
     }
-    localStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(allLogs));
+    safeStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(allLogs));
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };

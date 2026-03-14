@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Trash2, Bot, User } from 'lucide-react';
 

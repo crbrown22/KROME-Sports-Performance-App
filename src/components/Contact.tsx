@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Smartphone, Globe, Clipboard, ChevronLeft } from 'lucide-react';

@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from "react";
 import { getCurrentDate } from '../utils/date';
 import { 
@@ -196,7 +197,7 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
             const dbData = await res.json();
             if (dbData) {
               setBodyMetricsData(dbData);
-              localStorage.setItem(`krome_metrics_${user.id}`, JSON.stringify(dbData));
+              safeStorage.setItem(`krome_metrics_${user.id}`, JSON.stringify(dbData));
               return;
             }
           }
@@ -205,7 +206,7 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
         }
       }
 
-      const savedMetrics = localStorage.getItem(`krome_metrics_${user.id}`);
+      const savedMetrics = safeStorage.getItem(`krome_metrics_${user.id}`);
       if (savedMetrics) {
         try {
           setBodyMetricsData(JSON.parse(savedMetrics));

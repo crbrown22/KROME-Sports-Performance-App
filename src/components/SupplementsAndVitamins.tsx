@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React from 'react';
 import { Pill } from 'lucide-react';
 import { BodyMetricsData } from '../types';

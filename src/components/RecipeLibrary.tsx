@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,7 +46,7 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
   const mealTypes = ["All", "Breakfast", "Lunch", "Dinner", "Snack", "Dessert"];
 
   // Load user recipes
-  const userRecipes = JSON.parse(localStorage.getItem('krome_user_recipes') || '[]');
+  const userRecipes = JSON.parse(safeStorage.getItem('krome_user_recipes') || '[]');
   const allRecipes = [...recipes, ...userRecipes];
 
   const filteredRecipes = allRecipes.filter(recipe => {
@@ -75,9 +76,9 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
       instructions: newRecipe.instructions || ""
     };
 
-    const savedRecipes = JSON.parse(localStorage.getItem('krome_user_recipes') || '[]');
+    const savedRecipes = JSON.parse(safeStorage.getItem('krome_user_recipes') || '[]');
     const updatedRecipes = [...savedRecipes, recipe];
-    localStorage.setItem('krome_user_recipes', JSON.stringify(updatedRecipes));
+    safeStorage.setItem('krome_user_recipes', JSON.stringify(updatedRecipes));
     
     setShowAddModal(false);
     setNewRecipe({
@@ -143,9 +144,9 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
   const handleSaveRecipe = () => {
     if (!generatedRecipe) return;
 
-    const savedRecipes = JSON.parse(localStorage.getItem('krome_user_recipes') || '[]');
+    const savedRecipes = JSON.parse(safeStorage.getItem('krome_user_recipes') || '[]');
     const newRecipes = [...savedRecipes, generatedRecipe];
-    localStorage.setItem('krome_user_recipes', JSON.stringify(newRecipes));
+    safeStorage.setItem('krome_user_recipes', JSON.stringify(newRecipes));
     
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
@@ -175,9 +176,9 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
       per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 }
     };
 
-    const currentLog = JSON.parse(localStorage.getItem(`krome_nutrition_log_${userId}`) || '[]');
+    const currentLog = JSON.parse(safeStorage.getItem(`krome_nutrition_log_${userId}`) || '[]');
     const updatedLog = [newEntry, ...currentLog];
-    localStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(updatedLog));
+    safeStorage.setItem(`krome_nutrition_log_${userId}`, JSON.stringify(updatedLog));
 
     // Also try to save to DB if user is logged in (fire and forget)
     if (userId !== 'guest') {

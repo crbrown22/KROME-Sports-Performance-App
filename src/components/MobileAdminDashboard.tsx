@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { safeStorage } from '../utils/storage';
 import React from "react";
 import { 
   User, 

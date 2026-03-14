@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, ShoppingBag } from 'lucide-react';

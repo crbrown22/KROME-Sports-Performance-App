@@ -1,3 +1,5 @@
+import { haptics } from '../utils/nativeBridge';
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -149,6 +151,12 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   };
 
   const handleUpdateLog = async (log: WorkoutLog) => {
+    const isCompleted = !log.completed;
+    if (isCompleted) {
+      haptics.success();
+    } else {
+      haptics.light();
+    }
     await fetch(`/api/workout-logs/${userId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },

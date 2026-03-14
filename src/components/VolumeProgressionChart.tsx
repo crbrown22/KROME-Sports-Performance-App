@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useMemo } from 'react';
 import { 
   LineChart, 

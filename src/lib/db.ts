@@ -23,7 +23,7 @@ try {
     first_name TEXT,
     last_name TEXT,
     avatar_url TEXT,
-    role TEXT DEFAULT 'user',
+    role TEXT DEFAULT 'athlete',
     status TEXT DEFAULT 'active',
     parq_completed INTEGER DEFAULT 0,
     email_notifications INTEGER DEFAULT 1,
@@ -216,6 +216,13 @@ try {
 `);
 } catch (err) {
   console.error("Failed to initialize tables:", err);
+}
+
+// Migration: Update 'user' roles to 'athlete'
+try {
+  db.prepare("UPDATE users SET role = 'athlete' WHERE role = 'user'").run();
+} catch (err) {
+  // Ignore if column doesn't exist yet or other issues
 }
 
 // Migration: Add is_read column to messages table if it doesn't exist

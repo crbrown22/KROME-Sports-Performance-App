@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Edit3, Save, X } from 'lucide-react';
 

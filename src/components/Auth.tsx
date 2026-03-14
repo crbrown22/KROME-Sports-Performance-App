@@ -1,4 +1,6 @@
+import { haptics } from '../utils/nativeBridge';
 import { motion } from "framer-motion";
+import { safeStorage } from '../utils/storage';
 import React, { useState } from "react";
 import { getCurrentDate } from '../utils/date';
 import { 
@@ -25,7 +27,7 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<'user' | 'admin'>('user');
+  const [role, setRole] = useState<'athlete' | 'coach'>('athlete');
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -42,8 +44,10 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
         });
         const data = await response.json();
         if (response.ok) {
+          haptics.success();
           onLoginSuccess(data);
         } else {
+          haptics.error();
           setError(data.error || "Login failed");
         }
       } else if (mode === 'register') {
@@ -61,9 +65,10 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
         });
         const data = await response.json();
         if (response.ok) {
+          haptics.success();
           // Add to CRM leads
           try {
-            const savedLeads = localStorage.getItem('krome_crm_leads');
+            const savedLeads = safeStorage.getItem('krome_crm_leads');
             const leads = savedLeads ? JSON.parse(savedLeads) : [];
             const newLead = {
               id: `lead-${Date.now()}`,
@@ -75,13 +80,14 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
               lastContact: getCurrentDate(),
               userId: data.id
             };
-            localStorage.setItem('krome_crm_leads', JSON.stringify([...leads, newLead]));
+            safeStorage.setItem('krome_crm_leads', JSON.stringify([...leads, newLead]));
           } catch (e) {
             console.error("Failed to add lead to CRM", e);
           }
           
           onLoginSuccess(data);
         } else {
+          haptics.error();
           setError(data.error || "Registration failed");
         }
       } else {
@@ -188,9 +194,9 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => setRole('user')}
+                      onClick={() => setRole('athlete')}
                       className={`py-3 px-4 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all ${
-                        role === 'user' 
+                        role === 'athlete' 
                           ? 'bg-gold text-black border-gold' 
                           : 'bg-black/50 text-white/60 border-white/10 hover:border-white/30'
                       }`}
@@ -199,9 +205,9 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setRole('admin')}
+                      onClick={() => setRole('coach')}
                       className={`py-3 px-4 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all ${
-                        role === 'admin' 
+                        role === 'coach' 
                           ? 'bg-gold text-black border-gold' 
                           : 'bg-black/50 text-white/60 border-white/10 hover:border-white/30'
                       }`}

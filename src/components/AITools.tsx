@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Zap, Image as ImageIcon, Video, Loader2, Upload, Download, ChevronDown, ChevronUp, BookOpen, GraduationCap } from 'lucide-react';

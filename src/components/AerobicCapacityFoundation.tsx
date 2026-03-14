@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, CheckCircle2, Circle, PlayCircle, Edit2, Save, X, Calendar } from "lucide-react";
@@ -23,12 +24,12 @@ export default function AerobicCapacityFoundation({ onBack, userId }: Props) {
   const [workoutEndTime, setWorkoutEndTime] = useState<string | null>(null);
   const startedLogged = useRef(false);
 
-  // Load saved progress from localStorage and DB on mount
+  // Load saved progress from safeStorage and DB on mount
   useEffect(() => {
     const loadProgress = async () => {
       // Local storage fallback
-      const savedCompleted = localStorage.getItem(`krome_aerobic_completed_${userId}`);
-      const savedEdited = localStorage.getItem(`krome_aerobic_edited_${userId}`);
+      const savedCompleted = safeStorage.getItem(`krome_aerobic_completed_${userId}`);
+      const savedEdited = safeStorage.getItem(`krome_aerobic_edited_${userId}`);
       if (savedCompleted) setCompletedExercises(JSON.parse(savedCompleted));
       if (savedEdited) setEditedExercises(JSON.parse(savedEdited));
 
@@ -62,10 +63,10 @@ export default function AerobicCapacityFoundation({ onBack, userId }: Props) {
     loadProgress();
   }, [userId]);
 
-  // Save progress to localStorage and DB whenever it changes
+  // Save progress to safeStorage and DB whenever it changes
   useEffect(() => {
-    localStorage.setItem(`krome_aerobic_completed_${userId}`, JSON.stringify(completedExercises));
-    localStorage.setItem(`krome_aerobic_edited_${userId}`, JSON.stringify(editedExercises));
+    safeStorage.setItem(`krome_aerobic_completed_${userId}`, JSON.stringify(completedExercises));
+    safeStorage.setItem(`krome_aerobic_edited_${userId}`, JSON.stringify(editedExercises));
 
     if (userId !== 'guest') {
       const syncProgress = async () => {

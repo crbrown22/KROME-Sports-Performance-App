@@ -16,7 +16,8 @@ import {
   Shield,
   ChevronLeft,
   Lock,
-  LogOut
+  LogOut,
+  Share2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -58,6 +59,7 @@ import AccountSettings from "./components/AccountSettings";
 import { ALL_PROGRAMS } from "./data/workoutTemplates";
 import { logActivity } from "./utils/activity";
 import Chatbot from "./components/Chatbot";
+import { safeStorage } from "./utils/storage";
 
 const programs = [
   {
@@ -146,7 +148,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('krome_user');
+    const savedUser = safeStorage.getItem('krome_user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
@@ -235,9 +237,9 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem('krome_user', JSON.stringify(user));
+      safeStorage.setItem('krome_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('krome_user');
+      safeStorage.removeItem('krome_user');
     }
   }, [user]);
 
@@ -284,7 +286,7 @@ export default function App() {
   const handleLoginSuccess = (userData: any) => {
     console.log("Login success, user:", userData);
     setUser(userData);
-    localStorage.setItem('krome_user', JSON.stringify(userData));
+    safeStorage.setItem('krome_user', JSON.stringify(userData));
     resetToView('profile');
     logActivity(userData.id, 'login', { username: userData.username });
   };
@@ -294,8 +296,31 @@ export default function App() {
       logActivity(user?.id, 'logout', { username: user?.username });
     }
     setUser(null);
-    localStorage.removeItem('krome_user');
+    safeStorage.removeItem('krome_user');
     resetToView('home');
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: 'KROME Sports Performance',
+      text: 'Check out KROME Sports Performance for elite athletic training!',
+      url: window.location.origin
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.origin);
+        alert('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Error copying to clipboard:', err);
+      }
+    }
   };
 
   return (
@@ -316,7 +341,7 @@ export default function App() {
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
           >
-            <img src="/logo.png" alt="KROME Sports Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+            <img src="/logo.jpg" alt="KROME Sports Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
             <span className="text-xl font-black tracking-tighter uppercase italic">
               KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
             </span>
@@ -435,10 +460,18 @@ export default function App() {
               </button>
             )}
 
+            <button 
+              onClick={handleShare}
+              className="text-accent hover:text-white transition-colors flex items-center gap-2 !outline-none hover:krome-outline px-2 py-1 rounded-lg"
+              aria-label="Share app"
+            >
+              <Share2 className="w-4 h-4" /> Share
+            </button>
+
             <NotificationIcon 
               userId={user?.id}
               onOpenChat={() => setShowChat(true)} 
-              onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); localStorage.setItem('krome_admin_active_tab', 'chat'); }}
+              onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); }}
               isAdmin={user?.role === 'admin'}
               unreadCount={unreadCount}
             />
@@ -506,7 +539,13 @@ export default function App() {
               <a href="#" onClick={() => { navigateTo('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Specialized Training</a>
 
               <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-4">
-              <a href="#" onClick={() => { setShopCategory('all'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Shop</a>
+                <button 
+                  onClick={() => { handleShare(); setMobileMenuOpen(false); }} 
+                  className="text-accent flex items-center justify-center gap-2 !outline-none"
+                >
+                  <Share2 className="w-4 h-4" /> Share App
+                </button>
+                <a href="#" onClick={() => { setShopCategory('all'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Shop</a>
               <a href="#" onClick={() => { setShopCategory('programs'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Programs</a>
               <a href="#" onClick={() => { setShopCategory('apparel'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none">Apparel</a>
 
@@ -921,7 +960,7 @@ export default function App() {
             onBack={goBack}
             onUpdate={(updated) => {
               setUser(updated);
-              localStorage.setItem('krome_user', JSON.stringify(updated));
+              safeStorage.setItem('krome_user', JSON.stringify(updated));
             }}
             onDelete={handleLogout}
             onNavigate={(view) => navigateTo(view as View)}
@@ -1114,7 +1153,7 @@ export default function App() {
               onComplete={() => {
                 const updatedUser = { ...user, parq_completed: 1 };
                 setUser(updatedUser);
-                localStorage.setItem('krome_user', JSON.stringify(updatedUser));
+                safeStorage.setItem('krome_user', JSON.stringify(updatedUser));
                 goBack();
               }}
             />
@@ -1165,7 +1204,7 @@ export default function App() {
               user={user} 
               onUpdate={(updated) => {
                 setUser(updated);
-                localStorage.setItem('krome_user', JSON.stringify(updated));
+                safeStorage.setItem('krome_user', JSON.stringify(updated));
               }}
               onDelete={handleLogout}
               onBack={goBack}
@@ -1491,7 +1530,7 @@ export default function App() {
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
               >
-                <img src="/logo.png" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                <img src="/logo.jpg" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
                 <span className="text-lg font-black tracking-tighter uppercase italic">
                   KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
                 </span>

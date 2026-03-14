@@ -1,3 +1,4 @@
+import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Save, Edit2, Activity } from 'lucide-react';
@@ -124,7 +125,7 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
       const leadValue = calculateLeadValue(data.sessionRequests);
 
       try {
-        const savedLeads = localStorage.getItem('krome_crm_leads');
+        const savedLeads = safeStorage.getItem('krome_crm_leads');
         if (savedLeads) {
           const leads = JSON.parse(savedLeads);
           const updatedLeads = leads.map((lead: any) => {
@@ -141,7 +142,7 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
             }
             return lead;
           });
-          localStorage.setItem('krome_crm_leads', JSON.stringify(updatedLeads));
+          safeStorage.setItem('krome_crm_leads', JSON.stringify(updatedLeads));
           window.dispatchEvent(new CustomEvent('crm-leads-updated'));
         }
       } catch (e) {
@@ -151,7 +152,7 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
   }, [data, isEditing, userId]);
 
   const handleSave = async () => {
-    localStorage.setItem(`krome_parq_${userId}`, JSON.stringify(data));
+    safeStorage.setItem(`krome_parq_${userId}`, JSON.stringify(data));
     
     // Calculate lead value
     const priceMap: Record<string, number> = {
