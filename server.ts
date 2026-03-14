@@ -107,12 +107,21 @@ async function startServer() {
   console.log("startServer() called");
   console.log("Initializing express app...");
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // Trust proxy for correct protocol/IP detection behind nginx
   app.set('trust proxy', true);
 
   console.log("Setting up middleware...");
+  
+  // Log environment info (excluding secrets)
+  console.log(`[Server] PORT: ${PORT}`);
+  console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[Server] APP_URL: ${process.env.APP_URL}`);
+  console.log(`[Server] VAPID_PUBLIC_KEY set: ${!!process.env.VAPID_PUBLIC_KEY}`);
+  console.log(`[Server] SMTP_HOST set: ${!!process.env.SMTP_HOST}`);
+  console.log(`[Server] SQUARE_ACCESS_TOKEN set: ${!!process.env.SQUARE_ACCESS_TOKEN}`);
+  
   app.use(cors());
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
@@ -1284,16 +1293,18 @@ async function startServer() {
   const distPath = path.resolve(process.cwd(), "dist");
   const indexPath = path.resolve(distPath, "index.html");
   
-  // Explicitly check NODE_ENV
-  const isProduction = process.env.NODE_ENV === 'production';
+  // Explicitly check NODE_ENV or if we are in Cloud Run (K_SERVICE is set)
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
 
   console.log(`[Server] Environment: ${process.env.NODE_ENV}`);
+  console.log(`[Server] Cloud Run Service: ${process.env.K_SERVICE || 'none'}`);
   console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
-  console.log(`[Server] Dist Path: ${distPath}`);
-  console.log(`[Server] Index Path: ${indexPath}`);
-  console.log(`[Server] Index Path Exists: ${fs.existsSync(indexPath)}`);
+  
+  // Simple health check for Cloud Run
+  app.get("/health", (req, res) => res.status(200).send("OK"));
+  app.get("/api/health", (req, res) => res.json({ status: "ok", env: isProduction ? 'prod' : 'dev' }));
 
-  if (isProduction || fs.existsSync(indexPath)) {
+  if (isProduction) {
     console.log("[Server] Serving static files from dist...");
     
     // Serve static files from dist
