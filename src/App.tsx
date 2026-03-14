@@ -387,7 +387,7 @@ export default function App() {
           pointerEvents: 'auto'
         }}
       >
-        <div className={`max-w-7xl mx-auto px-6 flex justify-between items-center transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "py-3" : "py-6"}`}>
+        <div className={`max-w-7xl mx-auto px-6 flex justify-between items-center transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "py-2" : "py-4"}`}>
           <div 
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => { navigateTo('home'); setMobileMenuOpen(false); }}
@@ -623,16 +623,6 @@ export default function App() {
                 <button onClick={() => { navigateTo('admin'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Admin Dashboard</button>
               )}
               
-              <div className="flex justify-center gap-4 mt-4">
-                <NotificationIcon 
-                  userId={user?.id}
-                  onOpenChat={() => { setShowChat(true); setMobileMenuOpen(false); }} 
-                  onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); setMobileMenuOpen(false); }}
-                  isAdmin={user?.role === 'admin'}
-                  unreadCount={unreadCount}
-                />
-              </div>
-
               {user ? (
                 <button onClick={() => { navigateTo('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto !outline-none py-2">
                   Profile
