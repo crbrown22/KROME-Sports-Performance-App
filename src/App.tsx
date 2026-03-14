@@ -165,7 +165,7 @@ export default function App() {
 
   const BottomNav = () => {
     const navItems = [
-      { id: 'home', icon: <Dumbbell className="w-5 h-5" />, label: 'Home' },
+      { id: 'messages', icon: <NotificationIcon userId={user?.id} onOpenChat={() => setShowChat(true)} onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); }} isAdmin={user?.role === 'admin'} unreadCount={unreadCount} />, label: 'Messages' },
       { id: 'programCatalog', icon: <Zap className="w-5 h-5" />, label: 'Programs' },
       { id: 'shop', icon: <ShoppingBag className="w-5 h-5" />, label: 'Shop' },
       { id: 'profile', icon: <User className="w-5 h-5" />, label: 'Profile' },
@@ -180,6 +180,8 @@ export default function App() {
             onClick={() => {
               if (item.id === 'more') {
                 setMobileMenuOpen(!mobileMenuOpen);
+              } else if (item.id === 'messages') {
+                setShowChat(true);
               } else if (item.id === 'profile' && !user) {
                 setAuthMode('login');
                 navigateTo('auth');
@@ -599,7 +601,7 @@ export default function App() {
               </button>
             </div>
 
-            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('home'); setMobileMenuOpen(false); }} className="!outline-none py-2 border-b border-white/5">About</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('home'); setMobileMenuOpen(false); }} className="!outline-none py-2 border-b border-white/5">Home</a>
             <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('contact'); setMobileMenuOpen(false); }} className="!outline-none py-2 border-b border-white/5">Contact</a>
             
             <div className="text-[10px] text-white/30 mt-4 border-b border-white/5 pb-2">Programs</div>
