@@ -8,10 +8,11 @@ interface ShopProps {
   onRedirectToLogin: () => void;
   key?: string;
   initialCategory?: 'all' | 'programs' | 'apparel';
+  className?: string;
 }
 
 const Shop = (props: ShopProps) => {
-  const { onBack, userId, onRedirectToLogin, initialCategory = 'all' } = props;
+  const { onBack, userId, onRedirectToLogin, initialCategory = 'all', className = "" } = props;
   const [category, setCategory] = useState(initialCategory);
 
   const programs = [
@@ -78,16 +79,16 @@ const Shop = (props: ShopProps) => {
   };
 
   const ShopSection = ({ title, items }: { title: string, items: any[] }) => (
-    <div className="mb-20">
-      <h2 className="text-2xl font-light tracking-widest uppercase text-zinc-400 mb-12 text-center">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+    <div className="mb-12 md:mb-20">
+      <h2 className="text-xl md:text-2xl font-black tracking-widest uppercase text-zinc-400 mb-8 md:mb-12 text-center italic">{title}</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
         {items.map((item, idx) => (
-          <div key={idx} className="bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 flex flex-col hover:border-zinc-600 transition-colors krome-outline">
-            <img src={item.img} alt={item.title} className="w-full h-56 object-cover opacity-90" referrerPolicy="no-referrer" />
-            <div className="p-8 flex flex-col flex-1">
-              <h5 className="text-lg font-medium text-zinc-100 mb-3 flex-1">{item.title}</h5>
-              <p className="text-zinc-400 font-light text-sm mb-6">{item.price}</p>
-              <button onClick={() => handlePurchaseClick(item)} className="border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white px-6 py-2 text-sm uppercase tracking-wider transition-all w-full">Select</button>
+          <div key={idx} className="bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800 flex flex-col hover:border-zinc-600 transition-colors krome-outline">
+            <img src={item.img} alt={item.title} className="w-full h-48 md:h-56 object-cover opacity-90" referrerPolicy="no-referrer" />
+            <div className="p-6 md:p-8 flex flex-col flex-1">
+              <h5 className="text-base md:text-lg font-bold text-zinc-100 mb-2 md:mb-3 flex-1 uppercase italic">{item.title}</h5>
+              <p className="text-zinc-400 font-bold text-xs md:text-sm mb-4 md:mb-6">{item.price}</p>
+              <button onClick={() => handlePurchaseClick(item)} className="btn-outline-accent !py-2 !text-xs w-full">Select</button>
             </div>
           </div>
         ))}
@@ -100,7 +101,7 @@ const Shop = (props: ShopProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="py-24 bg-black text-white relative"
+      className={`pt-24 md:pt-32 pb-24 min-h-screen bg-black text-white relative ${className}`}
     >
       <div className="absolute inset-0 z-0 opacity-40">
         <img 
@@ -112,9 +113,9 @@ const Shop = (props: ShopProps) => {
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <button onClick={onBack} className="text-zinc-400 mb-12 hover:text-zinc-100 transition-colors tracking-widest uppercase text-xs">← Back</button>
-        <h1 className="text-4xl font-light uppercase tracking-widest text-zinc-100 text-center mb-20">KROME <span className="text-accent">Shop</span></h1>
+      <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+        <button onClick={onBack} className="text-zinc-400 mb-8 md:mb-12 hover:text-zinc-100 transition-colors tracking-widest uppercase text-[10px] md:text-xs">← Back</button>
+        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-100 text-center mb-12 md:mb-20 italic">KROME <span className="text-accent">Shop</span></h1>
         
         {(category === 'all' || category === 'programs') && (
           <>

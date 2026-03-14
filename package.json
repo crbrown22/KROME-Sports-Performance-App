@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist/server.cjs",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "tsc -b && vite build && esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/server.cjs --external:express --external:better-sqlite3 --external:bcryptjs --external:multer --external:nodemailer --external:web-push --external:square --external:dotenv --external:vite",

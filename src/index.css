@@ -17,9 +17,13 @@
 @layer base {
   :root {
     /* Safe area variables for native app support */
+    --safe-area-top: constant(safe-area-inset-top, 0px);
     --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: constant(safe-area-inset-bottom, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: constant(safe-area-inset-left, 0px);
     --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: constant(safe-area-inset-right, 0px);
     --safe-area-right: env(safe-area-inset-right, 0px);
   }
 
@@ -83,6 +87,18 @@
 
 @utility btn-outline-accent {
   @apply px-6 py-3 rounded-xl font-bold uppercase tracking-wider transition-all duration-300 border-2 border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-black active:scale-95 krome-outline;
+}
+
+@utility mobile-nav-item {
+  @apply flex flex-col items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-tighter transition-all duration-300;
+}
+
+@utility mobile-nav-active {
+  @apply text-gold scale-110;
+}
+
+@utility mobile-nav-inactive {
+  @apply text-white/40 hover:text-white/60;
 }
 
 /* Custom Scrollbar */

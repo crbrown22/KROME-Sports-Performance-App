@@ -400,20 +400,20 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-32 pb-24 bg-black px-6"
+      className="min-h-screen pt-24 md:pt-32 pb-24 bg-black px-4 md:px-6"
     >
       <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-12">
+        <div className="flex justify-between items-center mb-8 md:mb-12">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all !outline-none"
+            className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all !outline-none"
             aria-label="Go back to home page"
           >
-            <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back to Home
+            <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back
           </button>
           <button 
             onClick={onLogout}
-            className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all !outline-none"
+            className="flex items-center gap-2 text-red-500 font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all !outline-none"
             aria-label="Logout from your account"
           >
             Logout <LogOut className="w-4 h-4" aria-hidden="true" />
@@ -421,8 +421,8 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
         </div>
 
         <div className="text-center">
-          <div className="relative inline-block mb-8 group">
-            <div className="w-40 h-40 rounded-3xl gold-gradient p-1 shadow-2xl shadow-gold/20">
+          <div className="relative inline-block mb-6 md:mb-8 group">
+            <div className="w-32 h-32 md:w-40 md:h-40 rounded-3xl gold-gradient p-1 shadow-2xl shadow-gold/20">
               <div className="w-full h-full bg-zinc-900 rounded-[22px] flex items-center justify-center overflow-hidden relative">
                 {formData.avatar_url ? (
                   <img 
@@ -452,15 +452,15 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
               />
             </label>
           </div>
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">{user.username}</h2>
+          <h2 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter mb-2">{user.username}</h2>
           <div className="flex items-center justify-center gap-2 mb-2">
-            <p className="text-white/60 font-bold uppercase tracking-widest text-sm italic">
+            <p className="text-white/60 font-bold uppercase tracking-widest text-xs md:text-sm italic">
               {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : 'Name Not Set'}
             </p>
           </div>
-          <p className="text-gold font-bold uppercase tracking-widest text-[10px] mb-8 italic">Elite Member</p>
+          <p className="text-gold font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-6 md:mb-8 italic">Elite Member</p>
 
-          <div className="space-y-3" role="tablist" aria-label="Profile sections">
+          <div className="grid grid-cols-1 gap-3" role="tablist" aria-label="Profile sections">
             <button 
               onClick={() => {
                 if (onProgramSelect) {
@@ -470,96 +470,96 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
                 }
               }}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Calendar className="w-4 h-4" aria-hidden="true" /> Training Programs
             </button>
             <button 
               onClick={() => onNavigate('workoutTracker')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <History className="w-4 h-4" aria-hidden="true" /> Training History
             </button>
             <button 
               onClick={() => onNavigate('fitnessOverview')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <TrendingUp className="w-4 h-4" aria-hidden="true" /> Fitness Overview
             </button>
             <button 
               onClick={() => onNavigate('progressTracker')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <TrendingUp className="w-4 h-4" aria-hidden="true" /> Training Stats
             </button>
             <button 
               onClick={() => onNavigate('nutritionDashboard')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Apple className="w-4 h-4" aria-hidden="true" /> Nutrition
             </button>
             <button 
               onClick={() => onNavigate('bodyComposition')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Camera className="w-4 h-4" aria-hidden="true" /> Body Composition
             </button>
             <button 
               onClick={() => onNavigate('bodyMetrics')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Activity className="w-4 h-4" aria-hidden="true" /> Body Metrics
             </button>
             <button 
               onClick={() => onNavigate('videoAnalysis')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Video className="w-4 h-4" aria-hidden="true" /> Video Analysis
             </button>
             <button 
               onClick={() => onNavigate('programBuilder')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Edit3 className="w-4 h-4" aria-hidden="true" /> Program Creator
             </button>
             <button 
               onClick={() => onNavigate('parq')}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
             >
               <ShieldAlert className="w-4 h-4" aria-hidden="true" /> PAR-Q
             </button>
             <button 
               onClick={() => onNavigate('programCalendar')}
               disabled={user.parq_completed === 0}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
               <Calendar className="w-4 h-4" aria-hidden="true" /> Schedule
             </button>
             {user.role === 'admin' && (
               <button 
                 onClick={() => onNavigate('admin')}
-                className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-gold/10 text-gold hover:bg-gold/20 krome-outline`}
+                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-gold/10 text-gold hover:bg-gold/20 krome-outline`}
               >
                 <Shield className="w-4 h-4" aria-hidden="true" /> Admin Dashboard
               </button>
             )}
             <button 
               onClick={() => onNavigate('accountSettings')}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
             >
               <Settings className="w-4 h-4" aria-hidden="true" /> Account Settings
             </button>
             <button 
               onClick={onLogout}
-              className={`w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-red-500/10 text-red-500 hover:bg-red-500/20 mt-4`}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-red-500/10 text-red-500 hover:bg-red-500/20 mt-4`}
             >
               <LogOut className="w-4 h-4" aria-hidden="true" /> Logout
             </button>

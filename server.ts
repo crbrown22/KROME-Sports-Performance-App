@@ -1,7 +1,12 @@
+console.log("[Server] Script starting...");
 import "dotenv/config";
+console.log("[Server] Dotenv loaded");
 import express from "express";
+console.log("[Server] Express imported");
 import { createServer as createViteServer } from "vite";
-import db from "./src/lib/db";
+console.log("[Server] Vite imported");
+import db from "./src/lib/db.js";
+console.log("[Server] Database imported");
 import path from "path";
 import { SquareClient, SquareEnvironment } from 'square';
 import crypto from 'crypto';
@@ -1294,9 +1299,10 @@ async function startServer() {
   const indexPath = path.resolve(distPath, "index.html");
   
   // Explicitly check NODE_ENV or if we are in Cloud Run (K_SERVICE is set)
-  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
+  // Default to production unless explicitly set to development
+  const isProduction = process.env.NODE_ENV !== 'development';
 
-  console.log(`[Server] Environment: ${process.env.NODE_ENV}`);
+  console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV}`);
   console.log(`[Server] Cloud Run Service: ${process.env.K_SERVICE || 'none'}`);
   console.log(`[Server] Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
   
