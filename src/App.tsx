@@ -168,18 +168,29 @@ export default function App() {
       { id: 'programCatalog', icon: <Zap className="w-5 h-5" />, label: 'Programs' },
       { id: 'shop', icon: <ShoppingBag className="w-5 h-5" />, label: 'Shop' },
       { id: 'profile', icon: <User className="w-5 h-5" />, label: 'Profile' },
+      { id: 'more', icon: <Menu className="w-5 h-5" />, label: 'More' },
     ];
 
     return (
-      <div className="md:hidden fixed bottom-0 left-0 w-full bg-black/90 backdrop-blur-xl border-t border-white/10 px-6 py-3 flex justify-between items-center z-[100] pb-[calc(12px+var(--safe-area-bottom))]">
+      <div className="md:hidden fixed bottom-0 left-0 w-full bg-black/90 backdrop-blur-xl border-t border-white/10 px-4 py-3 flex justify-between items-center z-[100] pb-[calc(12px+var(--safe-area-bottom))]">
         {navItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => navigateTo(item.id as View)}
-            className={`mobile-nav-item ${currentView === item.id ? 'mobile-nav-active' : 'mobile-nav-inactive'}`}
+            onClick={() => {
+              if (item.id === 'more') {
+                setMobileMenuOpen(!mobileMenuOpen);
+              } else if (item.id === 'profile' && !user) {
+                setAuthMode('login');
+                navigateTo('auth');
+              } else {
+                navigateTo(item.id as View);
+                setMobileMenuOpen(false);
+              }
+            }}
+            className={`mobile-nav-item ${currentView === item.id || (item.id === 'more' && mobileMenuOpen) ? 'mobile-nav-active' : 'mobile-nav-inactive'}`}
           >
             {item.icon}
-            <span>{item.label}</span>
+            <span className="text-[10px]">{item.label}</span>
           </button>
         ))}
       </div>
@@ -367,13 +378,13 @@ export default function App() {
       <nav 
         role="navigation" 
         aria-label="Main navigation"
-        className={`fixed top-0 w-full z-[1000] transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "bg-black/95 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50" : "bg-transparent"}`}
+        className={`hidden md:block fixed top-0 w-full z-[1000] transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "bg-black/95 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50" : "bg-transparent"}`}
         style={{ 
           paddingTop: 'var(--safe-area-top)',
           pointerEvents: 'auto'
         }}
       >
-        <div className={`max-w-7xl mx-auto px-6 flex justify-between items-center transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "py-4" : "py-8"}`}>
+        <div className={`max-w-7xl mx-auto px-6 flex justify-between items-center transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "py-3" : "py-6"}`}>
           <div 
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => { navigateTo('home'); setMobileMenuOpen(false); }}
@@ -554,77 +565,96 @@ export default function App() {
 
           {/* Mobile Toggle */}
           <button 
-            className="md:hidden text-white p-5 -mr-5 !outline-none cursor-pointer active:scale-75 transition-all touch-manipulation z-[1001] relative" 
+            className="md:hidden text-white p-2 !outline-none cursor-pointer active:scale-95 transition-transform" 
             onClick={(e) => {
-              e.preventDefault();
               e.stopPropagation();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X className="w-8 h-8" aria-hidden="true" /> : <Menu className="w-8 h-8" aria-hidden="true" />}
+            {mobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
           </button>
         </div>
-
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div 
-              initial={{ opacity: 0, x: '100%' }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="md:hidden fixed inset-0 z-[999] bg-black/98 backdrop-blur-2xl flex flex-col p-6 gap-6 text-center uppercase font-bold tracking-widest overflow-y-auto"
-              style={{ paddingTop: 'calc(var(--safe-area-top) + 100px)' }}
-            >
-              <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('home'); setMobileMenuOpen(false); }} className="text-2xl !outline-none hover:text-gold transition-colors">About</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('contact'); setMobileMenuOpen(false); }} className="text-2xl !outline-none hover:text-gold transition-colors">Contact</a>
-              
-              <div className="text-xs text-white/30 mt-8 border-b border-white/10 pb-2">Programs</div>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('programCatalog'); setMobileMenuOpen(false); }} className="text-xl text-gold !outline-none">52 Week Program</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('specializedLanding'); setMobileMenuOpen(false); }} className="text-xl text-gold !outline-none">Specialized Training</a>
-
-              <div className="mt-8 border-t border-white/10 pt-8 flex flex-col gap-6">
-                <button 
-                  onClick={() => { handleShare(); setMobileMenuOpen(false); }} 
-                  className="text-accent flex items-center justify-center gap-3 text-lg !outline-none"
-                >
-                  <Share2 className="w-5 h-5" /> Share App
-                </button>
-                <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('all'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-xl text-gold !outline-none">Shop</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('programs'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-xl text-gold !outline-none">Programs</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('apparel'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-xl text-gold !outline-none">Apparel</a>
-
-                {user?.role === 'admin' && (
-                  <button onClick={() => { navigateTo('admin'); setMobileMenuOpen(false); }} className="text-gold text-xl !outline-none">Admin Dashboard</button>
-                )}
-                {user ? (
-                  <button onClick={() => { navigateTo('profile'); setMobileMenuOpen(false); }} className="text-gold text-xl relative inline-flex items-center gap-3 mx-auto !outline-none">
-                    Profile
-                    {unreadCount > 0 && (
-                      <span className="flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                      </span>
-                    )}
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => { setAuthMode('login'); navigateTo('auth'); setMobileMenuOpen(false); }}
-                    className="btn-gold mx-auto !outline-none"
-                  >
-                    Login
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </nav>
 
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden fixed top-0 left-0 w-full bg-black/95 border-b border-white/10 p-6 flex flex-col gap-4 text-center uppercase font-bold tracking-widest overflow-y-auto max-h-[80vh] z-[1000]"
+            style={{ paddingTop: 'calc(var(--safe-area-top) + 20px)' }}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <img src="/logo.jpg" alt="Logo" className="w-8 h-8 object-contain" />
+                <span className="text-lg font-black tracking-tighter uppercase italic">KROME <span className="text-gold">Sports</span></span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/60 hover:text-white transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('home'); setMobileMenuOpen(false); }} className="!outline-none py-2 border-b border-white/5">About</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('contact'); setMobileMenuOpen(false); }} className="!outline-none py-2 border-b border-white/5">Contact</a>
+            
+            <div className="text-[10px] text-white/30 mt-4 border-b border-white/5 pb-2">Programs</div>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('programCatalog'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">52 Week Program</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('specializedLanding'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Specialized Training</a>
+
+            <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-4">
+              <button 
+                onClick={() => { handleShare(); setMobileMenuOpen(false); }} 
+                className="text-accent flex items-center justify-center gap-2 !outline-none py-2"
+              >
+                <Share2 className="w-4 h-4" /> Share App
+              </button>
+              <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('all'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Shop</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('programs'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Programs</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); setShopCategory('apparel'); navigateTo('shop'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Apparel</a>
+
+              {user?.role === 'admin' && (
+                <button onClick={() => { navigateTo('admin'); setMobileMenuOpen(false); }} className="text-gold !outline-none py-2">Admin Dashboard</button>
+              )}
+              
+              <div className="flex justify-center gap-4 mt-4">
+                <NotificationIcon 
+                  userId={user?.id}
+                  onOpenChat={() => { setShowChat(true); setMobileMenuOpen(false); }} 
+                  onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); setMobileMenuOpen(false); }}
+                  isAdmin={user?.role === 'admin'}
+                  unreadCount={unreadCount}
+                />
+              </div>
+
+              {user ? (
+                <button onClick={() => { navigateTo('profile'); setMobileMenuOpen(false); }} className="text-gold relative inline-flex items-center gap-2 mx-auto !outline-none py-2">
+                  Profile
+                  {unreadCount > 0 && (
+                    <span className="flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { setAuthMode('login'); navigateTo('auth'); setMobileMenuOpen(false); }}
+                  className="btn-gold mx-auto !outline-none"
+                >
+                  Login
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
         {showChat && user && (
-          <div className="fixed bottom-24 md:bottom-6 right-6 z-[100] w-full max-w-sm px-6 md:px-0">
+          <div className="fixed bottom-28 md:bottom-6 right-6 z-[110] w-full max-w-sm px-6 md:px-0">
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
