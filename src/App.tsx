@@ -59,6 +59,7 @@ import ProgramCalendar from "./components/ProgramCalendar";
 import AccountSettings from "./components/AccountSettings";
 import { ALL_PROGRAMS } from "./data/workoutTemplates";
 import { logActivity } from "./utils/activity";
+import { haptics } from "./utils/nativeBridge";
 import Chatbot from "./components/Chatbot";
 import { safeStorage } from "./utils/storage";
 
@@ -364,7 +365,7 @@ export default function App() {
     } else {
       try {
         await navigator.clipboard.writeText(window.location.origin);
-        alert('Link copied to clipboard!');
+        haptics.success();
       } catch (err) {
         console.error('Error copying to clipboard:', err);
       }

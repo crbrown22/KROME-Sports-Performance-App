@@ -51,6 +51,7 @@ import { LoggedFood } from "../data/nutritionData";
 import { calculateNutritionRecommendations } from "../utils/nutrition";
 import { getSupplementRecommendation, generateDefaultSupplements } from "../utils/supplements";
 import { BodyMetricsData, INITIAL_DATA } from "../types";
+import { haptics } from "../utils/nativeBridge";
 import { FullProgramTemplate } from "../data/workoutTemplates";
 import AdminAssistant from "./AdminAssistant";
 import VideoAnalyzer from "./VideoAnalyzer";
@@ -1453,13 +1454,13 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                             })
                           });
                           if (res.ok) {
-                            alert(`Program ${program.name} assigned to ${selectedUser.first_name} ${selectedUser.last_name}`);
+                            haptics.success();
                           } else {
-                            alert("Failed to assign program");
+                            haptics.error();
                           }
                         } catch (err) {
                           console.error(err);
-                          alert("Failed to assign program");
+                          haptics.error();
                         }
                       }}
                     />

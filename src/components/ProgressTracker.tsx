@@ -23,6 +23,7 @@ import {
   ChevronLeft
 } from "lucide-react";
 import { formatDate } from '../utils/date';
+import ConfirmModal from './ConfirmModal';
 
 interface ProgressEntry {
   id: number;
@@ -54,6 +55,10 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState(METRICS[0].name);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: number | null }>({
+    isOpen: false,
+    id: null
+  });
   
   // Form state
   const [newMetricName, setNewMetricName] = useState(METRICS[0].name);
@@ -111,12 +116,15 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
   };
 
   const deleteEntry = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this entry?")) {
-      return;
-    }
+    setDeleteConfirm({ isOpen: true, id });
+  };
+
+  const confirmDeleteEntry = async () => {
+    if (deleteConfirm.id === null) return;
     try {
-      await fetch(`/api/progress/${id}`, { method: 'DELETE' });
+      await fetch(`/api/progress/${deleteConfirm.id}`, { method: 'DELETE' });
       fetchProgress();
+      setDeleteConfirm({ isOpen: false, id: null });
     } catch (err) {
       console.error("Failed to delete entry", err);
     }
@@ -386,6 +394,16 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Progress Entry"
+        message="Are you sure you want to delete this progress entry? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        type="danger"
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

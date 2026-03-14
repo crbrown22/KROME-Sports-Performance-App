@@ -41,6 +41,7 @@ import ReactCalendar from 'react-calendar';
 import { format, isSameDay } from 'date-fns';
 import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
 import VideoModal from './VideoModal';
+import ConfirmModal from './ConfirmModal';
 import { PlayCircle } from 'lucide-react';
 
 interface WorkoutLog {
@@ -77,6 +78,10 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [videoModal, setVideoModal] = useState<{isOpen: boolean, url: string, title: string}>({isOpen: false, url: '', title: ''});
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; log: WorkoutLog | null }>({
+    isOpen: false,
+    log: null
+  });
 
   const fetchLogs = async () => {
     try {
@@ -166,14 +171,19 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   };
 
   const handleDeleteLog = async (log: WorkoutLog) => {
-    if (!window.confirm("Are you sure you want to delete this workout log?")) {
-      return;
-    }
+    setDeleteConfirm({ isOpen: true, log });
+  };
+
+  const confirmDeleteLog = async () => {
+    if (!deleteConfirm.log) return;
+    const log = deleteConfirm.log;
+    
     await fetch(`/api/workout-logs/${userId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
       body: JSON.stringify({ workout_id: log.workoutId, exercise_id: log.exerciseId, date: log.date })
     });
+    setDeleteConfirm({ isOpen: false, log: null });
     await fetchLogs();
   };
 
@@ -617,6 +627,17 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
         onClose={() => setVideoModal({ ...videoModal, isOpen: false })}
         videoUrl={videoModal.url}
         title={videoModal.title}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Workout Log"
+        message="Are you sure you want to delete this workout log? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        type="danger"
+        onConfirm={confirmDeleteLog}
+        onCancel={() => setDeleteConfirm({ isOpen: false, log: null })}
       />
     </div>
   );

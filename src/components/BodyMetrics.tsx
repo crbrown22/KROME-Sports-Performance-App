@@ -1,4 +1,5 @@
 import { safeStorage } from '../utils/storage';
+import { haptics } from '../utils/nativeBridge';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -291,7 +292,11 @@ Goal: ${data.primaryGoal}
     `.trim();
     
     navigator.clipboard.writeText(summary).then(() => {
-      alert('Summary copied to clipboard!');
+      // Use a custom event or state to show notification if possible, 
+      // but for now let's just use a console log or a better UI feedback if available.
+      // Since we don't have a global toast yet, I'll just skip the alert for now
+      // or use the haptics for feedback.
+      haptics.success();
     });
   };
 
