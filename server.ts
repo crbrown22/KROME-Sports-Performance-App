@@ -420,63 +420,73 @@ async function startServer() {
       const result = insert.run(username, email, hashedPassword, first_name || firstName || "", last_name || lastName || "", finalRole, status || 'active', uid || null);
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
       
+      if (!user) {
+        throw new Error("Failed to retrieve user after registration");
+      }
+
       // Add to leads
       db.prepare('INSERT INTO leads (name, email, status) VALUES (?, ?, ?)').run(`${user.first_name} ${user.last_name}`, user.email, 'New Lead');
 
       // Send email notifications
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_PORT === '465',
-        requireTLS: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_PORT === '465',
+          requireTLS: true,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
 
-      // Email to Admin
-      await transporter.sendMail({
-        from: '"KROME Fitness" <kromefitness@gmail.com>',
-        to: 'kromefitness@gmail.com',
-        subject: 'New Athlete Registered',
-        text: `A new athlete has registered:\n\nName: ${user.first_name} ${user.last_name}\nEmail: ${user.email}`,
-      });
+        // Email to Admin
+        await transporter.sendMail({
+          from: '"KROME Fitness" <kromefitness@gmail.com>',
+          to: 'kromefitness@gmail.com',
+          subject: 'New Athlete Registered',
+          text: `A new athlete has registered:\n\nName: ${user.first_name} ${user.last_name}\nEmail: ${user.email}`,
+        });
 
-      // Email to Athlete
-      const appUrl = process.env.APP_URL || 'https://www.kromesport.com';
-      await transporter.sendMail({
-        from: '"KROME Fitness" <kromefitness@gmail.com>',
-        to: user.email,
-        subject: 'Welcome to KROME Fitness',
-        text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nTo get the best experience, we invite you to download our app directly to your phone:\n\n1. Visit ${appUrl} on your mobile browser.\n2. Tap the "Share" button (iOS) or the menu icon (Android).\n3. Select "Add to Home Screen".\n\nThis will give you instant access to your training programs and performance tracking right from your home screen.\n\nBest regards,\nThe KROME Team`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-            <h2 style="color: #000;">Welcome to KROME Fitness!</h2>
-            <p>Hello ${user.first_name},</p>
-            <p>We are excited to have you on board. KROME is your premium platform for elite athletic training and performance tracking.</p>
-            <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="margin-top: 0;">📲 Download the App</h3>
-              <p>For the best experience, install KROME directly on your phone:</p>
-              <ol>
-                <li>Open <strong>${appUrl}</strong> in your mobile browser.</li>
-                <li>Tap the <strong>Share</strong> button (iOS) or <strong>Menu</strong> icon (Android).</li>
-                <li>Select <strong>"Add to Home Screen"</strong>.</li>
-              </ol>
-              <a href="${appUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Open KROME App</a>
+        // Email to Athlete
+        const appUrl = process.env.APP_URL || 'https://www.kromesport.com';
+        await transporter.sendMail({
+          from: '"KROME Fitness" <kromefitness@gmail.com>',
+          to: user.email,
+          subject: 'Welcome to KROME Fitness',
+          text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nTo get the best experience, we invite you to download our app directly to your phone:\n\n1. Visit ${appUrl} on your mobile browser.\n2. Tap the "Share" button (iOS) or the menu icon (Android).\n3. Select "Add to Home Screen".\n\nThis will give you instant access to your training programs and performance tracking right from your home screen.\n\nBest regards,\nThe KROME Team`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <h2 style="color: #000;">Welcome to KROME Fitness!</h2>
+              <p>Hello ${user.first_name},</p>
+              <p>We are excited to have you on board. KROME is your premium platform for elite athletic training and performance tracking.</p>
+              <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">📲 Download the App</h3>
+                <p>For the best experience, install KROME directly on your phone:</p>
+                <ol>
+                  <li>Open <strong>${appUrl}</strong> in your mobile browser.</li>
+                  <li>Tap the <strong>Share</strong> button (iOS) or <strong>Menu</strong> icon (Android).</li>
+                  <li>Select <strong>"Add to Home Screen"</strong>.</li>
+                </ol>
+                <a href="${appUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Open KROME App</a>
+              </div>
+              <p>Best regards,<br>The KROME Team</p>
             </div>
-            <p>Best regards,<br>The KROME Team</p>
-          </div>
-        `
-      });
+          `
+        });
+      } catch (emailErr) {
+        console.error("Failed to send registration emails:", emailErr);
+        // Don't fail the registration if email fails
+      }
 
       console.log("Registered user:", user);
       res.json(user);
     } catch (err: any) {
+      console.error("Registration error:", err);
       if (err.code === 'SQLITE_CONSTRAINT') {
         res.status(400).json({ error: "Username or email already exists" });
       } else {
-        res.status(500).json({ error: "Database error" });
+        res.status(500).json({ error: "Database error: " + err.message });
       }
     }
   });
