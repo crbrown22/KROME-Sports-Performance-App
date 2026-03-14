@@ -27,5 +27,9 @@ RUN npm run build
 # Expose the port the app runs on
 EXPOSE 3000
 
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3000
+
 # Run the web service on container startup.
-CMD [ "npm", "start" ]
+CMD [ "node", "dist/server.cjs" ]

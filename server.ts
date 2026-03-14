@@ -107,7 +107,7 @@ async function startServer() {
   console.log("startServer() called");
   console.log("Initializing express app...");
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Trust proxy for correct protocol/IP detection behind nginx
   app.set('trust proxy', true);
