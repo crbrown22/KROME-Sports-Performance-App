@@ -339,35 +339,99 @@ async function startServer() {
   app.get("/api/leads", (req, res) => {
     try {
       const leads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
-      res.json(leads);
+      res.json(leads.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        email: l.email,
+        status: l.status,
+        value: l.value,
+        userId: l.user_id,
+        dateAdded: l.created_at,
+        lastContact: l.created_at, // Default to created_at if no last_contact field
+        sports: l.sports ? JSON.parse(l.sports) : [],
+        sessionRequests: l.session_requests ? JSON.parse(l.session_requests) : [],
+        preferredTimes: l.preferred_times ? JSON.parse(l.preferred_times) : [],
+        preferredDays: l.preferred_days ? JSON.parse(l.preferred_days) : [],
+        positions: l.positions ? JSON.parse(l.positions) : []
+      })));
     } catch (err) {
+      console.error("Database error fetching leads:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Leads: Add lead
   app.post("/api/leads", (req, res) => {
-    const { name, email, status } = req.body;
+    const { name, email, status, value, sports, sessionRequests, preferredTimes, preferredDays, positions, userId } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO leads (name, email, status) VALUES (?, ?, ?)');
-      const result = insert.run(name, email, status || 'New Lead');
-      res.json({ id: result.lastInsertRowid, name, email, status });
+      const result = db.prepare(`
+        INSERT INTO leads (
+          name, email, status, value, sports, session_requests, 
+          preferred_times, preferred_days, positions, user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        name, 
+        email, 
+        status || 'New Lead', 
+        value || 0,
+        sports ? JSON.stringify(sports) : null,
+        sessionRequests ? JSON.stringify(sessionRequests) : null,
+        preferredTimes ? JSON.stringify(preferredTimes) : null,
+        preferredDays ? JSON.stringify(preferredDays) : null,
+        positions ? JSON.stringify(positions) : null,
+        userId || null
+      );
+      res.json({ 
+        id: result.lastInsertRowid,
+        name,
+        email,
+        status: status || 'New Lead',
+        value: value || 0,
+        userId: userId || null,
+        dateAdded: new Date().toISOString(),
+        lastContact: new Date().toISOString(),
+        sports: sports || [],
+        sessionRequests: sessionRequests || [],
+        preferredTimes: preferredTimes || [],
+        preferredDays: preferredDays || [],
+        positions: positions || []
+      });
     } catch (err) {
+      console.error("Database error adding lead:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Leads: Update lead
-  app.patch("/api/leads/:id", (req, res) => {
+  const updateLeadHandler = (req: any, res: any) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, value, sports, sessionRequests, preferredTimes, preferredDays, positions } = req.body;
     try {
-      db.prepare('UPDATE leads SET status = ? WHERE id = ?').run(status, id);
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (status !== undefined) { updates.push('status = ?'); params.push(status); }
+      if (value !== undefined) { updates.push('value = ?'); params.push(value); }
+      if (sports !== undefined) { updates.push('sports = ?'); params.push(JSON.stringify(sports)); }
+      if (sessionRequests !== undefined) { updates.push('session_requests = ?'); params.push(JSON.stringify(sessionRequests)); }
+      if (preferredTimes !== undefined) { updates.push('preferred_times = ?'); params.push(JSON.stringify(preferredTimes)); }
+      if (preferredDays !== undefined) { updates.push('preferred_days = ?'); params.push(JSON.stringify(preferredDays)); }
+      if (positions !== undefined) { updates.push('positions = ?'); params.push(JSON.stringify(positions)); }
+
+      if (updates.length > 0) {
+        params.push(id);
+        db.prepare(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      }
+      
       res.json({ success: true });
     } catch (err) {
+      console.error("Database error updating lead:", err);
       res.status(500).json({ error: "Database error" });
     }
-  });
+  };
+
+  app.patch("/api/leads/:id", updateLeadHandler);
+  app.put("/api/leads/:id", updateLeadHandler);
 
   // Leads: Delete lead
   app.delete("/api/leads/:id", (req, res) => {
@@ -425,7 +489,11 @@ async function startServer() {
       }
 
       // Add to leads
-      db.prepare('INSERT INTO leads (name, email, status) VALUES (?, ?, ?)').run(`${user.first_name} ${user.last_name}`, user.email, 'New Lead');
+      try {
+        db.prepare('INSERT INTO leads (name, email, status, user_id) VALUES (?, ?, ?, ?)').run(`${user.first_name} ${user.last_name}`, user.email, 'New Lead', user.id);
+      } catch (leadErr) {
+        console.error("Failed to add lead:", leadErr);
+      }
 
       // Send email notifications
       try {

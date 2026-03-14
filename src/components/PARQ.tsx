@@ -124,77 +124,38 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
       
       const leadValue = calculateLeadValue(data.sessionRequests);
 
-      try {
-        const savedLeads = safeStorage.getItem('krome_crm_leads');
-        if (savedLeads) {
-          const leads = JSON.parse(savedLeads);
-          const updatedLeads = leads.map((lead: any) => {
-            if (lead.userId === userId) {
-              return {
-                ...lead,
-                sports: data.sports,
-                sessionRequests: data.sessionRequests,
-                preferredTimes: data.preferredTimes,
-                preferredDays: data.preferredDays,
-                positions: data.positions,
-                value: leadValue
-              };
+      const updateLead = async () => {
+        try {
+          const leadsRes = await fetch('/api/leads');
+          if (leadsRes.ok) {
+            const leads = await leadsRes.json();
+            const userLead = leads.find((l: any) => l.user_id === parseInt(userId));
+            
+            if (userLead) {
+              await fetch(`/api/leads/${userLead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sports: data.sports,
+                  sessionRequests: data.sessionRequests,
+                  preferredTimes: data.preferredTimes,
+                  preferredDays: data.preferredDays,
+                  positions: data.positions,
+                  value: leadValue
+                })
+              });
             }
-            return lead;
-          });
-          safeStorage.setItem('krome_crm_leads', JSON.stringify(updatedLeads));
-          window.dispatchEvent(new CustomEvent('crm-leads-updated'));
+          }
+        } catch (e) {
+          console.error("Failed to update lead in CRM", e);
         }
-      } catch (e) {
-        console.error("Failed to update lead in CRM", e);
-      }
+      };
+      
+      updateLead();
     }
   }, [data, isEditing, userId]);
 
   const handleSave = async () => {
-    safeStorage.setItem(`krome_parq_${userId}`, JSON.stringify(data));
-    
-    // Calculate lead value
-    const priceMap: Record<string, number> = {
-      'Personal Training Session': 60,
-      '52 Week Program': 6000,
-      '16 Week Online Training Program': 3000,
-      '8 Week Online Training Program': 1500,
-      '52 Week Flexibility & Mobility Online Program': 5000,
-      '16 Week Flexibility & Mobility Online Program': 2500,
-      '8 Week Flexibility & Mobility Online Program': 1500,
-      '52 Week Nutrition Plan': 6000,
-      '16 Week Nutrition Plan': 2500,
-      '8 Week Nutrition Plan': 1200,
-      'Baseball / Softball Hitting Lessons': 50,
-      'Baseball / Softball Fielding Lessons': 50,
-      'Baseball / Softball Hitting Analysis': 50,
-      'Team Strength & Conditioning Clinic': 20,
-      'Baseball / Softball Team Hitting Clinic': 20,
-      'Baseball / Softball Team Defense Clinic': 20
-    };
-    
-    const calculateLeadValue = (sessionRequests: string[] = []) => {
-      let totalValue = 0;
-      sessionRequests.forEach(request => {
-        totalValue += priceMap[request] || 0;
-      });
-      return totalValue;
-    };
-    
-    const leadValue = calculateLeadValue(data.sessionRequests);
-
-    // Update lead in CRM
-    if (userId && userId !== 'guest') {
-      try {
-        // CRM logic remains client-side as per existing code
-        // Note: The original code also tried to sync leads to Firestore, 
-        // but the user asked to remove Firestore sync.
-      } catch (e) {
-        console.error("Failed to update lead in CRM", e);
-      }
-    }
-    
     if (userId && userId !== 'guest') {
       try {
         await fetch(`/api/parq/${userId}`, {

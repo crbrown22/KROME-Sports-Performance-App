@@ -492,16 +492,31 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
 
   const [error, setError] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<any[]>([]);
-  const [leads, setLeads] = useState<any[]>(() => {
-    const saved = safeStorage.getItem('krome_crm_leads');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [leads, setLeads] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/admin/purchases')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setPurchases(data); })
-      .catch(err => console.error(err));
+    const fetchData = async () => {
+      try {
+        const [purchasesRes, leadsRes] = await Promise.all([
+          fetch('/api/admin/purchases'),
+          fetch('/api/leads')
+        ]);
+        
+        if (purchasesRes.ok) {
+          const purchasesData = await purchasesRes.json();
+          if (Array.isArray(purchasesData)) setPurchases(purchasesData);
+        }
+        
+        if (leadsRes.ok) {
+          const leadsData = await leadsRes.json();
+          if (Array.isArray(leadsData)) setLeads(leadsData);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data", err);
+      }
+    };
+    
+    fetchData();
   }, []);
 
   const kpiData = calculateKPIs(users, purchases, leads);

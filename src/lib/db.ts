@@ -155,10 +155,18 @@ try {
 
   CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     name TEXT,
     email TEXT,
     status TEXT DEFAULT 'New Lead',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    value REAL DEFAULT 0,
+    sports TEXT,
+    session_requests TEXT,
+    preferred_times TEXT,
+    preferred_days TEXT,
+    positions TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS custom_programs (

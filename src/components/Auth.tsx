@@ -66,25 +66,6 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
         const data = await response.json();
         if (response.ok) {
           haptics.success();
-          // Add to CRM leads
-          try {
-            const savedLeads = safeStorage.getItem('krome_crm_leads');
-            const leads = savedLeads ? JSON.parse(savedLeads) : [];
-            const newLead = {
-              id: `lead-${Date.now()}`,
-              name: `${firstName} ${lastName}`.trim() || username,
-              email: email,
-              status: 'New Lead',
-              value: 0,
-              dateAdded: getCurrentDate(),
-              lastContact: getCurrentDate(),
-              userId: data.id
-            };
-            safeStorage.setItem('krome_crm_leads', JSON.stringify([...leads, newLead]));
-          } catch (e) {
-            console.error("Failed to add lead to CRM", e);
-          }
-          
           onLoginSuccess(data);
         } else {
           haptics.error();
