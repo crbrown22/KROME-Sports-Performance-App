@@ -1607,7 +1607,7 @@ export default function App() {
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
               >
-                <img src="/logo.jpg" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                <img src="https://storage.googleapis.com/kspimage/KLogo.jpg" alt="KROME Sports Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
                 <span className="text-lg font-black tracking-tighter uppercase italic">
                   KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
                 </span>
