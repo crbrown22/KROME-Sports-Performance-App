@@ -28,6 +28,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
   const [newMessage, setNewMessage] = useState('');
   const [unreadUserIds, setUnreadUserIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [chatSearchTerm, setChatSearchTerm] = useState('');
   const [showUserList, setShowUserList] = useState(true);
   const [aiPromptType, setAiPromptType] = useState<'image' | 'video' | null>(null);
   const [aiPromptValue, setAiPromptValue] = useState('');
@@ -84,18 +85,27 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
 
   const fetchMessages = async () => {
     if (!selectedUser) return;
+    
+    // Load cached messages
+    const cached = safeStorage.getItem(`krome_admin_messages_${selectedUser.id}`);
+    if (cached) {
+      setMessages(JSON.parse(cached));
+    }
+
     try {
       const response = await fetch(`/api/messages/${selectedUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.map((m: any) => ({
+        const formattedMessages = data.map((m: any) => ({
           id: m.id.toString(),
           senderId: m.sender_id.toString(),
           receiverId: m.receiver_id.toString(),
           text: m.message,
           createdAt: m.created_at,
           read: !!m.is_read
-        })));
+        }));
+        setMessages(formattedMessages);
+        safeStorage.setItem(`krome_admin_messages_${selectedUser.id}`, JSON.stringify(formattedMessages));
 
         // Mark as read
         const unread = data.filter((m: any) => m.sender_id.toString() === selectedUser.id && !m.is_read);
@@ -220,10 +230,14 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
     return text;
   };
 
-  const groupedMessages = React.useMemo(() => groupMessagesByDate(messages), [messages]);
+  const filteredMessages = messages.filter(msg =>
+    msg.text.toLowerCase().includes(chatSearchTerm.toLowerCase())
+  );
+
+  const groupedMessages = React.useMemo(() => groupMessagesByDate(filteredMessages), [filteredMessages, chatSearchTerm]);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-300px)] min-h-[600px] bg-zinc-900/30 border border-white/5 rounded-[40px] overflow-hidden backdrop-blur-xl shadow-2xl relative">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-200px)] md:h-[calc(100vh-300px)] min-h-[500px] bg-zinc-900/30 border border-white/5 rounded-[40px] overflow-hidden backdrop-blur-xl shadow-2xl relative">
       {/* User List */}
       <div className={`${showUserList ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 xl:w-96 border-r border-white/5 flex-col bg-black/20 shrink-0`}>
         <div className="p-6 border-b border-white/5">
@@ -320,10 +334,20 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <input 
+                    type="text"
+                    placeholder="Search chat..."
+                    value={chatSearchTerm}
+                    onChange={(e) => setChatSearchTerm(e.target.value)}
+                    className="bg-black/40 border border-white/10 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:border-gold outline-none transition-all placeholder:text-white/20 w-40 lg:w-64"
+                  />
+                </div>
                 <button className="p-2 text-white/40 hover:text-white transition-colors"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 custom-scrollbar bg-black/40">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 custom-scrollbar bg-black/40 min-h-0">
               {Object.entries(groupedMessages).map(([date, dateMsgs]) => (
                 <div key={date} className="space-y-6">
                   <div className="flex justify-center">
