@@ -62,7 +62,7 @@ export default function UserAdminChat({ userId, onClose }: UserAdminChatProps) {
 
   useEffect(() => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [messages]);
 

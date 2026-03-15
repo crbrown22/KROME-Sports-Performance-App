@@ -82,34 +82,33 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
     return () => clearInterval(interval);
   }, [adminId]);
 
-  useEffect(() => {
+  const fetchMessages = async () => {
     if (!selectedUser) return;
+    try {
+      const response = await fetch(`/api/messages/${selectedUser.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.map((m: any) => ({
+          id: m.id.toString(),
+          senderId: m.sender_id.toString(),
+          receiverId: m.receiver_id.toString(),
+          text: m.message,
+          createdAt: m.created_at,
+          read: !!m.is_read
+        })));
 
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`/api/messages/${selectedUser.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setMessages(data.map((m: any) => ({
-            id: m.id.toString(),
-            senderId: m.sender_id.toString(),
-            receiverId: m.receiver_id.toString(),
-            text: m.message,
-            createdAt: m.created_at,
-            read: !!m.is_read
-          })));
-
-          // Mark as read
-          const unread = data.filter((m: any) => m.sender_id.toString() === selectedUser.id && !m.is_read);
-          for (const msg of unread) {
-            await fetch(`/api/messages/${msg.id}/read`, { method: 'PATCH' });
-          }
+        // Mark as read
+        const unread = data.filter((m: any) => m.sender_id.toString() === selectedUser.id && !m.is_read);
+        for (const msg of unread) {
+          await fetch(`/api/messages/${msg.id}/read`, { method: 'PATCH' });
         }
-      } catch (err) {
-        console.error("Failed to fetch messages", err);
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch messages", err);
+    }
+  };
 
+  useEffect(() => {
     fetchMessages();
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
@@ -117,7 +116,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
 
   useEffect(() => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [messages]);
 
@@ -134,6 +133,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
         })
       });
       setNewMessage('');
+      fetchMessages();
     } catch (err) {
       console.error("Failed to send message", err);
     }
