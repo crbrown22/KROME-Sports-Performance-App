@@ -389,14 +389,13 @@ export default function App() {
       >
         <div className={`max-w-7xl mx-auto px-6 flex justify-between items-center transition-all duration-300 ${isScrolled || currentView !== 'home' || mobileMenuOpen ? "py-2" : "py-4"}`}>
           <div 
-            className="flex items-center gap-2 cursor-pointer" 
+            className="flex items-center cursor-pointer" 
             onClick={() => { navigateTo('home'); setMobileMenuOpen(false); }}
             role="button"
             aria-label="KROME Sports Home"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigateTo('home'); }}
           >
-            <img src="https://storage.googleapis.com/kspimage/KLogo.jpg" alt="KROME Sports Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
             <span className="text-xl font-black tracking-tighter uppercase italic">
               KROME <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-1 pb-1">Sports</span>
             </span>
@@ -592,8 +591,7 @@ export default function App() {
             style={{ paddingTop: 'calc(var(--safe-area-top) + 20px)' }}
           >
             <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <img src="https://storage.googleapis.com/kspimage/KLogo.jpg" alt="Logo" className="w-8 h-8 object-contain" />
+              <div className="flex items-center">
                 <span className="text-lg font-black tracking-tighter uppercase italic">KROME <span className="text-gold">Sports</span></span>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/60 hover:text-white transition-colors">
