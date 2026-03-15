@@ -428,7 +428,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
               </div>
             )}
 
-            <div className="p-4 lg:p-6 border-t border-white/5 bg-zinc-900/80 backdrop-blur-xl">
+            <div className="p-4 lg:p-6 border-t border-white/5 bg-zinc-900/80 backdrop-blur-xl flex-shrink-0">
               {showQuickReplies && (
                 <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-bottom-2">
                   {quickReplies.map((reply, i) => (
