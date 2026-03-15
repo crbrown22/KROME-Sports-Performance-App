@@ -1,0 +1,29 @@
+steps:
+# Build the container image using your Dockerfile
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/nodejs-app:$COMMIT_SHA' # Tag with commit SHA for unique versions
+  - '.'
+# Push the container image to Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'push'
+  - 'gcr.io/$PROJECT_ID/nodejs-app:$COMMIT_SHA'
+# Deploy container image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'deploy'
+  - 'node-app-service' # This is the Cloud Run service name from your design
+  - '--image'
+  - 'gcr.io/$PROJECT_ID/nodejs-app:$COMMIT_SHA'
+  - '--region'
+  - 'us-central1' # This is the region from your design
+  - '--platform'
+  - 'managed'
+  - '--allow-unauthenticated' # Adjust based on your authentication needs
+images:
+- 'gcr.io/$PROJECT_ID/nodejs-app:$COMMIT_SHA'
