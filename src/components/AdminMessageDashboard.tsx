@@ -119,7 +119,10 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
   };
 
   useEffect(() => {
-    fetchMessages();
+    if (selectedUser) {
+      setMessages([]);
+      fetchMessages();
+    }
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
   }, [selectedUser, adminId]);
