@@ -343,7 +343,7 @@ Goal: ${data.primaryGoal}
   return (
     <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] backdrop-blur-xl overflow-hidden">
       {/* Header Actions */}
-      <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-black/20">
+      <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-black/20 sticky top-0 z-20">
         <div>
           <h2 className="text-3xl font-black uppercase italic tracking-tighter">Body <span className="text-gold">Metrics</span></h2>
           <p className="text-xs font-bold uppercase tracking-widest text-white/40">Track your physical evolution</p>
