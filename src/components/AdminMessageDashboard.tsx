@@ -310,7 +310,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
       </div>
 
       {/* Chat Area */}
-      <div className={`${!showUserList || window.innerWidth >= 1024 ? 'flex' : 'hidden'} flex-1 flex flex-col bg-black/40 relative`}>
+      <div className={`${!showUserList ? 'flex' : 'hidden'} lg:flex flex-1 flex flex-col bg-black/40 relative`}>
         {selectedUser ? (
           <>
             <div className="p-4 lg:p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/50 backdrop-blur-md sticky top-0 z-10">
