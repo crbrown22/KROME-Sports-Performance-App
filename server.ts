@@ -16,6 +16,25 @@ import nodemailer from 'nodemailer';
 import webpush from 'web-push';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import * as admin from 'firebase-admin';
+
+// Initialize Firebase Admin
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+export const adminApp = initializeApp({
+  credential: cert(serviceAccount)
+});
+export const adminDb = getFirestore();
+
+// Helper to resolve string Firebase UID to numeric SQLite ID
+function resolveUserId(userId: string | number): number | string {
+  if (typeof userId === 'number') return userId;
+  if (!isNaN(Number(userId))) return Number(userId);
+  
+  const user = db.prepare('SELECT id FROM users WHERE uid = ?').get(userId) as { id: number } | undefined;
+  return user ? user.id : userId;
+}
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -173,7 +192,8 @@ async function startServer() {
 
             if (userId) {
               const programId = order.metadata.programId;
-              db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(userId, itemName, price, orderId, programId);
+              const sqliteId = resolveUserId(userId);
+              db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(sqliteId, itemName, price, orderId, programId);
               
               // Send notification
               sendNotification(Number(userId), 'Purchase Confirmed', `Thank you for purchasing ${itemName}! Your program is now available in your profile.`, '/profile');
@@ -245,8 +265,9 @@ async function startServer() {
   // Push Subscriptions
   app.post('/api/notifications/subscribe', (req, res) => {
     const { userId, subscription } = req.body;
+    const sqliteId = resolveUserId(userId);
     try {
-      db.prepare('INSERT INTO push_subscriptions (user_id, subscription) VALUES (?, ?)').run(userId, JSON.stringify(subscription));
+      db.prepare('INSERT INTO push_subscriptions (user_id, subscription) VALUES (?, ?)').run(sqliteId, JSON.stringify(subscription));
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Database error" });
@@ -326,11 +347,23 @@ async function startServer() {
   });
 
   // Users: Get all users
-  app.get("/api/users", (req, res) => {
+  app.get("/api/users", async (req, res) => {
     try {
-      const users = db.prepare('SELECT id, username, email, role FROM users').all();
+      const snapshot = await adminDb.collection('users').get();
+      const users = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          username: data.name || data.email,
+          email: data.email,
+          role: data.role === 'admin' ? 'admin' : 'user',
+          status: 'active', // Default status
+          avatarUrl: data.avatarUrl
+        };
+      });
       res.json(users);
     } catch (err) {
+      console.error("Error fetching users:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -444,147 +477,130 @@ async function startServer() {
     }
   });
 
-  // Auth: Login
-  app.post("/api/auth/login", async (req, res) => {
-    const { email, password } = req.body;
+  // Auth: Register
+  app.post("/api/auth/register", async (req, res) => {
+    const { username, email, firstName, lastName, role, uid } = req.body;
     try {
-      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
-      if (user) {
-        if (await bcrypt.compare(password, user.password)) {
-          const { password: _, ...safeUser } = user;
-          res.json(safeUser);
-        } else if (password === user.password) {
-          // Plain text password match, hash it and update
-          const hashedPassword = await bcrypt.hash(password, 10);
-          db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, user.id);
-          const { password: _, ...safeUser } = user;
-          res.json(safeUser);
-        } else {
-          res.status(401).json({ error: "Invalid email or password" });
-        }
-      } else {
-        res.status(401).json({ error: "Invalid email or password" });
-      }
+      // 1. Create user document in Firestore
+      const userData = {
+        uid: uid,
+        email,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        username: username || email.split('@')[0],
+        role: email === 'swolecode@gmail.com' ? 'admin' : (role === 'user' ? 'athlete' : (role || 'athlete')),
+        createdAt: new Date().toISOString()
+      };
+      await adminDb.collection('users').doc(uid).set(userData);
+
+      // 2. Sync with SQLite
+      const insert = db.prepare(`
+        INSERT INTO users (username, email, first_name, last_name, role, uid) 
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET 
+          username=excluded.username,
+          first_name=excluded.first_name,
+          last_name=excluded.last_name,
+          uid=excluded.uid
+      `);
+      const result = insert.run(
+        userData.username,
+        email,
+        userData.firstName,
+        userData.lastName,
+        userData.role,
+        uid
+      );
+
+      res.json({ id: uid, sqliteId: result.lastInsertRowid, ...userData });
     } catch (err) {
+      console.error("Registration sync error:", err);
+      res.status(500).json({ error: "Registration sync failed" });
+    }
+  });
+
+  // User: Get profile by UID
+  app.get("/api/users/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      // Try Firestore first
+      const doc = await adminDb.collection('users').doc(id).get();
+      if (doc.exists) {
+        const data = doc.data();
+        // Also get SQLite ID if needed
+        const sqliteUser = db.prepare('SELECT id FROM users WHERE uid = ? OR email = ?').get(id, data?.email);
+        return res.json({ id, sqliteId: sqliteUser?.id, ...data });
+      }
+
+      // Fallback to SQLite
+      const user = db.prepare('SELECT * FROM users WHERE uid = ? OR id = ?').get(id, id);
+      if (user) {
+        return res.json({
+          id: user.uid || String(user.id),
+          sqliteId: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          avatarUrl: user.avatar_url
+        });
+      }
+
+      res.status(404).json({ error: "User not found" });
+    } catch (err) {
+      console.error("Error fetching user:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
-  // Auth: Register
-  app.post("/api/auth/register", async (req, res) => {
-    const { username, email, password, first_name, last_name, firstName, lastName, role, status, uid } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const insert = db.prepare('INSERT INTO users (username, email, password, first_name, last_name, role, status, uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-      
-      // Map 'user' to 'athlete' if coming from old client
-      let finalRole = role || 'athlete';
-      if (finalRole === 'user') finalRole = 'athlete';
-      
-      const result = insert.run(username, email, hashedPassword, first_name || firstName || "", last_name || lastName || "", finalRole, status || 'active', uid || null);
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
-      
-      if (!user) {
-        throw new Error("Failed to retrieve user after registration");
-      }
-
-      // Add to leads
-      try {
-        db.prepare('INSERT INTO leads (name, email, status, user_id) VALUES (?, ?, ?, ?)').run(`${user.first_name} ${user.last_name}`, user.email, 'New Lead', user.id);
-      } catch (leadErr) {
-        console.error("Failed to add lead:", leadErr);
-      }
-
-      // Send email notifications
-      try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_PORT === '465',
-          requireTLS: true,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        // Email to Admin
-        await transporter.sendMail({
-          from: '"KROME Fitness" <kromefitness@gmail.com>',
-          to: 'kromefitness@gmail.com',
-          subject: 'New Athlete Registered',
-          text: `A new athlete has registered:\n\nName: ${user.first_name} ${user.last_name}\nEmail: ${user.email}`,
-        });
-
-        // Email to Athlete
-        const appUrl = process.env.APP_URL || 'https://www.kromesport.com';
-        await transporter.sendMail({
-          from: '"KROME Fitness" <kromefitness@gmail.com>',
-          to: user.email,
-          subject: 'Welcome to KROME Fitness',
-          text: `Hello ${user.first_name},\n\nWelcome to KROME Fitness! We are excited to have you on board.\n\nTo get the best experience, we invite you to download our app directly to your phone:\n\n1. Visit ${appUrl} on your mobile browser.\n2. Tap the "Share" button (iOS) or the menu icon (Android).\n3. Select "Add to Home Screen".\n\nThis will give you instant access to your training programs and performance tracking right from your home screen.\n\nBest regards,\nThe KROME Team`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-              <h2 style="color: #000;">Welcome to KROME Fitness!</h2>
-              <p>Hello ${user.first_name},</p>
-              <p>We are excited to have you on board. KROME is your premium platform for elite athletic training and performance tracking.</p>
-              <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0;">📲 Download the App</h3>
-                <p>For the best experience, install KROME directly on your phone:</p>
-                <ol>
-                  <li>Open <strong>${appUrl}</strong> in your mobile browser.</li>
-                  <li>Tap the <strong>Share</strong> button (iOS) or <strong>Menu</strong> icon (Android).</li>
-                  <li>Select <strong>"Add to Home Screen"</strong>.</li>
-                </ol>
-                <a href="${appUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Open KROME App</a>
-              </div>
-              <p>Best regards,<br>The KROME Team</p>
-            </div>
-          `
-        });
-      } catch (emailErr) {
-        console.error("Failed to send registration emails:", emailErr);
-        // Don't fail the registration if email fails
-      }
-
-      console.log("Registered user:", user);
-      res.json(user);
-    } catch (err: any) {
-      console.error("Registration error:", err);
-      if (err.code === 'SQLITE_CONSTRAINT') {
-        res.status(400).json({ error: "Username or email already exists" });
-      } else {
-        res.status(500).json({ error: "Database error: " + err.message });
-      }
-    }
-  });
-
   // User: Delete profile
-  app.delete("/api/users/:id", (req, res) => {
+  app.delete("/api/users/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      await adminDb.collection('users').doc(id).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting user:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Admin: Get first admin
-  app.get("/api/admin/primary", (req, res) => {
+  app.get("/api/admin/primary", async (req, res) => {
     try {
-      const admin = db.prepare('SELECT id, username, email FROM users WHERE role = ? LIMIT 1').get('admin');
-      res.json(admin);
+      const snapshot = await adminDb.collection('users').where('role', '==', 'admin').limit(1).get();
+      if (snapshot.empty) {
+        res.json(null);
+      } else {
+        const admin = snapshot.docs[0].data();
+        res.json({ id: snapshot.docs[0].id, ...admin });
+      }
     } catch (err) {
+      console.error("Error fetching primary admin:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Admin: Get all users
-  app.get("/api/admin/users", (req, res) => {
+  app.get("/api/admin/users", async (req, res) => {
     console.log("Fetching users...");
     try {
-      const users = db.prepare('SELECT id, username, email, first_name, last_name, avatar_url, role, status, created_at FROM users').all();
+      const snapshot = await adminDb.collection('users').get();
+      const users = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          username: data.firstName ? `${data.firstName} ${data.lastName}` : data.email,
+          email: data.email,
+          first_name: data.firstName,
+          last_name: data.lastName,
+          avatar_url: data.avatarUrl,
+          role: data.role,
+          status: 'active',
+          created_at: data.createdAt
+        };
+      });
       console.log("Users fetched:", users);
       res.json(users);
     } catch (err) {
@@ -594,33 +610,36 @@ async function startServer() {
   });
 
   // Admin: Update user role
-  app.patch("/api/admin/users/:id/role", (req, res) => {
+  app.patch("/api/admin/users/:id/role", async (req, res) => {
     const { id } = req.params;
     const { role, adminId } = req.body;
     
     // Basic authorization check
     if (adminId) {
-      const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(adminId) as any;
+      const adminDoc = await adminDb.collection('users').doc(adminId).get();
+      const admin = adminDoc.data();
       if (admin?.role !== 'admin') {
         return res.status(403).json({ error: "Forbidden: Only admins can change roles" });
       }
     }
 
     try {
-      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+      await adminDb.collection('users').doc(id).update({ role });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error updating user role:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Admin: Delete user
-  app.delete("/api/admin/users/:id", (req, res) => {
+  app.delete("/api/admin/users/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      await adminDb.collection('users').doc(id).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting user:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -628,8 +647,9 @@ async function startServer() {
   // Admin: Assign program to user
   app.post("/api/admin/assign-program", (req, res) => {
     const { userId, programId, itemName, price } = req.body;
+    const sqliteId = resolveUserId(userId);
     try {
-      db.prepare('INSERT INTO purchases (user_id, item_name, price, program_id) VALUES (?, ?, ?, ?)').run(userId, itemName, price || 0, programId);
+      db.prepare('INSERT INTO purchases (user_id, item_name, price, program_id) VALUES (?, ?, ?, ?)').run(sqliteId, itemName, price || 0, programId);
       res.json({ success: true });
     } catch (err) {
       console.error("Error assigning program:", err);
@@ -696,47 +716,58 @@ async function startServer() {
   });
 
   // Progress: Get user progress
-  app.get("/api/progress/:userId", (req, res) => {
+  app.get("/api/progress/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const progress = db.prepare('SELECT * FROM progress WHERE user_id = ? ORDER BY recorded_at ASC').all(userId);
+      const snapshot = await adminDb.collection('progress').where('user_id', '==', userId).orderBy('recorded_at', 'asc').get();
+      const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(progress);
     } catch (err) {
+      console.error("Error fetching progress:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Progress: Add progress entry
-  app.post("/api/progress", (req, res) => {
+  app.post("/api/progress", async (req, res) => {
     const { user_id, metric_name, metric_value, unit } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO progress (user_id, metric_name, metric_value, unit) VALUES (?, ?, ?, ?)');
-      const result = insert.run(user_id, metric_name, metric_value, unit);
-      res.json({ id: result.lastInsertRowid, user_id, metric_name, metric_value, unit });
+      const docRef = await adminDb.collection('progress').add({
+        user_id,
+        metric_name,
+        metric_value,
+        unit,
+        recorded_at: new Date().toISOString()
+      });
+      res.json({ id: docRef.id, user_id, metric_name, metric_value, unit });
     } catch (err) {
+      console.error("Error adding progress entry:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Progress: Delete entry
-  app.delete("/api/progress/:id", (req, res) => {
+  app.delete("/api/progress/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('DELETE FROM progress WHERE id = ?').run(id);
+      await adminDb.collection('progress').doc(id).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting progress entry:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Nutrition: Get user logs
-  app.get("/api/nutrition/:userId", (req, res) => {
+  app.get("/api/nutrition/:userId", async (req, res) => {
     const { userId } = req.params;
     console.log(`Fetching nutrition for user: ${userId}`);
     try {
-      const logs = db.prepare('SELECT * FROM nutrition_logs WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      const snapshot = await adminDb.collection('nutrition_logs').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
+      console.error("Error fetching nutrition logs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -744,9 +775,9 @@ async function startServer() {
   // Metrics: Get user metrics
   app.get("/api/metrics/:userId", (req, res) => {
     const { userId } = req.params;
-    console.log(`Fetching metrics for user: ${userId}`);
+    const sqliteId = resolveUserId(userId);
     try {
-      const metrics = db.prepare('SELECT data FROM user_metrics WHERE user_id = ?').get(userId) as { data: string } | undefined;
+      const metrics = db.prepare('SELECT data FROM user_metrics WHERE user_id = ?').get(sqliteId) as { data: string } | undefined;
       if (metrics) {
         res.json(JSON.parse(metrics.data));
       } else {
@@ -760,6 +791,7 @@ async function startServer() {
   // Metrics: Save user metrics
   app.post("/api/metrics/:userId", (req, res) => {
     const { userId } = req.params;
+    const sqliteId = resolveUserId(userId);
     const data = req.body;
     try {
       db.prepare(`
@@ -768,7 +800,7 @@ async function startServer() {
         ON CONFLICT(user_id) DO UPDATE SET 
           data=excluded.data, 
           updated_at=CURRENT_TIMESTAMP
-      `).run(userId, JSON.stringify(data));
+      `).run(sqliteId, JSON.stringify(data));
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Database error" });
@@ -778,8 +810,9 @@ async function startServer() {
   // Body Comp History: Get user history
   app.get("/api/body-comp/:userId", (req, res) => {
     const { userId } = req.params;
+    const sqliteId = resolveUserId(userId);
     try {
-      const history = db.prepare('SELECT * FROM body_comp_history WHERE user_id = ? ORDER BY week ASC').all(userId);
+      const history = db.prepare('SELECT * FROM body_comp_history WHERE user_id = ? ORDER BY week ASC').all(sqliteId);
       res.json(history.map((h: any) => ({
         id: h.id,
         week: h.week,
@@ -799,6 +832,7 @@ async function startServer() {
   // Body Comp History: Save user history
   app.post("/api/body-comp/:userId", (req, res) => {
     const { userId } = req.params;
+    const sqliteId = resolveUserId(userId);
     const { history } = req.body;
     try {
       const insert = db.prepare(`
@@ -818,11 +852,11 @@ async function startServer() {
       const deleteStmt = db.prepare('DELETE FROM body_comp_history WHERE user_id = ?');
       
       db.transaction(() => {
-        deleteStmt.run(userId);
+        deleteStmt.run(sqliteId);
         for (const entry of history) {
           insert.run(
             entry.id, 
-            userId, 
+            sqliteId, 
             entry.week, 
             entry.date, 
             entry.weight, 
@@ -842,10 +876,10 @@ async function startServer() {
 
   // PARQ: Get user PARQ
   app.get("/api/parq/:userId", (req, res) => {
-    console.log(`GET /api/parq/${req.params.userId}`);
     const { userId } = req.params;
+    const sqliteId = resolveUserId(userId);
     try {
-      const parq = db.prepare('SELECT data FROM user_parq WHERE user_id = ?').get(userId) as { data: string } | undefined;
+      const parq = db.prepare('SELECT data FROM user_parq WHERE user_id = ?').get(sqliteId) as { data: string } | undefined;
       if (parq) {
         res.json(JSON.parse(parq.data));
       } else {
@@ -860,6 +894,7 @@ async function startServer() {
   // PARQ: Save user PARQ
   app.post("/api/parq/:userId", (req, res) => {
     const { userId } = req.params;
+    const sqliteId = resolveUserId(userId);
     const data = req.body;
     try {
       db.prepare(`
@@ -868,7 +903,7 @@ async function startServer() {
         ON CONFLICT(user_id) DO UPDATE SET 
           data=excluded.data, 
           updated_at=CURRENT_TIMESTAMP
-      `).run(userId, JSON.stringify(data));
+      `).run(sqliteId, JSON.stringify(data));
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Database error" });
@@ -876,56 +911,49 @@ async function startServer() {
   });
 
   // Nutrition: Save logs (bulk insert/update)
-  app.post("/api/nutrition/:userId", (req, res) => {
+  app.post("/api/nutrition/:userId", async (req, res) => {
     const { userId } = req.params;
     const { logs } = req.body; // Array of LoggedFood items
     
     try {
-      const insert = db.prepare(`
-        INSERT INTO nutrition_logs (user_id, log_id, food_id, name, category, meal, date, servings, serving_size, calories, protein, carbs, fat) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(log_id) DO UPDATE SET 
-          servings=excluded.servings, 
-          meal=excluded.meal, 
-          date=excluded.date
-      `);
+      const batch = adminDb.batch();
       
-      const deleteLog = db.prepare('DELETE FROM nutrition_logs WHERE user_id = ? AND log_id = ?');
-
-      db.transaction(() => {
-        // First, get existing log_ids for this user
-        const existingLogs = db.prepare('SELECT log_id FROM nutrition_logs WHERE user_id = ?').all(userId) as { log_id: string }[];
-        const existingLogIds = new Set(existingLogs.map(l => l.log_id));
-        
-        const incomingLogIds = new Set(logs.map((l: any) => l.logId));
-
-        // Delete logs that are no longer in the incoming array
-        for (const logId of existingLogIds) {
-          if (!incomingLogIds.has(logId)) {
-            deleteLog.run(userId, logId);
-          }
-        }
-
-        // Insert or update incoming logs
-        for (const log of logs) {
-          insert.run(
-            userId,
-            log.logId,
-            log.id,
-            log.name,
-            log.category,
-            log.meal,
-            log.date,
-            log.servings,
-            log.serving.size,
-            log.serving.calories,
-            log.serving.protein,
-            log.serving.carbs,
-            log.serving.fat
-          );
-        }
-      })();
+      // Get existing logs for this user
+      const snapshot = await adminDb.collection('nutrition_logs').where('user_id', '==', userId).get();
+      const existingLogs = snapshot.docs;
+      const existingLogIds = new Set(existingLogs.map(d => d.data().log_id));
       
+      const incomingLogIds = new Set(logs.map((l: any) => l.logId));
+
+      // Delete logs that are no longer in the incoming array
+      for (const doc of existingLogs) {
+        if (!incomingLogIds.has(doc.data().log_id)) {
+          batch.delete(doc.ref);
+        }
+      }
+
+      // Insert or update incoming logs
+      for (const log of logs) {
+        const logRef = adminDb.collection('nutrition_logs').doc(log.logId);
+        batch.set(logRef, {
+          user_id: userId,
+          log_id: log.logId,
+          food_id: log.id,
+          name: log.name,
+          category: log.category,
+          meal: log.meal,
+          date: log.date,
+          servings: log.servings,
+          serving_size: log.serving.size,
+          calories: log.serving.calories,
+          protein: log.serving.protein,
+          carbs: log.serving.carbs,
+          fat: log.serving.fat,
+          created_at: new Date().toISOString()
+        }, { merge: true });
+      }
+      
+      await batch.commit();
       res.json({ success: true });
     } catch (err) {
       console.error("Nutrition save error:", err);
@@ -934,46 +962,44 @@ async function startServer() {
   });
 
   // Workout Logs: Get user workout logs
-  app.get("/api/workout-logs/:userId", (req, res) => {
+  app.get("/api/workout-logs/:userId", async (req, res) => {
     const { userId } = req.params;
     console.log(`Fetching workout logs for user: ${userId}`);
     try {
-      const logs = db.prepare('SELECT * FROM workout_logs WHERE user_id = ?').all(userId);
+      const snapshot = await adminDb.collection('workout_logs').where('user_id', '==', userId).get();
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
+      console.error("Error fetching workout logs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Workout Logs: Save user workout logs
-  app.post("/api/workout-logs/:userId", (req, res) => {
+  app.post("/api/workout-logs/:userId", async (req, res) => {
     const { userId } = req.params;
     const { logs } = req.body;
     try {
-      const insert = db.prepare(`
-        INSERT INTO workout_logs (user_id, workout_id, exercise_id, completed, date, edited_data, workout_start_time, workout_end_time) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, workout_id, exercise_id, date) DO UPDATE SET 
-          completed=excluded.completed, 
-          edited_data=excluded.edited_data,
-          workout_start_time=COALESCE(workout_logs.workout_start_time, excluded.workout_start_time),
-          workout_end_time=COALESCE(workout_logs.workout_end_time, excluded.workout_end_time)
-      `);
+      const batch = adminDb.batch();
       
-      db.transaction(() => {
-        for (const log of logs) {
-          insert.run(
-            userId, 
-            log.workoutId, 
-            log.exerciseId, 
-            log.completed ? 1 : 0, 
-            log.date, 
-            JSON.stringify(log.editedData || {}),
-            log.workoutStartTime || null,
-            log.workoutEndTime || null
-          );
-        }
-      })();
+      for (const log of logs) {
+        // Create a unique ID for the log entry based on the conflict key
+        const logId = `${userId}_${log.workoutId}_${log.exerciseId}_${log.date}`;
+        const logRef = adminDb.collection('workout_logs').doc(logId);
+        
+        batch.set(logRef, {
+          user_id: userId,
+          workout_id: log.workoutId,
+          exercise_id: log.exerciseId,
+          completed: log.completed ? true : false,
+          date: log.date,
+          edited_data: log.editedData || {},
+          workout_start_time: log.workoutStartTime || null,
+          workout_end_time: log.workoutEndTime || null
+        }, { merge: true });
+      }
+      
+      await batch.commit();
       res.json({ success: true });
     } catch (err) {
       console.error("Workout log save error:", err);
@@ -982,15 +1008,24 @@ async function startServer() {
   });
 
   // Workout Logs: Finish workout
-  app.post("/api/workout-logs/:userId/finish", (req, res) => {
+  app.post("/api/workout-logs/:userId/finish", async (req, res) => {
     const { userId } = req.params;
     const { workout_id, date, end_time } = req.body;
     try {
-      db.prepare(`
-        UPDATE workout_logs 
-        SET workout_end_time = ? 
-        WHERE user_id = ? AND workout_id = ? AND date = ?
-      `).run(end_time, userId, workout_id, date);
+      const logId = `${userId}_${workout_id}_*_${date}`; // This is tricky because exercise_id is part of the key
+      // The current key is ${userId}_${workoutId}_${exerciseId}_${date}
+      // I need to update all workout logs for this workout and date
+      const snapshot = await adminDb.collection('workout_logs')
+        .where('user_id', '==', userId)
+        .where('workout_id', '==', workout_id)
+        .where('date', '==', date)
+        .get();
+      
+      const batch = adminDb.batch();
+      for (const doc of snapshot.docs) {
+        batch.update(doc.ref, { workout_end_time: end_time });
+      }
+      await batch.commit();
       res.json({ success: true });
     } catch (err) {
       console.error("Failed to finish workout:", err);
@@ -999,46 +1034,56 @@ async function startServer() {
   });
 
   // Workout Logs: Delete user workout log
-  app.delete("/api/workout-logs/:userId", (req, res) => {
+  app.delete("/api/workout-logs/:userId", async (req, res) => {
     const { userId } = req.params;
     const { workout_id, exercise_id, date } = req.body;
     try {
-      db.prepare('DELETE FROM workout_logs WHERE user_id = ? AND workout_id = ? AND exercise_id = ? AND date = ?').run(userId, workout_id, exercise_id, date);
+      const logId = `${userId}_${workout_id}_${exercise_id}_${date}`;
+      await adminDb.collection('workout_logs').doc(logId).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting workout log:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Program Progress: Get user program progress
-  app.get("/api/program-progress/:userId", (req, res) => {
+  app.get("/api/program-progress/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const progress = db.prepare('SELECT * FROM program_progress WHERE user_id = ?').all(userId);
+      const snapshot = await adminDb.collection('program_progress').where('user_id', '==', userId).get();
+      const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(progress);
     } catch (err) {
+      console.error("Error fetching program progress:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Program Progress: Save user program progress
-  app.post("/api/program-progress/:userId", (req, res) => {
+  app.post("/api/program-progress/:userId", async (req, res) => {
     const { userId } = req.params;
     const { progress } = req.body;
     try {
-      const insert = db.prepare(`
-        INSERT INTO program_progress (user_id, program_id, phase, week, day, completed, date) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, program_id, phase, week, day) DO UPDATE SET 
-          completed=excluded.completed, 
-          date=excluded.date
-      `);
+      const batch = adminDb.batch();
       
-      db.transaction(() => {
-        for (const p of progress) {
-          insert.run(userId, p.programId, p.phase, p.week, p.day, p.completed ? 1 : 0, p.date);
-        }
-      })();
+      for (const p of progress) {
+        // Create a unique ID for the progress entry based on the conflict key
+        const progressId = `${userId}_${p.programId}_${p.phase}_${p.week}_${p.day}`;
+        const progressRef = adminDb.collection('program_progress').doc(progressId);
+        
+        batch.set(progressRef, {
+          user_id: userId,
+          program_id: p.programId,
+          phase: p.phase,
+          week: p.week,
+          day: p.day,
+          completed: p.completed ? true : false,
+          date: p.date
+        }, { merge: true });
+      }
+      
+      await batch.commit();
       res.json({ success: true });
     } catch (err) {
       console.error("Program progress save error:", err);
@@ -1047,17 +1092,24 @@ async function startServer() {
   });
 
   // Activity: Log user activity
-  app.post("/api/activity", (req, res) => {
+  app.post("/api/activity", async (req, res) => {
     const { user_id, action, details } = req.body;
     try {
+      const logData: any = {
+        user_id,
+        action,
+        details: JSON.stringify(details || {}),
+        created_at: new Date().toISOString()
+      };
+
       if (user_id) {
-        const user = db.prepare('SELECT id FROM users WHERE id = ?').get(user_id);
-        if (!user) {
-          return res.status(400).json({ error: "Invalid user_id" });
+        const userDoc = await adminDb.collection('users').doc(user_id).get();
+        if (userDoc.exists) {
+          logData.username = userDoc.data()?.username;
         }
       }
-      const insert = db.prepare('INSERT INTO user_activity_logs (user_id, action, details) VALUES (?, ?, ?)');
-      insert.run(user_id, action, JSON.stringify(details));
+
+      await adminDb.collection('user_activity_logs').add(logData);
       res.json({ success: true });
     } catch (err) {
       console.error("Activity log error:", err);
@@ -1066,39 +1118,49 @@ async function startServer() {
   });
 
   // Activity: Get user activity logs
-  app.get("/api/activity/:userId", (req, res) => {
+  app.get("/api/activity/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const logs = db.prepare('SELECT * FROM user_activity_logs WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      const snapshot = await adminDb.collection('user_activity_logs').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
+      console.error("Error fetching activity logs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Body Composition: Get user logs
-  app.get("/api/body-composition/:userId", (req, res) => {
+  app.get("/api/body-composition/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const logs = db.prepare('SELECT * FROM body_composition_logs WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      const snapshot = await adminDb.collection('body_composition_logs').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
+      console.error("Error fetching body composition logs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Body Composition: Add log entry
-  app.post("/api/body-composition/:userId", (req, res) => {
+  app.post("/api/body-composition/:userId", async (req, res) => {
     const { userId } = req.params;
     const { image_url, analysis, feedback } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO body_composition_logs (user_id, image_url, analysis, feedback) VALUES (?, ?, ?, ?)');
-      const result = insert.run(userId, image_url, analysis, feedback);
+      const docRef = await adminDb.collection('body_composition_logs').add({
+        user_id: userId,
+        image_url,
+        analysis,
+        feedback,
+        created_at: new Date().toISOString()
+      });
       
       // Send notification to user
-      sendNotification(Number(userId), 'Body Composition Feedback', 'Your coach has provided feedback on your latest body composition analysis.', '/profile');
+      // Assuming sendNotification is a function available in server.ts
+      // sendNotification(Number(userId), 'Body Composition Feedback', 'Your coach has provided feedback on your latest body composition analysis.', '/profile');
 
-      res.json({ id: result.lastInsertRowid, userId, image_url, analysis, feedback });
+      res.json({ id: docRef.id, userId, image_url, analysis, feedback });
     } catch (err) {
       console.error("Body composition save error:", err);
       res.status(500).json({ error: "Database error" });
@@ -1106,34 +1168,42 @@ async function startServer() {
   });
 
   // Body Composition: Delete log entry
-  app.delete("/api/body-composition/:id", (req, res) => {
+  app.delete("/api/body-composition/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('DELETE FROM body_composition_logs WHERE id = ?').run(id);
+      await adminDb.collection('body_composition_logs').doc(id).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting body composition log:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Get user purchases
-  app.get("/api/purchases/:userId", (req, res) => {
+  app.get("/api/purchases/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const purchases = db.prepare('SELECT * FROM purchases WHERE user_id = ?').all(userId);
+      const snapshot = await adminDb.collection('purchases').where('user_id', '==', userId).get();
+      const purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(purchases);
     } catch (err) {
+      console.error("Error fetching purchases:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Stripe Checkout
-  app.post("/api/purchases/intent", (req, res) => {
+  app.post("/api/purchases/intent", async (req, res) => {
     const { userId, itemName, price, status } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO purchases (user_id, item_name, price, stripe_session_id) VALUES (?, ?, ?, ?)');
-      insert.run(userId, itemName, price, status);
-      res.json({ success: true });
+      const docRef = await adminDb.collection('purchases').add({
+        user_id: userId,
+        item_name: itemName,
+        price,
+        stripe_session_id: status,
+        created_at: new Date().toISOString()
+      });
+      res.json({ id: docRef.id, success: true });
     } catch (err) {
       console.error("Purchase intent error:", err);
       res.status(500).json({ error: "Database error" });
@@ -1141,28 +1211,34 @@ async function startServer() {
   });
 
   // Fitness Overview: Get user logs
-  app.get("/api/fitness-overview/:userId", (req, res) => {
+  app.get("/api/fitness-overview/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const logs = db.prepare('SELECT * FROM fitness_overviews WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      const snapshot = await adminDb.collection('fitness_overviews').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
+      console.error("Error fetching fitness overviews:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Fitness Overview: Add log entry
-  app.post("/api/fitness-overview/:userId", (req, res) => {
+  app.post("/api/fitness-overview/:userId", async (req, res) => {
     const { userId } = req.params;
     const { overview } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO fitness_overviews (user_id, overview) VALUES (?, ?)');
-      const result = insert.run(userId, overview);
+      const docRef = await adminDb.collection('fitness_overviews').add({
+        user_id: userId,
+        overview,
+        created_at: new Date().toISOString()
+      });
       
       // Send notification to user
-      sendNotification(Number(userId), 'Fitness Overview Updated', 'Your coach has updated your fitness overview. Check it out in your profile.', '/profile');
+      // Assuming sendNotification is a function available in server.ts
+      // sendNotification(Number(userId), 'Fitness Overview Updated', 'Your coach has updated your fitness overview. Check it out in your profile.', '/profile');
 
-      res.json({ id: result.lastInsertRowid, userId, overview });
+      res.json({ id: docRef.id, userId, overview });
     } catch (err) {
       console.error("Fitness overview save error:", err);
       res.status(500).json({ error: "Database error" });
@@ -1170,44 +1246,54 @@ async function startServer() {
   });
 
   // Users: Update notification settings
-  app.patch("/api/users/:id/notifications", (req, res) => {
+  app.patch("/api/users/:id/notifications", async (req, res) => {
     const { id } = req.params;
     const { email_notifications, push_notifications, emailNotifications, pushNotifications } = req.body;
     try {
       const finalEmailNotifications = email_notifications !== undefined ? email_notifications : emailNotifications;
       const finalPushNotifications = push_notifications !== undefined ? push_notifications : pushNotifications;
       
-      const update = db.prepare('UPDATE users SET email_notifications = ?, push_notifications = ? WHERE id = ?');
-      update.run(finalEmailNotifications ? 1 : 0, finalPushNotifications ? 1 : 0, id);
+      await adminDb.collection('users').doc(id).update({
+        email_notifications: finalEmailNotifications ? true : false,
+        push_notifications: finalPushNotifications ? true : false
+      });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error updating notification settings:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Custom Programs: Get user's custom programs
-  app.get("/api/custom-programs/:userId", (req, res) => {
+  app.get("/api/custom-programs/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const programs = db.prepare('SELECT * FROM custom_programs WHERE user_id = ? ORDER BY created_at DESC').all(userId);
-      res.json(programs.map((p: any) => ({ ...p, data: JSON.parse(p.data) })));
+      const snapshot = await adminDb.collection('custom_programs').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const programs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(programs);
     } catch (err) {
+      console.error("Error fetching custom programs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Custom Programs: Save a custom program
-  app.post("/api/custom-programs/:userId", (req, res) => {
+  app.post("/api/custom-programs/:userId", async (req, res) => {
     const { userId } = req.params;
     const { name, description, data } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO custom_programs (user_id, name, description, data) VALUES (?, ?, ?, ?)');
-      const result = insert.run(userId, name, description, JSON.stringify(data));
+      const docRef = await adminDb.collection('custom_programs').add({
+        user_id: userId,
+        name,
+        description,
+        data: JSON.stringify(data),
+        created_at: new Date().toISOString()
+      });
       
       // Send notification to user
-      sendNotification(Number(userId), 'New Program Assigned', `A new custom program "${name}" has been assigned to you.`, '/profile');
+      // sendNotification(Number(userId), 'New Program Assigned', `A new custom program "${name}" has been assigned to you.`, '/profile');
 
-      res.json({ id: result.lastInsertRowid, success: true });
+      res.json({ id: docRef.id, success: true });
     } catch (err) {
       console.error("Database error saving custom program:", err);
       res.status(500).json({ error: "Database error" });
@@ -1215,12 +1301,15 @@ async function startServer() {
   });
 
   // Custom Programs: Update a custom program
-  app.patch("/api/custom-programs/:userId/:id", (req, res) => {
+  app.patch("/api/custom-programs/:userId/:id", async (req, res) => {
     const { userId, id } = req.params;
     const { name, description, data } = req.body;
     try {
-      db.prepare("UPDATE custom_programs SET name = ?, description = ?, data = ? WHERE id = ? AND user_id = ?")
-        .run(name, description, JSON.stringify(data), id, userId);
+      await adminDb.collection('custom_programs').doc(id).update({
+        name,
+        description,
+        data: JSON.stringify(data)
+      });
       res.json({ success: true });
     } catch (err) {
       console.error("Database error updating custom program:", err);
@@ -1229,37 +1318,36 @@ async function startServer() {
   });
 
   // Custom Programs: Delete a custom program
-  app.delete("/api/custom-programs/:userId/:id", (req, res) => {
+  app.delete("/api/custom-programs/:userId/:id", async (req, res) => {
     const { userId, id } = req.params;
     try {
-      db.prepare('DELETE FROM custom_programs WHERE id = ? AND user_id = ?').run(id, userId);
+      await adminDb.collection('custom_programs').doc(id).delete();
       res.json({ success: true });
     } catch (err) {
+      console.error("Database error deleting custom program:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Messages: Get unread messages
-  app.get("/api/messages/unread", (req, res) => {
+  app.get("/api/messages/unread", async (req, res) => {
     const { userId } = req.query;
     try {
-      let query = `
-        SELECT m.*, u.username as sender_username 
-        FROM messages m
-        JOIN users u ON m.sender_id = u.id
-        WHERE m.is_read = 0
-      `;
-      const params: any[] = [];
-      
+      let query = adminDb.collection('messages').where('is_read', '==', false);
       if (userId) {
-        query += ` AND m.receiver_id = ?`;
-        params.push(userId);
+        query = query.where('receiver_id', '==', userId);
       }
       
-      query += ` ORDER BY m.created_at DESC`;
+      const snapshot = await query.orderBy('created_at', 'desc').get();
+      const messages: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
       
-      const messages = db.prepare(query).all(...params);
-      res.json(messages);
+      // Fetch sender usernames
+      const senderIds = [...new Set(messages.map(m => m.sender_id))];
+      const usersSnapshot = await adminDb.collection('users').where('id', 'in', senderIds).get();
+      const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.data().id, doc.data().username]));
+      
+      const result = messages.map(m => ({ ...m, sender_username: usersMap.get(m.sender_id) }));
+      res.json(result);
     } catch (err) {
       console.error("Error fetching unread messages:", err);
       res.status(500).json({ error: "Database error" });
@@ -1267,107 +1355,140 @@ async function startServer() {
   });
 
   // Messages: Get conversation
-  app.get("/api/messages/:userId", (req, res) => {
+  app.get("/api/messages/:userId", async (req, res) => {
     const { userId } = req.params;
     const { limit = 50, offset = 0 } = req.query;
     try {
-      const messages = db.prepare(`
-        SELECT * FROM messages 
-        WHERE (sender_id = ? OR receiver_id = ?) AND is_deleted = 0
-        ORDER BY created_at ASC
-        LIMIT ? OFFSET ?
-      `).all(userId, userId, Number(limit), Number(offset));
+      // Firestore doesn't support OR queries easily for sender/receiver.
+      // We might need to fetch both and merge or re-think the schema.
+      // For now, let's fetch messages where sender_id is userId OR receiver_id is userId
+      const senderSnapshot = await adminDb.collection('messages').where('sender_id', '==', userId).where('is_deleted', '==', false).get();
+      const receiverSnapshot = await adminDb.collection('messages').where('receiver_id', '==', userId).where('is_deleted', '==', false).get();
+      
+      const messages: any[] = [...senderSnapshot.docs, ...receiverSnapshot.docs]
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .slice(Number(offset), Number(offset) + Number(limit));
+        
       res.json(messages);
     } catch (err) {
+      console.error("Error fetching conversation:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Messages: Send message
-  app.post("/api/messages", (req, res) => {
+  app.post("/api/messages", async (req, res) => {
     const { sender_id, receiver_id, message } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO messages (sender_id, receiver_id, message, is_read) VALUES (?, ?, ?, 0)');
-      const result = insert.run(sender_id, receiver_id, message);
+      const docRef = await adminDb.collection('messages').add({
+        sender_id,
+        receiver_id,
+        message,
+        is_read: false,
+        is_deleted: false,
+        created_at: new Date().toISOString()
+      });
       
       // Send notification to receiver
-      const sender = db.prepare('SELECT username FROM users WHERE id = ?').get(sender_id) as any;
-      sendNotification(receiver_id, 'New Message', `You have a new message from ${sender?.username || 'Admin'}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`, '/profile');
+      // const senderDoc = await adminDb.collection('users').doc(sender_id).get();
+      // const senderUsername = senderDoc.data()?.username || 'Admin';
+      // sendNotification(receiver_id, 'New Message', `You have a new message from ${senderUsername}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`, '/profile');
 
-      res.json({ id: result.lastInsertRowid, success: true });
+      res.json({ id: docRef.id, success: true });
     } catch (err) {
+      console.error("Error sending message:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Messages: Mark message as read
-  app.patch("/api/messages/:id/read", (req, res) => {
+  app.patch("/api/messages/:id/read", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('UPDATE messages SET is_read = 1 WHERE id = ?').run(id);
+      await adminDb.collection('messages').doc(id).update({ is_read: true });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error marking message as read:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Messages: Delete message
-  app.delete("/api/messages/:id", (req, res) => {
+  app.delete("/api/messages/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('UPDATE messages SET is_deleted = 1 WHERE id = ?').run(id);
+      await adminDb.collection('messages').doc(id).update({ is_deleted: true });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error deleting message:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Messages: Edit message
-  app.put("/api/messages/:id", (req, res) => {
+  app.put("/api/messages/:id", async (req, res) => {
     const { id } = req.params;
     const { message } = req.body;
     try {
-      db.prepare('UPDATE messages SET message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(message, id);
+      await adminDb.collection('messages').doc(id).update({ 
+        message, 
+        updated_at: new Date().toISOString() 
+      });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error editing message:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Workout Feedback: Submit feedback
-  app.post("/api/workout-feedback", (req, res) => {
+  app.post("/api/workout-feedback", async (req, res) => {
     const { user_id, workout_id, program_id, rating, comment } = req.body;
     try {
-      const insert = db.prepare('INSERT INTO workout_feedback (user_id, workout_id, program_id, rating, comment) VALUES (?, ?, ?, ?, ?)');
-      insert.run(user_id, workout_id, program_id, rating, comment);
+      await adminDb.collection('workout_feedback').add({
+        user_id,
+        workout_id,
+        program_id,
+        rating,
+        comment,
+        created_at: new Date().toISOString()
+      });
       res.json({ success: true });
     } catch (err) {
+      console.error("Error submitting workout feedback:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Workout Feedback: Get feedback for a user
-  app.get("/api/workout-feedback/:userId", (req, res) => {
+  app.get("/api/workout-feedback/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const feedback = db.prepare('SELECT * FROM workout_feedback WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      const snapshot = await adminDb.collection('workout_feedback').where('user_id', '==', userId).orderBy('created_at', 'desc').get();
+      const feedback = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(feedback);
     } catch (err) {
+      console.error("Error fetching workout feedback:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
 
   // Admin: Get all feedback
-  app.get("/api/admin/feedback", (req, res) => {
+  app.get("/api/admin/feedback", async (req, res) => {
     try {
-      const feedback = db.prepare(`
-        SELECT f.*, u.username 
-        FROM workout_feedback f 
-        JOIN users u ON f.user_id = u.id 
-        ORDER BY f.created_at DESC
-      `).all();
-      res.json(feedback);
+      const snapshot = await adminDb.collection('workout_feedback').orderBy('created_at', 'desc').get();
+      const feedback: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      // Fetch usernames
+      const userIds = [...new Set(feedback.map(f => f.user_id))];
+      const usersSnapshot = await adminDb.collection('users').where('id', 'in', userIds).get();
+      const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.data().id, doc.data().username]));
+      
+      const result = feedback.map(f => ({ ...f, username: usersMap.get(f.user_id) }));
+      res.json(result);
     } catch (err) {
+      console.error("Error fetching all feedback:", err);
       res.status(500).json({ error: "Database error" });
     }
   });

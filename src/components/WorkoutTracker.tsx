@@ -43,8 +43,11 @@ import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
 import VideoModal from './VideoModal';
 import ConfirmModal from './ConfirmModal';
 import { PlayCircle } from 'lucide-react';
+import { getWorkoutLogs, addWorkoutLog, deleteWorkoutLog, getProgramProgress, getWorkoutFeedback, updateWorkoutLog } from '../services/firebaseService';
+import { handleFirestoreError, OperationType } from '../utils/firebaseError';
 
 interface WorkoutLog {
+  id?: string;
   workoutId: string;
   exerciseId: string;
   completed: boolean;
@@ -85,36 +88,28 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch(`/api/workout-logs/${userId}`, {
-        headers: { 'X-User-Id': userId }
-      });
-      if (res.ok) {
-        const logs = await res.json();
-        setWorkoutLogs(logs.map((l: any) => ({
-          ...l,
-          workoutId: l.workout_id,
-          exerciseId: l.exercise_id,
-          completed: l.completed === 1,
-          date: l.date || new Date().toISOString(), // Fallback to current date if missing
-          editedData: l.edited_data ? JSON.parse(l.edited_data) : {},
-          workoutStartTime: l.workout_start_time,
-          workoutEndTime: l.workout_end_time
-        })));
-      }
+      const logs = await getWorkoutLogs(userId);
+      setWorkoutLogs(logs.map((l: any) => ({
+        id: l.id,
+        workoutId: l.workout_id,
+        exerciseId: l.exercise_id,
+        completed: l.completed === 1 || l.completed === true,
+        date: l.date || new Date().toISOString(),
+        editedData: l.edited_data ? JSON.parse(l.edited_data) : {},
+        workoutStartTime: l.workout_start_time,
+        workoutEndTime: l.workout_end_time
+      })));
     } catch (err) {
-      console.error("Failed to fetch workout logs", err);
+      handleFirestoreError(err, OperationType.LIST, 'workout_logs');
     }
   };
 
   const fetchFeedback = async () => {
     try {
-      const res = await fetch(`/api/workout-feedback/${userId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setFeedback(data);
-      }
+      const data = await getWorkoutFeedback(userId);
+      setFeedback(data);
     } catch (err) {
-      console.error("Failed to fetch feedback", err);
+      handleFirestoreError(err, OperationType.LIST, 'workout_feedback');
     }
   };
 
@@ -125,15 +120,12 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
           fetchLogs(),
           fetchFeedback(),
           (async () => {
-            const progressRes = await fetch(`/api/program-progress/${userId}`);
-            if (progressRes.ok) {
-              const progress = await progressRes.json();
-              setProgramProgress(progress.map((p: any) => ({
-                ...p,
-                programId: p.program_id,
-                completed: p.completed === 1
-              })));
-            }
+            const progress = await getProgramProgress(userId);
+            setProgramProgress(progress.map((p: any) => ({
+              ...p,
+              programId: p.program_id,
+              completed: p.completed === 1 || p.completed === true
+            })));
           })()
         ]);
       } catch (err) {
@@ -147,27 +139,39 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   }, [userId]);
 
   const handleAddLog = async (log: WorkoutLog) => {
-    await fetch(`/api/workout-logs/${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
-      body: JSON.stringify({ logs: [log] })
-    });
-    await fetchLogs();
+    try {
+      await addWorkoutLog({
+        user_id: userId,
+        workout_id: log.workoutId,
+        exercise_id: log.exerciseId,
+        completed: log.completed ? 1 : 0,
+        date: log.date,
+        edited_data: JSON.stringify(log.editedData || {}),
+        workout_start_time: log.workoutStartTime,
+        workout_end_time: log.workoutEndTime
+      });
+      await fetchLogs();
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'workout_logs');
+    }
   };
 
   const handleUpdateLog = async (log: WorkoutLog) => {
+    if (!log.id) return;
     const isCompleted = !log.completed;
     if (isCompleted) {
       haptics.success();
     } else {
       haptics.light();
     }
-    await fetch(`/api/workout-logs/${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
-      body: JSON.stringify({ logs: [{ ...log, completed: !log.completed }] })
-    });
-    await fetchLogs();
+    try {
+      await updateWorkoutLog(log.id, {
+        completed: isCompleted ? 1 : 0
+      });
+      await fetchLogs();
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'workout_logs');
+    }
   };
 
   const handleDeleteLog = async (log: WorkoutLog) => {
@@ -327,17 +331,16 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
     if (!window.confirm("Are you sure you want to delete this entire workout session?")) {
       return;
     }
-    console.log("Deleting session:", session);
-    for (const log of session.logs) {
-      console.log("Deleting log:", log);
-      const response = await fetch(`/api/workout-logs/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
-        body: JSON.stringify({ workout_id: log.workoutId, exercise_id: log.exerciseId, date: log.date })
-      });
-      console.log("Delete response status:", response.status);
+    try {
+      for (const log of session.logs) {
+        if (log.id) {
+          await deleteWorkoutLog(log.id);
+        }
+      }
+      await fetchLogs();
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'workout_logs');
     }
-    await fetchLogs();
   };
 
   if (loading) {

@@ -1,7 +1,14 @@
+import { auth } from '../firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  updateProfile
+} from 'firebase/auth';
+import React, { useState } from "react";
 import { haptics } from '../utils/nativeBridge';
 import { motion } from "framer-motion";
 import { safeStorage } from '../utils/storage';
-import React, { useState } from "react";
 import { getCurrentDate } from '../utils/date';
 import { 
   Mail, 
@@ -30,53 +37,84 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
   const [role, setRole] = useState<'athlete' | 'coach'>('athlete');
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     
     try {
       if (mode === 'login') {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await response.json();
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Fetch additional user data from our backend
+        const response = await fetch(`/api/users/${user.uid}`);
         if (response.ok) {
+          const userData = await response.json();
           haptics.success();
-          onLoginSuccess(data);
+          onLoginSuccess(userData);
         } else {
-          haptics.error();
-          setError(data.error || "Login failed");
+          // If user exists in Firebase but not in our DB, create a basic entry
+          const userData = {
+            id: user.uid,
+            email: user.email,
+            username: user.displayName || user.email?.split('@')[0],
+            role: 'athlete'
+          };
+          haptics.success();
+          onLoginSuccess(userData);
         }
       } else if (mode === 'register') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Update Firebase profile
+        await updateProfile(user, {
+          displayName: `${firstName} ${lastName}`.trim()
+        });
+
+        // Sync with our backend
         const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            username, 
+            uid: user.uid,
+            username: username || email.split('@')[0], 
             email, 
-            password,
-            first_name: firstName,
-            last_name: lastName,
-            role: role
+            firstName,
+            lastName,
+            role
           })
         });
-        const data = await response.json();
+        
         if (response.ok) {
+          const userData = await response.json();
           haptics.success();
-          onLoginSuccess(data);
+          onLoginSuccess(userData);
         } else {
-          haptics.error();
-          setError(data.error || "Registration failed");
+          const data = await response.json();
+          setError(data.error || "Registration sync failed");
         }
       } else {
+        await sendPasswordResetEmail(auth, email);
         setSuccess("A reset link has been sent to your email.");
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Network error. Please try again.");
+      let message = "An error occurred. Please try again.";
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        message = "Invalid email or password.";
+      } else if (err.code === 'auth/email-already-in-use') {
+        message = "This email is already registered.";
+      } else if (err.code === 'auth/weak-password') {
+        message = "Password should be at least 6 characters.";
+      }
+      setError(message);
+      haptics.error();
+    } finally {
+      setLoading(false);
     }
   };
 

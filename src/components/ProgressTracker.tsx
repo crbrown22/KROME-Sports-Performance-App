@@ -24,14 +24,15 @@ import {
 } from "lucide-react";
 import { formatDate } from '../utils/date';
 import ConfirmModal from './ConfirmModal';
+import { getProgress, addProgress, deleteProgress } from '../services/firebaseService';
 
 interface ProgressEntry {
-  id: number;
+  id: string;
   user_id: number;
   metric_name: string;
   metric_value: number;
   unit: string;
-  recorded_at: string;
+  recorded_at: any;
 }
 
 interface ProgressTrackerProps {
@@ -55,7 +56,7 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState(METRICS[0].name);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: number | null }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string | null }>({
     isOpen: false,
     id: null
   });
@@ -66,12 +67,8 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
 
   const fetchProgress = async () => {
     try {
-      const response = await fetch(`/api/progress/${userId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch progress: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setEntries(data);
+      const data = await getProgress(userId.toString());
+      setEntries(data as ProgressEntry[]);
     } catch (err) {
       console.error("Failed to fetch progress", err);
     } finally {
@@ -94,35 +91,29 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
     const metric = METRICS.find(m => m.name === newMetricName);
     
     try {
-      const response = await fetch('/api/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          metric_name: newMetricName,
-          metric_value: val,
-          unit: metric?.unit || ""
-        })
+      await addProgress({
+        user_id: userId,
+        metric_name: newMetricName,
+        metric_value: val,
+        unit: metric?.unit || ""
       });
 
-      if (response.ok) {
-        fetchProgress();
-        setNewValue("");
-        setShowAddForm(false);
-      }
+      fetchProgress();
+      setNewValue("");
+      setShowAddForm(false);
     } catch (err) {
       console.error("Failed to add entry", err);
     }
   };
 
-  const deleteEntry = async (id: number) => {
+  const deleteEntry = async (id: string) => {
     setDeleteConfirm({ isOpen: true, id });
   };
 
   const confirmDeleteEntry = async () => {
     if (deleteConfirm.id === null) return;
     try {
-      await fetch(`/api/progress/${deleteConfirm.id}`, { method: 'DELETE' });
+      await deleteProgress(deleteConfirm.id);
       fetchProgress();
       setDeleteConfirm({ isOpen: false, id: null });
     } catch (err) {
@@ -132,13 +123,18 @@ export default function ProgressTracker({ userId, isAdmin = false, onBack }: Pro
 
   const filteredEntries = entries
     .filter(e => e.metric_name === selectedMetric)
-    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+    .sort((a, b) => {
+      const dateA = a.recorded_at?.toDate ? a.recorded_at.toDate() : new Date(a.recorded_at);
+      const dateB = b.recorded_at?.toDate ? b.recorded_at.toDate() : new Date(b.recorded_at);
+      return dateA.getTime() - dateB.getTime();
+    })
     .map((e, index, arr) => {
       const prevValue = index > 0 ? arr[index - 1].metric_value : null;
       const diff = prevValue !== null ? e.metric_value - prevValue : 0;
       const percentDiff = prevValue !== null && prevValue !== 0 ? (diff / prevValue) * 100 : 0;
       
-      const dateStr = e.recorded_at.split(' ')[0].split('T')[0];
+      const date = e.recorded_at?.toDate ? e.recorded_at.toDate() : new Date(e.recorded_at);
+      const dateStr = date.toISOString().split('T')[0];
       return {
         ...e,
         date: formatDate(dateStr),

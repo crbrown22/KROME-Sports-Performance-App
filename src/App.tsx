@@ -62,6 +62,7 @@ import { logActivity } from "./utils/activity";
 import { haptics } from "./utils/nativeBridge";
 import Chatbot from "./components/Chatbot";
 import { safeStorage } from "./utils/storage";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const programs = [
   {
@@ -376,7 +377,8 @@ export default function App() {
 
   return (
     <NotificationProvider>
-      <div className="min-h-screen bg-black overflow-x-hidden pb-20 md:pb-0">
+      <ErrorBoundary>
+        <div className="min-h-screen bg-black overflow-x-hidden pb-20 md:pb-0">
         {/* Navbar */}
       <nav 
         role="navigation" 
@@ -1656,6 +1658,7 @@ export default function App() {
       <Chatbot user={user} />
       <InstallPrompt />
     </div>
+      </ErrorBoundary>
     </NotificationProvider>
   );
 }

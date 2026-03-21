@@ -8,6 +8,8 @@ import { calculateNutritionRecommendations } from '../utils/nutrition';
 import { BodyMetricsData, INITIAL_DATA } from '../types';
 import SupplementsAndVitamins from './SupplementsAndVitamins';
 import { getSupplementRecommendation, generateDefaultSupplements } from '../utils/supplements';
+import { getNutritionLogs } from '../services/firebaseService';
+import { handleFirestoreError, OperationType } from '../utils/firebaseError';
 
 interface NutritionDashboardProps {
   user: any;
@@ -40,30 +42,27 @@ export default function NutritionDashboard({ user, onBack, onLogout }: Nutrition
     const fetchNutritionLogs = async () => {
       if (!user || !user.id || user.id === 'guest') return;
       try {
-        const response = await fetch(`/api/nutrition/${user.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          const formattedLogs: LoggedFood[] = data.map((item: any) => ({
-            id: item.food_id,
-            logId: item.log_id,
-            name: item.name,
-            category: item.category,
-            meal: item.meal,
-            date: item.date,
-            servings: item.servings,
-            serving: {
-              size: item.serving_size,
-              calories: item.calories,
-              protein: item.protein,
-              carbs: item.carbs,
-              fat: item.fat
-            },
-            per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 }
-          }));
-          setNutritionLogs(formattedLogs);
-        }
+        const data = await getNutritionLogs(user.id);
+        const formattedLogs: LoggedFood[] = data.map((item: any) => ({
+          id: item.food_id,
+          logId: item.id,
+          name: item.name,
+          category: item.category,
+          meal: item.meal,
+          date: item.date,
+          servings: item.servings,
+          serving: {
+            size: item.serving_size,
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fat: item.fat
+          },
+          per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        }));
+        setNutritionLogs(formattedLogs);
       } catch (err) {
-        console.error("Failed to fetch nutrition logs", err);
+        handleFirestoreError(err, OperationType.LIST, 'nutrition_logs');
       }
     };
     fetchNutritionLogs();

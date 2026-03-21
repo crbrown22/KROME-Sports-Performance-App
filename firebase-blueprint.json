@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "athlete", "coach"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ProgressEntry": {
+      "title": "ProgressEntry",
+      "description": "Stores athletic performance metrics.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "metric_name": { "type": "string" },
+        "metric_value": { "type": "number" },
+        "unit": { "type": "string" },
+        "recorded_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "metric_name", "metric_value"]
+    },
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "Stores individual exercise logs.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "workout_id": { "type": "string" },
+        "exercise_id": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "date": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "workout_id", "exercise_id"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles collection."
+    },
+    "/progress/{entryId}": {
+      "schema": { "$ref": "ProgressEntry" },
+      "description": "Progress entries collection."
+    },
+    "/workout_logs/{logId}": {
+      "schema": { "$ref": "WorkoutLog" },
+      "description": "Workout logs collection."
+    }
+  }
+}
