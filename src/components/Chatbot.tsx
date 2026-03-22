@@ -131,18 +131,46 @@ Explain what to expect:
 - Custom Blueprint: Identify the KROME program that fits your needs.`,
           tools: [
             {
-              functionDeclarations: [{
-                name: 'generatePDF',
-                description: 'Generate a downloadable PDF for a workout or nutrition plan',
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    content: { type: Type.STRING, description: 'The content of the PDF' },
-                    fileName: { type: Type.STRING, description: 'The name of the PDF file' }
-                  },
-                  required: ['content', 'fileName']
+              functionDeclarations: [
+                {
+                  name: 'generatePDF',
+                  description: 'Generate a downloadable PDF for a workout or nutrition plan',
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      content: { type: Type.STRING, description: 'The content of the PDF' },
+                      fileName: { type: Type.STRING, description: 'The name of the PDF file' }
+                    },
+                    required: ['content', 'fileName']
+                  }
+                },
+                {
+                  name: 'getUserFitnessData',
+                  description: 'Fetch the user\'s fitness data including training stats, body metrics, and workout history to provide personalized advice.',
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      dataType: { 
+                        type: Type.STRING, 
+                        enum: ['stats', 'metrics', 'workouts', 'all'],
+                        description: 'The type of fitness data to fetch' 
+                      }
+                    },
+                    required: ['dataType']
+                  }
+                },
+                {
+                  name: 'sendMessageToCoach',
+                  description: 'Send a direct message to the coach/admin on behalf of the user.',
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      message: { type: Type.STRING, description: 'The message content to send to the coach' }
+                    },
+                    required: ['message']
+                  }
                 }
-              }]
+              ]
             }
           ]
         },
@@ -156,6 +184,7 @@ Explain what to expect:
       
       // Handle tool calls
       if (result.functionCalls) {
+        let toolResponses = [];
         for (const call of result.functionCalls) {
           if (call.name === 'generatePDF') {
             if (!checkAccess()) continue;
@@ -163,6 +192,61 @@ Explain what to expect:
             generatePDF(content, fileName);
             setMessages(prev => [...prev, { role: 'model', text: `I have generated the PDF: ${fileName}.pdf` }]);
             incrementUsage();
+          } else if (call.name === 'getUserFitnessData') {
+            if (!user) {
+              setMessages(prev => [...prev, { role: 'model', text: 'Please log in to allow me to access your fitness data.' }]);
+              continue;
+            }
+            const { dataType } = call.args as any;
+            try {
+              let data = {};
+              if (dataType === 'stats' || dataType === 'all') {
+                const res = await fetch(`/api/progress/${user.id}`);
+                if (res.ok) data = { ...data, stats: await res.json() };
+              }
+              if (dataType === 'metrics' || dataType === 'all') {
+                const res = await fetch(`/api/body-metrics/${user.id}`);
+                if (res.ok) data = { ...data, metrics: await res.json() };
+              }
+              if (dataType === 'workouts' || dataType === 'all') {
+                const res = await fetch(`/api/workouts/${user.id}`);
+                if (res.ok) data = { ...data, workouts: await res.json() };
+              }
+              
+              // Send data back to AI for final response
+              const followUp = await chat.sendMessage({
+                message: `Here is my fitness data: ${JSON.stringify(data)}. Please analyze it and provide feedback.`
+              });
+              
+              setMessages(prev => [...prev, { 
+                role: 'model', 
+                text: followUp.text || "I've analyzed your data. How else can I help?" 
+              }]);
+            } catch (err) {
+              console.error("Error fetching fitness data for AI:", err);
+              setMessages(prev => [...prev, { role: 'model', text: "I tried to fetch your data but encountered an error." }]);
+            }
+          } else if (call.name === 'sendMessageToCoach') {
+            if (!user) {
+              setMessages(prev => [...prev, { role: 'model', text: 'Please log in to send a message to your coach.' }]);
+              continue;
+            }
+            const { message } = call.args as any;
+            try {
+              const res = await fetch('/api/messages/to-coach', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender_id: user.id, message })
+              });
+              if (res.ok) {
+                setMessages(prev => [...prev, { role: 'model', text: "I've sent that message to your coach. They will get back to you soon!" }]);
+              } else {
+                throw new Error("Failed to send message");
+              }
+            } catch (err) {
+              console.error("Error sending message to coach via AI:", err);
+              setMessages(prev => [...prev, { role: 'model', text: "I tried to send your message but encountered an error." }]);
+            }
           }
         }
       } else {

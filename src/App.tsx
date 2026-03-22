@@ -821,7 +821,7 @@ export default function App() {
                     <iframe 
                       className="w-full h-full"
                       src="https://www.youtube.com/embed/fU599S2F3k4" 
-                      title="KROME Fitness"
+                      title="KROME Sports Performance"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                       allowFullScreen

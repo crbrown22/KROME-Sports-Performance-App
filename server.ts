@@ -116,7 +116,7 @@ async function sendNotification(userId: number, title: string, body: string, url
       });
 
       await transporter.sendMail({
-        from: '"KROME Fitness" <kromefitness@gmail.com>',
+        from: '"KROME Sports Performance" <kromefitness@gmail.com>',
         to: user.email,
         subject: title,
         text: `Hello ${user.first_name || 'Athlete'},\n\n${body}\n\nView here: ${process.env.APP_URL}${url}\n\nBest regards,\nThe KROME Team`,
@@ -314,10 +314,10 @@ async function startServer() {
 
       // Send confirmation email to user
       await transporter.sendMail({
-        from: '"KROME Fitness" <kromefitness@gmail.com>',
+        from: '"KROME Sports Performance" <kromefitness@gmail.com>',
         to: email,
         subject: 'Confirmation: We received your message',
-        text: `Hello ${name},\n\nThank you for contacting KROME Fitness. We have received your message and will get back to you soon.\n\nHere is a copy of your message:\n\n"${message}"\n\nBest regards,\nThe KROME Team`,
+        text: `Hello ${name},\n\nThank you for contacting KROME Sports Performance. We have received your message and will get back to you soon.\n\nHere is a copy of your message:\n\n"${message}"\n\nBest regards,\nThe KROME Team`,
       });
 
       res.json({ success: true });
@@ -514,6 +514,38 @@ async function startServer() {
         userData.role,
         uid
       );
+
+      // 3. Send Welcome Email to Athlete
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_PORT === '465',
+          requireTLS: true,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: '"KROME Sports Performance" <kromefitness@gmail.com>',
+          to: email,
+          subject: 'Welcome to KROME Sports Performance!',
+          text: `Hello ${finalFirstName},\n\nWelcome to KROME Sports Performance! We're excited to have you on board. Your account has been successfully created.\n\nYou can now log in and start tracking your progress, workouts, and nutrition.\n\nBest regards,\nThe KROME Team`,
+        });
+
+        // 4. Send Notification Email to Admin
+        await transporter.sendMail({
+          from: '"KROME System" <kromefitness@gmail.com>',
+          to: 'kromefitness@gmail.com', // Admin email
+          subject: 'New Athlete Registered',
+          text: `A new athlete has registered:\n\nName: ${finalFirstName} ${finalLastName}\nEmail: ${email}\nUsername: ${userData.username}\nRole: ${userData.role}\n\nCheck the admin dashboard for more details.`,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration emails:", emailErr);
+        // Don't fail registration if emails fail
+      }
 
       res.json({ 
         id: uid, 
@@ -1577,6 +1609,44 @@ async function startServer() {
       res.json({ success: true });
     } catch (err) {
       console.error("Error editing message:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Messages: Send message to coach (AI Tool)
+  app.post("/api/messages/to-coach", async (req, res) => {
+    const { sender_id, message } = req.body;
+    try {
+      // Find primary admin
+      const adminSnapshot = await adminDb.collection('users').where('role', '==', 'admin').limit(1).get();
+      if (adminSnapshot.empty) {
+        return res.status(404).json({ error: "No coach found" });
+      }
+      const adminDoc = adminSnapshot.docs[0];
+      const adminId = adminDoc.id;
+
+      const docRef = await adminDb.collection('messages').add({
+        sender_id,
+        receiver_id: adminId,
+        message,
+        is_read: false,
+        is_deleted: false,
+        created_at: new Date().toISOString()
+      });
+
+      // Notify admin
+      const senderDoc = await adminDb.collection('users').doc(sender_id.toString()).get();
+      const senderUsername = senderDoc.data()?.username || 'Athlete';
+      
+      // Use numeric ID for sendNotification if possible, otherwise skip push for now
+      const sqliteUser = db.prepare('SELECT id FROM users WHERE role = ?').get('admin') as { id: number } | undefined;
+      if (sqliteUser) {
+        sendNotification(sqliteUser.id, 'New Message from Athlete', `${senderUsername}: "${message.substring(0, 50)}..."`, '/admin/chat');
+      }
+
+      res.json({ id: docRef.id, success: true });
+    } catch (err) {
+      console.error("Error sending message to coach:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
