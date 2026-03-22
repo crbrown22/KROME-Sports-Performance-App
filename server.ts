@@ -1298,8 +1298,7 @@ async function startServer() {
       });
       
       // Send notification to user
-      // Assuming sendNotification is a function available in server.ts
-      // sendNotification(Number(userId), 'Body Composition Feedback', 'Your coach has provided feedback on your latest body composition analysis.', '/profile');
+      sendNotification(Number(userId), 'Body Composition Feedback', 'Your coach has provided feedback on your latest body composition analysis.', '/profile');
 
       res.json({ id: docRef.id, userId, image_url, analysis, feedback });
     } catch (err) {
@@ -1376,8 +1375,7 @@ async function startServer() {
       });
       
       // Send notification to user
-      // Assuming sendNotification is a function available in server.ts
-      // sendNotification(Number(userId), 'Fitness Overview Updated', 'Your coach has updated your fitness overview. Check it out in your profile.', '/profile');
+      sendNotification(Number(userId), 'Fitness Overview Updated', 'Your coach has updated your fitness overview. Check it out in your profile.', '/profile');
 
       res.json({ id: docRef.id, userId, overview });
     } catch (err) {
@@ -1432,7 +1430,7 @@ async function startServer() {
       });
       
       // Send notification to user
-      // sendNotification(Number(userId), 'New Program Assigned', `A new custom program "${name}" has been assigned to you.`, '/profile');
+      sendNotification(Number(userId), 'New Program Assigned', `A new custom program "${name}" has been assigned to you.`, '/profile');
 
       res.json({ id: docRef.id, success: true });
     } catch (err) {
@@ -1532,9 +1530,9 @@ async function startServer() {
       });
       
       // Send notification to receiver
-      // const senderDoc = await adminDb.collection('users').doc(sender_id).get();
-      // const senderUsername = senderDoc.data()?.username || 'Admin';
-      // sendNotification(receiver_id, 'New Message', `You have a new message from ${senderUsername}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`, '/profile');
+      const senderDoc = await adminDb.collection('users').doc(sender_id.toString()).get();
+      const senderUsername = senderDoc.data()?.username || 'Admin';
+      sendNotification(Number(receiver_id), 'New Message', `You have a new message from ${senderUsername}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`, '/profile');
 
       res.json({ id: docRef.id, success: true });
     } catch (err) {
