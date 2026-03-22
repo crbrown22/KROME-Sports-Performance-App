@@ -479,14 +479,17 @@ async function startServer() {
 
   // Auth: Register
   app.post("/api/auth/register", async (req, res) => {
-    const { username, email, firstName, lastName, role, uid } = req.body;
+    const { username, email, firstName, lastName, first_name, last_name, role, uid } = req.body;
     try {
+      const finalFirstName = firstName || first_name || "";
+      const finalLastName = lastName || last_name || "";
+      
       // 1. Create user document in Firestore
       const userData = {
         uid: uid,
         email,
-        firstName: firstName || "",
-        lastName: lastName || "",
+        firstName: finalFirstName,
+        lastName: finalLastName,
         username: username || email.split('@')[0],
         role: email === 'swolecode@gmail.com' ? 'admin' : (role === 'user' ? 'athlete' : (role || 'athlete')),
         createdAt: new Date().toISOString()
@@ -550,17 +553,13 @@ async function startServer() {
       const user = db.prepare('SELECT * FROM users WHERE uid = ? OR id = ?').get(id, id);
       if (user) {
         return res.json({
+          ...user,
           id: user.uid || String(user.id),
           sqliteId: user.id,
-          username: user.username,
-          email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
           first_name: user.first_name,
-          last_name: user.last_name,
-          role: user.role,
-          avatarUrl: user.avatar_url,
-          avatar_url: user.avatar_url
+          last_name: user.last_name
         });
       }
 
@@ -694,64 +693,78 @@ async function startServer() {
   app.get("/api/admin/growth-kpis", (req, res) => {
     try {
       const now = new Date();
+      const currentDay = now.getDate();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
       
       const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = prevMonthDate.getMonth() + 1;
       const prevYear = prevMonthDate.getFullYear();
+      
+      // For PMTD (Previous Month-to-Date), handle cases where previous month has fewer days
+      const lastDayOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+      const compareDay = Math.min(currentDay, lastDayOfPrevMonth);
 
       const formatMonth = (m: number) => m.toString().padStart(2, '0');
+      const formatDay = (d: number) => d.toString().padStart(2, '0');
+
+      // Date strings for SQLite comparison (YYYY-MM-DD HH:MM:SS)
+      const currentMonthStart = `${currentYear}-${formatMonth(currentMonth)}-01 00:00:00`;
+      const prevMonthStart = `${prevYear}-${formatMonth(prevMonth)}-01 00:00:00`;
+      const prevMonthMTDEnd = `${prevYear}-${formatMonth(prevMonth)}-${formatDay(compareDay)} 23:59:59`;
 
       // 1. Revenue Metrics
       const totalRevenue = db.prepare('SELECT SUM(price) as total FROM purchases').get() as { total: number };
+      
       const currentMonthRevenue = db.prepare(`
         SELECT SUM(price) as total FROM purchases 
-        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(currentMonth), currentYear.toString()) as { total: number };
+        WHERE created_at >= ?
+      `).get(currentMonthStart) as { total: number };
       
-      const prevMonthRevenue = db.prepare(`
+      const prevMonthMTDRevenue = db.prepare(`
         SELECT SUM(price) as total FROM purchases 
-        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(prevMonth), prevYear.toString()) as { total: number };
+        WHERE created_at >= ? AND created_at <= ?
+      `).get(prevMonthStart, prevMonthMTDEnd) as { total: number };
 
       // 2. User Metrics
       const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'athlete'").get() as { count: number };
+      
       const currentMonthUsers = db.prepare(`
         SELECT COUNT(*) as count FROM users 
-        WHERE role = 'athlete' AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(currentMonth), currentYear.toString()) as { count: number };
+        WHERE role = 'athlete' AND created_at >= ?
+      `).get(currentMonthStart) as { count: number };
       
-      const prevMonthUsers = db.prepare(`
+      const prevMonthMTDUsers = db.prepare(`
         SELECT COUNT(*) as count FROM users 
-        WHERE role = 'athlete' AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(prevMonth), prevYear.toString()) as { count: number };
+        WHERE role = 'athlete' AND created_at >= ? AND created_at <= ?
+      `).get(prevMonthStart, prevMonthMTDEnd) as { count: number };
 
       // 3. Lead Metrics
       const totalLeads = db.prepare('SELECT COUNT(*) as count FROM leads').get() as { count: number };
+      
       const currentMonthLeads = db.prepare(`
         SELECT COUNT(*) as count FROM leads 
-        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(currentMonth), currentYear.toString()) as { count: number };
+        WHERE created_at >= ?
+      `).get(currentMonthStart) as { count: number };
       
-      const prevMonthLeads = db.prepare(`
+      const prevMonthMTDLeads = db.prepare(`
         SELECT COUNT(*) as count FROM leads 
-        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
-      `).get(formatMonth(prevMonth), prevYear.toString()) as { count: number };
+        WHERE created_at >= ? AND created_at <= ?
+      `).get(prevMonthStart, prevMonthMTDEnd) as { count: number };
 
       // 4. Conversion Metrics
       const closedWonLeads = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'Closed Won'").get() as { count: number };
-      const consultations = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status IN ('Consultation Scheduled', 'Consultation Completed', 'Closed Won')").get() as { count: number };
+      const consultations = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status IN ('Consultation Scheduled', 'Consultation Completed', 'Closed Won', 'Consultation')").get() as { count: number };
 
-      // Calculate Percentages
+      // Calculate Percentages (MTD vs PMTD)
       const calculateGrowth = (current: number, previous: number) => {
         if (!previous || previous === 0) return current > 0 ? 100 : 0;
         return ((current - previous) / previous) * 100;
       };
 
-      const revenueGrowth = calculateGrowth(currentMonthRevenue.total || 0, prevMonthRevenue.total || 0);
-      const userGrowth = calculateGrowth(currentMonthUsers.count || 0, prevMonthUsers.count || 0);
-      const leadGrowth = calculateGrowth(currentMonthLeads.count || 0, prevMonthLeads.count || 0);
+      const revenueGrowth = calculateGrowth(currentMonthRevenue.total || 0, prevMonthMTDRevenue.total || 0);
+      const userGrowth = calculateGrowth(currentMonthUsers.count || 0, prevMonthMTDUsers.count || 0);
+      const leadGrowth = calculateGrowth(currentMonthLeads.count || 0, prevMonthMTDLeads.count || 0);
 
       const mrr = currentMonthRevenue.total || 0;
       const ltv = totalUsers.count > 0 ? (totalRevenue.total || 0) / totalUsers.count : 0;
@@ -777,29 +790,54 @@ async function startServer() {
   });
 
   // User: Update profile
-  app.patch("/api/users/:id", (req, res) => {
+  app.patch("/api/users/:id", async (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, email, avatar_url, firstName, lastName, avatarUrl, role, status } = req.body;
+    const { first_name, last_name, email, avatar_url, firstName, lastName, avatarUrl, role, status, username } = req.body;
     try {
-      // Build dynamic update query
-      const fields = [];
-      const params = [];
-      
       const finalFirstName = first_name !== undefined ? first_name : firstName;
       const finalLastName = last_name !== undefined ? last_name : lastName;
       const finalAvatarUrl = avatar_url !== undefined ? avatar_url : avatarUrl;
 
+      // 1. Update SQLite
+      const fields = [];
+      const params = [];
+      
       if (finalFirstName !== undefined) { fields.push('first_name = ?'); params.push(finalFirstName); }
       if (finalLastName !== undefined) { fields.push('last_name = ?'); params.push(finalLastName); }
       if (email !== undefined) { fields.push('email = ?'); params.push(email); }
+      if (username !== undefined) { fields.push('username = ?'); params.push(username); }
       if (finalAvatarUrl !== undefined) { fields.push('avatar_url = ?'); params.push(finalAvatarUrl); }
       if (role !== undefined) { fields.push('role = ?'); params.push(role); }
       if (status !== undefined) { fields.push('status = ?'); params.push(status); }
       
-      if (fields.length === 0) return res.json({ success: true });
+      if (fields.length > 0) {
+        params.push(id, id); // For uid = ? OR id = ?
+        db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE uid = ? OR id = ?`).run(...params);
+      }
+
+      // 2. Update Firestore if we have a UID
+      // We need to find the UID if 'id' is numeric
+      let uid = id;
+      if (!isNaN(Number(id))) {
+        const user = db.prepare('SELECT uid FROM users WHERE id = ?').get(id);
+        if (user?.uid) uid = user.uid;
+      }
+
+      if (uid && typeof uid === 'string' && uid.length > 10) { // Basic check for Firebase UID
+        const firestoreUpdate: any = {};
+        if (finalFirstName !== undefined) firestoreUpdate.firstName = finalFirstName;
+        if (finalLastName !== undefined) firestoreUpdate.lastName = finalLastName;
+        if (email !== undefined) firestoreUpdate.email = email;
+        if (username !== undefined) firestoreUpdate.username = username;
+        if (finalAvatarUrl !== undefined) firestoreUpdate.avatarUrl = finalAvatarUrl;
+        if (role !== undefined) firestoreUpdate.role = role;
+        if (status !== undefined) firestoreUpdate.status = status;
+
+        if (Object.keys(firestoreUpdate).length > 0) {
+          await adminDb.collection('users').doc(uid).update(firestoreUpdate);
+        }
+      }
       
-      params.push(id);
-      db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
       res.json({ success: true });
     } catch (err) {
       console.error("Error updating user:", err);

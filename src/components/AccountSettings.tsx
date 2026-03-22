@@ -17,8 +17,8 @@ export default function AccountSettings({ user, onUpdate, onDelete, onBack, onLo
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [formData, setFormData] = useState({ 
     ...user,
-    firstName: user.firstName || "",
-    lastName: user.lastName || "",
+    firstName: user.firstName || user.first_name || "",
+    lastName: user.lastName || user.last_name || "",
     username: user.username || ""
   });
   const [success, setSuccess] = useState("");
@@ -270,7 +270,7 @@ export default function AccountSettings({ user, onUpdate, onDelete, onBack, onLo
                 <div className="space-y-8">
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 block">Name</label>
-                    <div className="text-xl font-medium text-white">{user.firstName || user.lastName ? `${user.firstName} ${user.lastName}` : 'Not set'}</div>
+                    <div className="text-xl font-medium text-white">{(user.firstName || user.first_name || user.lastName || user.last_name) ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 'Not set'}</div>
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 block">Username</label>
