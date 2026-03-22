@@ -81,7 +81,7 @@ interface AdminDashboardProps {
   adminId?: number;
   user: any;
   onBack: () => void;
-  initialTab?: 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand';
+  initialTab?: 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand' | 'system';
   unreadSenderIds?: Set<number>;
 }
 
@@ -95,7 +95,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     const saved = safeStorage.getItem('krome_admin_selected_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand'>(() => {
+  const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand' | 'system'>(() => {
     const saved = safeStorage.getItem('krome_admin_active_tab');
     if (window.innerWidth < 1024) return 'menu';
     return initialTab || (saved as any) || 'workouts';
@@ -108,10 +108,11 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback' | 'brand'>(() => {
+  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback' | 'brand' | 'system'>(() => {
     if (initialTab === 'chat') return 'chat';
     if (initialTab === 'feedback') return 'feedback';
     if (initialTab === 'brand') return 'brand';
+    if (initialTab === 'system') return 'system';
     return 'sales';
   });
 
@@ -667,6 +668,16 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
               <ImageIcon className="w-4 h-4" aria-hidden="true" />
               Brand
             </button>
+            <button 
+              onClick={() => setTopLevelTab('system')}
+              className={`px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2 ${topLevelTab === 'system' ? 'bg-gold text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]' : 'bg-zinc-900 border border-white/10 text-white hover:border-gold'} krome-outline`}
+              role="tab"
+              aria-selected={topLevelTab === 'system'}
+              aria-label="System Settings section"
+            >
+              <Settings className="w-4 h-4" aria-hidden="true" />
+              System
+            </button>
           </div>
         )}
 
@@ -680,6 +691,85 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
           <AdminMessageDashboard adminId={adminId.toString()} />
         ) : topLevelTab === 'feedback' && !selectedUser ? (
           <FeedbackViewer />
+        ) : topLevelTab === 'system' && !selectedUser ? (
+          <div className="space-y-8">
+            <div className="bg-zinc-900/50 border border-white/10 rounded-[40px] p-10 backdrop-blur-xl shadow-2xl">
+              <h2 className="text-3xl font-black uppercase italic mb-2 flex items-center gap-3">
+                <Settings className="w-8 h-8 text-gold" />
+                System <span className="text-gold">Settings</span>
+              </h2>
+              <p className="text-white/40 mb-10 text-sm">Manage system-wide configurations and test integrations.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+                  <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+                    <Bell className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold uppercase italic mb-2">Email Integration</h3>
+                  <p className="text-xs text-white/40 mb-6 leading-relaxed">Verify that your SMTP settings are correctly configured by sending a test email to kromefitness@gmail.com.</p>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/admin/test-smtp', { method: 'POST' });
+                        const data = await res.json();
+                        if (res.ok) {
+                          alert(data.message);
+                        } else {
+                          alert("Error: " + data.error);
+                        }
+                      } catch (err) {
+                        alert("Network error testing SMTP");
+                      }
+                    }}
+                    className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Test SMTP Settings
+                  </button>
+                </div>
+
+                <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+                  <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+                    <UserPlus className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold uppercase italic mb-2">Registration Test</h3>
+                  <p className="text-xs text-white/40 mb-6 leading-relaxed">Simulate a new athlete registration to verify that both welcome and admin notification emails are sent.</p>
+                  <button 
+                    onClick={async () => {
+                      const testEmail = prompt("Enter a test email address to receive the welcome email:", "test-athlete@example.com");
+                      if (!testEmail) return;
+                      
+                      try {
+                        const res = await fetch('/api/auth/register', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            username: 'test_athlete_' + Date.now(),
+                            email: testEmail,
+                            password: 'testpassword123',
+                            firstName: 'Test',
+                            lastName: 'Athlete',
+                            role: 'athlete',
+                            uid: 'test-uid-' + Date.now()
+                          })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          alert("Test registration successful! Check " + testEmail + " for the welcome email and kromefitness@gmail.com for the admin notification.");
+                        } else {
+                          alert("Error: " + data.error);
+                        }
+                      } catch (err) {
+                        alert("Network error testing registration");
+                      }
+                    }}
+                    className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Run Registration Test
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : !selectedUser ? (
           <div className="bg-zinc-900/50 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl shadow-2xl">
             <div className="overflow-x-auto">
@@ -1528,6 +1618,85 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                   </div>
                 ) : activeTab === 'feedback' ? (
                   <FeedbackViewer />
+                ) : activeTab === 'system' ? (
+                  <div className="space-y-8">
+                    <div className="bg-zinc-900/50 border border-white/10 rounded-[40px] p-10 backdrop-blur-xl shadow-2xl">
+                      <h2 className="text-3xl font-black uppercase italic mb-2 flex items-center gap-3">
+                        <Settings className="w-8 h-8 text-gold" />
+                        System <span className="text-gold">Settings</span>
+                      </h2>
+                      <p className="text-white/40 mb-10 text-sm">Manage system-wide configurations and test integrations.</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+                          <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+                            <Bell className="w-6 h-6" />
+                          </div>
+                          <h3 className="text-lg font-bold uppercase italic mb-2">Email Integration</h3>
+                          <p className="text-xs text-white/40 mb-6 leading-relaxed">Verify that your SMTP settings are correctly configured by sending a test email to kromefitness@gmail.com.</p>
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/admin/test-smtp', { method: 'POST' });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  alert(data.message);
+                                } else {
+                                  alert("Error: " + data.error);
+                                }
+                              } catch (err) {
+                                alert("Network error testing SMTP");
+                              }
+                            }}
+                            className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Test SMTP Settings
+                          </button>
+                        </div>
+
+                        <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+                          <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+                            <UserPlus className="w-6 h-6" />
+                          </div>
+                          <h3 className="text-lg font-bold uppercase italic mb-2">Registration Test</h3>
+                          <p className="text-xs text-white/40 mb-6 leading-relaxed">Simulate a new athlete registration to verify that both welcome and admin notification emails are sent.</p>
+                          <button 
+                            onClick={async () => {
+                              const testEmail = prompt("Enter a test email address to receive the welcome email:", "test-athlete@example.com");
+                              if (!testEmail) return;
+                              
+                              try {
+                                const res = await fetch('/api/auth/register', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    username: 'test_athlete_' + Date.now(),
+                                    email: testEmail,
+                                    password: 'testpassword123',
+                                    firstName: 'Test',
+                                    lastName: 'Athlete',
+                                    role: 'athlete',
+                                    uid: 'test-uid-' + Date.now()
+                                  })
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  alert("Test registration successful! Check " + testEmail + " for the welcome email and kromefitness@gmail.com for the admin notification.");
+                                } else {
+                                  alert("Error: " + data.error);
+                                }
+                              } catch (err) {
+                                alert("Network error testing registration");
+                              }
+                            }}
+                            className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Run Registration Test
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <PARQ userId={selectedUser?.id?.toString() || '0'} initialReadOnly={false} />
                 )}

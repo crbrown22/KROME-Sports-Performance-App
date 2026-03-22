@@ -560,6 +560,34 @@ async function startServer() {
     }
   });
 
+  // Admin: Test SMTP
+  app.post("/api/admin/test-smtp", async (req, res) => {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465',
+        requireTLS: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: '"KROME Sports Performance" <kromefitness@gmail.com>',
+        to: 'kromefitness@gmail.com',
+        subject: 'SMTP Test Successful',
+        text: `This is a test email from KROME Sports Performance to verify that your SMTP settings are correctly configured.\n\nTimestamp: ${new Date().toISOString()}\n\nIf you received this, your email system is working correctly!`,
+      });
+
+      res.json({ success: true, message: "Test email sent successfully to kromefitness@gmail.com" });
+    } catch (err: any) {
+      console.error('SMTP Test Error:', err);
+      res.status(500).json({ error: err.message || "Failed to send test email" });
+    }
+  });
+
   // User: Get profile by UID
   app.get("/api/users/:id", async (req, res) => {
     const { id } = req.params;
