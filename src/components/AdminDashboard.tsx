@@ -67,7 +67,10 @@ interface UserRecord {
   email: string;
   first_name: string;
   last_name: string;
+  firstName?: string;
+  lastName?: string;
   avatar_url?: string;
+  avatarUrl?: string;
   role: 'athlete' | 'coach' | 'admin';
   status: 'active' | 'inactive' | 'pending';
   created_at: string;
@@ -172,8 +175,8 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
   useEffect(() => {
     if (editingUser) {
       setEditFormData({ 
-        first_name: editingUser.first_name || '', 
-        last_name: editingUser.last_name || '', 
+        first_name: editingUser.first_name || editingUser.firstName || '', 
+        last_name: editingUser.last_name || editingUser.lastName || '', 
         email: editingUser.email,
         role: editingUser.role,
         status: editingUser.status || 'active'
@@ -725,7 +728,9 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                         <div>
                           <p className="font-bold uppercase italic">{user.username || 'Unknown Athlete'}</p>
                           <p className="text-xs text-white/60">
-                            {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : 'No Name Set'}
+                            {user.first_name || user.last_name || user.firstName || user.lastName ? 
+                              `${user.first_name || user.firstName || ''} ${user.last_name || user.lastName || ''}`.trim() : 
+                              'No Name Set'}
                           </p>
                         </div>
                       </div>
@@ -854,7 +859,9 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                       </div>
                     </div>
                     <h3 className="text-lg font-black uppercase italic tracking-tight text-center">
-                      {selectedUser.first_name || selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.username}
+                      {selectedUser.first_name || selectedUser.last_name || selectedUser.firstName || selectedUser.lastName ? 
+                        `${selectedUser.first_name || selectedUser.firstName || ''} ${selectedUser.last_name || selectedUser.lastName || ''}`.trim() : 
+                        selectedUser.username}
                     </h3>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-1">Athlete Profile</p>
                   </div>
@@ -1008,7 +1015,9 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                         </div>
                       </div>
                       <h3 className="text-lg font-black uppercase italic tracking-tight text-center">
-                        {selectedUser.first_name || selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.username}
+                        {selectedUser.first_name || selectedUser.last_name || selectedUser.firstName || selectedUser.lastName ? 
+                          `${selectedUser.first_name || selectedUser.firstName || ''} ${selectedUser.last_name || selectedUser.lastName || ''}`.trim() : 
+                          selectedUser.username}
                       </h3>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-1">Athlete Profile</p>
                     </div>

@@ -71,8 +71,8 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
     }
     setFormData({
       ...user,
-      first_name: user.first_name || "",
-      last_name: user.last_name || "",
+      firstName: user.firstName || user.first_name || "",
+      lastName: user.lastName || user.last_name || "",
       username: user.username || ""
     });
   }, [user, initialTab]);
@@ -80,8 +80,8 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [formData, setFormData] = useState({ 
     ...user,
-    first_name: user.first_name || "",
-    last_name: user.last_name || "",
+    firstName: user.firstName || user.first_name || "",
+    lastName: user.lastName || user.last_name || "",
     username: user.username || ""
   });
   const [success, setSuccess] = useState("");
@@ -455,7 +455,9 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
           <h2 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter mb-2">{user.username}</h2>
           <div className="flex items-center justify-center gap-2 mb-2">
             <p className="text-white/60 font-bold uppercase tracking-widest text-xs md:text-sm italic">
-              {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : 'Name Not Set'}
+              {user.firstName || user.lastName || user.first_name || user.last_name ? 
+                `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
+                'Name Not Set'}
             </p>
           </div>
           <p className="text-gold font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-6 md:mb-8 italic">Elite Member</p>

@@ -512,7 +512,13 @@ async function startServer() {
         uid
       );
 
-      res.json({ id: uid, sqliteId: result.lastInsertRowid, ...userData });
+      res.json({ 
+        id: uid, 
+        sqliteId: result.lastInsertRowid, 
+        ...userData,
+        first_name: userData.firstName,
+        last_name: userData.lastName
+      });
     } catch (err) {
       console.error("Registration sync error:", err);
       res.status(500).json({ error: "Registration sync failed" });
@@ -529,7 +535,15 @@ async function startServer() {
         const data = doc.data();
         // Also get SQLite ID if needed
         const sqliteUser = db.prepare('SELECT id FROM users WHERE uid = ? OR email = ?').get(id, data?.email);
-        return res.json({ id, sqliteId: sqliteUser?.id, ...data });
+        return res.json({ 
+          id, 
+          sqliteId: sqliteUser?.id, 
+          ...data,
+          first_name: data?.firstName || data?.first_name,
+          last_name: data?.lastName || data?.last_name,
+          firstName: data?.firstName || data?.first_name,
+          lastName: data?.lastName || data?.last_name
+        });
       }
 
       // Fallback to SQLite
@@ -542,8 +556,11 @@ async function startServer() {
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
+          first_name: user.first_name,
+          last_name: user.last_name,
           role: user.role,
-          avatarUrl: user.avatar_url
+          avatarUrl: user.avatar_url,
+          avatar_url: user.avatar_url
         });
       }
 

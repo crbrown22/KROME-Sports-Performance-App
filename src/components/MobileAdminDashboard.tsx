@@ -74,7 +74,9 @@ export default function MobileAdminDashboard({ user, onLogout, onBack, onNavigat
           <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">{user.username}</h2>
           <div className="flex items-center justify-center gap-2 mb-2">
             <p className="text-white/60 font-bold uppercase tracking-widest text-sm italic">
-              {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : 'Name Not Set'}
+              {user.firstName || user.lastName || user.first_name || user.last_name ? 
+                `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
+                'Name Not Set'}
             </p>
           </div>
           <p className="text-gold font-bold uppercase tracking-widest text-[10px] mb-8 italic">KROME ADMIN</p>
