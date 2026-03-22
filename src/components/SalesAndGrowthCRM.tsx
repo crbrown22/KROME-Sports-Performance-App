@@ -79,6 +79,7 @@ export default function SalesAndGrowthCRM() {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'kpis'>('kpis');
   const [users, setUsers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [growthKPIs, setGrowthKPIs] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     name: '',
@@ -94,22 +95,39 @@ export default function SalesAndGrowthCRM() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [leadsRes, usersRes, purchasesRes] = await Promise.all([
+        const [leadsRes, usersRes, purchasesRes, growthRes] = await Promise.all([
           fetch('/api/leads'),
           fetch('/api/users'),
-          fetch('/api/purchases')
+          fetch('/api/purchases'),
+          fetch('/api/admin/growth-kpis')
         ]);
         
         if (leadsRes.ok) setLeads(await leadsRes.json());
         if (usersRes.ok) setUsers(await usersRes.json());
         if (purchasesRes.ok) setPurchases(await purchasesRes.json());
+        if (growthRes.ok) setGrowthKPIs(await growthRes.json());
         setLoading(false);
       } catch (err) {
         console.error("Failed to fetch data", err);
         setLoading(false);
       }
     };
+
     fetchData();
+
+    // Real-time updates every 30 seconds
+    const interval = setInterval(async () => {
+      try {
+        const growthRes = await fetch('/api/admin/growth-kpis');
+        if (growthRes.ok) {
+          setGrowthKPIs(await growthRes.json());
+        }
+      } catch (err) {
+        console.error("Failed to refresh growth KPIs", err);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleAddLead = async () => {
@@ -253,16 +271,41 @@ export default function SalesAndGrowthCRM() {
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { label: 'Total Revenue', value: `$${kpis.totalRevenue.toLocaleString()}`, icon: DollarSign },
-              { label: 'Monthly Recurring Revenue', value: `$${kpis.mrr.toLocaleString()}`, icon: TrendingUp },
-              { label: 'Lifetime Value (LTV)', value: `$${kpis.ltv.toLocaleString()}`, icon: Target },
-              { label: 'Active Users', value: kpis.activeUsers.toString(), icon: Users },
+              { 
+                label: 'Total Revenue', 
+                value: `$${(growthKPIs?.totalRevenue || kpis.totalRevenue).toLocaleString()}`, 
+                icon: DollarSign,
+                growth: growthKPIs?.revenueGrowth
+              },
+              { 
+                label: 'Monthly Revenue', 
+                value: `$${(growthKPIs?.mrr || kpis.mrr).toLocaleString()}`, 
+                icon: TrendingUp,
+                growth: growthKPIs?.revenueGrowth // Using same growth for now as it's month-over-month
+              },
+              { 
+                label: 'Lifetime Value (LTV)', 
+                value: `$${(growthKPIs?.ltv || kpis.ltv).toLocaleString()}`, 
+                icon: Target 
+              },
+              { 
+                label: 'Active Users', 
+                value: (growthKPIs?.totalUsers || kpis.activeUsers).toString(), 
+                icon: Users,
+                growth: growthKPIs?.userGrowth
+              },
             ].map((kpi, i) => (
               <div key={i} className="bg-zinc-900 border border-white/10 p-6 rounded-3xl">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-white/5 rounded-2xl">
                     <kpi.icon className="w-6 h-6 text-gold" />
                   </div>
+                  {kpi.growth !== undefined && (
+                    <div className={`flex items-center gap-1 text-xs font-bold ${kpi.growth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {kpi.growth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                      {Math.abs(kpi.growth)}%
+                    </div>
+                  )}
                 </div>
                 <div className="text-3xl font-black italic">{kpi.value}</div>
                 <div className="text-xs font-bold uppercase tracking-widest text-white/60 mt-1">{kpi.label}</div>
@@ -272,12 +315,30 @@ export default function SalesAndGrowthCRM() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: 'Lead Conversion Rate', value: `${kpis.leadsPercentage}%` },
-              { label: 'Consultation Rate', value: `${kpis.consultationsPercentage}%` },
-              { label: 'Close Rate', value: `${kpis.closedWonPercentage}%` },
+              { 
+                label: 'Lead Conversion Rate', 
+                value: `${growthKPIs?.conversionRate || kpis.leadsPercentage}%`,
+                growth: growthKPIs?.leadGrowth
+              },
+              { 
+                label: 'Consultation Rate', 
+                value: `${growthKPIs?.consultationRate || kpis.consultationsPercentage}%` 
+              },
+              { 
+                label: 'Close Rate', 
+                value: `${growthKPIs?.conversionRate || kpis.closedWonPercentage}%` 
+              },
             ].map((kpi, i) => (
               <div key={i} className="bg-zinc-900 border border-white/10 p-6 rounded-3xl">
-                <div className="text-sm font-bold uppercase tracking-widest text-white/60 mb-2">{kpi.label}</div>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="text-sm font-bold uppercase tracking-widest text-white/60">{kpi.label}</div>
+                  {kpi.growth !== undefined && (
+                    <div className={`flex items-center gap-1 text-xs font-bold ${kpi.growth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {kpi.growth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                      {Math.abs(kpi.growth)}%
+                    </div>
+                  )}
+                </div>
                 <div className="text-4xl font-black italic text-gold">{kpi.value}</div>
               </div>
             ))}

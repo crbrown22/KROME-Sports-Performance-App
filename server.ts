@@ -673,6 +673,92 @@ async function startServer() {
     }
   });
 
+  // Admin: Get Real-time Growth KPIs
+  app.get("/api/admin/growth-kpis", (req, res) => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      
+      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonth = prevMonthDate.getMonth() + 1;
+      const prevYear = prevMonthDate.getFullYear();
+
+      const formatMonth = (m: number) => m.toString().padStart(2, '0');
+
+      // 1. Revenue Metrics
+      const totalRevenue = db.prepare('SELECT SUM(price) as total FROM purchases').get() as { total: number };
+      const currentMonthRevenue = db.prepare(`
+        SELECT SUM(price) as total FROM purchases 
+        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(currentMonth), currentYear.toString()) as { total: number };
+      
+      const prevMonthRevenue = db.prepare(`
+        SELECT SUM(price) as total FROM purchases 
+        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(prevMonth), prevYear.toString()) as { total: number };
+
+      // 2. User Metrics
+      const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'athlete'").get() as { count: number };
+      const currentMonthUsers = db.prepare(`
+        SELECT COUNT(*) as count FROM users 
+        WHERE role = 'athlete' AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(currentMonth), currentYear.toString()) as { count: number };
+      
+      const prevMonthUsers = db.prepare(`
+        SELECT COUNT(*) as count FROM users 
+        WHERE role = 'athlete' AND strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(prevMonth), prevYear.toString()) as { count: number };
+
+      // 3. Lead Metrics
+      const totalLeads = db.prepare('SELECT COUNT(*) as count FROM leads').get() as { count: number };
+      const currentMonthLeads = db.prepare(`
+        SELECT COUNT(*) as count FROM leads 
+        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(currentMonth), currentYear.toString()) as { count: number };
+      
+      const prevMonthLeads = db.prepare(`
+        SELECT COUNT(*) as count FROM leads 
+        WHERE strftime('%m', created_at) = ? AND strftime('%Y', created_at) = ?
+      `).get(formatMonth(prevMonth), prevYear.toString()) as { count: number };
+
+      // 4. Conversion Metrics
+      const closedWonLeads = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'Closed Won'").get() as { count: number };
+      const consultations = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status IN ('Consultation Scheduled', 'Consultation Completed', 'Closed Won')").get() as { count: number };
+
+      // Calculate Percentages
+      const calculateGrowth = (current: number, previous: number) => {
+        if (!previous || previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+      };
+
+      const revenueGrowth = calculateGrowth(currentMonthRevenue.total || 0, prevMonthRevenue.total || 0);
+      const userGrowth = calculateGrowth(currentMonthUsers.count || 0, prevMonthUsers.count || 0);
+      const leadGrowth = calculateGrowth(currentMonthLeads.count || 0, prevMonthLeads.count || 0);
+
+      const mrr = currentMonthRevenue.total || 0;
+      const ltv = totalUsers.count > 0 ? (totalRevenue.total || 0) / totalUsers.count : 0;
+
+      res.json({
+        totalRevenue: totalRevenue.total || 0,
+        mrr,
+        ltv,
+        totalUsers: totalUsers.count,
+        totalLeads: totalLeads.count,
+        closedWon: closedWonLeads.count,
+        consultations: consultations.count,
+        revenueGrowth: Number(revenueGrowth.toFixed(1)),
+        userGrowth: Number(userGrowth.toFixed(1)),
+        leadGrowth: Number(leadGrowth.toFixed(1)),
+        conversionRate: totalLeads.count > 0 ? Number(((closedWonLeads.count / totalLeads.count) * 100).toFixed(1)) : 0,
+        consultationRate: totalLeads.count > 0 ? Number(((consultations.count / totalLeads.count) * 100).toFixed(1)) : 0
+      });
+    } catch (err) {
+      console.error("Error calculating growth KPIs:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // User: Update profile
   app.patch("/api/users/:id", (req, res) => {
     const { id } = req.params;
