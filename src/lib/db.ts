@@ -26,6 +26,7 @@ try {
     role TEXT DEFAULT 'athlete',
     status TEXT DEFAULT 'active',
     parq_completed INTEGER DEFAULT 0,
+    fitness_goal TEXT,
     email_notifications INTEGER DEFAULT 1,
     push_notifications INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -256,6 +257,14 @@ try {
 } catch (err) {
   console.log('Adding uid column to users table...');
   db.exec('ALTER TABLE users ADD COLUMN uid TEXT');
+}
+
+// Migration: Add fitness_goal column if it doesn't exist
+try {
+  db.prepare('SELECT fitness_goal FROM users LIMIT 1').get();
+} catch (err) {
+  console.log('Adding fitness_goal column to users table...');
+  db.exec('ALTER TABLE users ADD COLUMN fitness_goal TEXT');
 }
 
 // Migration: Add avatar_url column if it doesn't exist

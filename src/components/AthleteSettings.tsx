@@ -13,7 +13,8 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
     firstName: user.firstName || "",
     lastName: user.lastName || "",
     email: user.email || "",
-    username: user.username || ""
+    username: user.username || "",
+    fitness_goal: user.fitness_goal || ""
   });
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
 
@@ -96,6 +97,22 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Email Address</label>
               <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors" />
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Fitness Goal</label>
+              <select 
+                value={formData.fitness_goal} 
+                onChange={e => setFormData({...formData, fitness_goal: e.target.value})} 
+                className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:border-gold outline-none transition-colors"
+              >
+                <option value="">Not Set</option>
+                <option value="build-muscle">Build Muscle</option>
+                <option value="increase-strength">Increase Strength</option>
+                <option value="speed-agility">Speed & Agility</option>
+                <option value="fat-loss">Fat Loss</option>
+                <option value="mobility-health">Mobility & Health</option>
+                <option value="sport-specific">Sport Specific</option>
+              </select>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -108,6 +125,10 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Email Address</p>
               <p className="text-lg font-bold uppercase italic">{user.email}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Fitness Goal</p>
+              <p className="text-lg font-bold uppercase italic text-gold">{user.fitness_goal?.replace('-', ' ') || 'Not Set'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Username</p>

@@ -26,7 +26,9 @@ import {
   Wheat,
   Droplets,
   Dumbbell,
-  Video
+  Video,
+  Target,
+  Lock
 } from "lucide-react";
 import ProgressTracker from "./ProgressTracker";
 import BodyMetrics from "./BodyMetrics";
@@ -102,7 +104,7 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
         const res = await fetch(`/api/purchases/${user.id}`);
         if (res.ok) {
           const data = await res.json();
-          setPurchasedPrograms(data.map((p: any) => p.item_name));
+          setPurchasedPrograms(data.map((p: any) => p.program_id || p.item_name));
         }
       } catch (err) {
         console.error("Failed to fetch purchases", err);
@@ -460,9 +462,25 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
                 'Name Not Set'}
             </p>
           </div>
-          <p className="text-gold font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-6 md:mb-8 italic">Elite Member</p>
+          <p className="text-gold font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2 italic">Elite Member</p>
+          
+          {user.fitness_goal && (
+            <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-gold/10 border border-gold/20 rounded-full">
+              <Target className="w-3 h-3 text-gold" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-gold">
+                Goal: {user.fitness_goal.replace('-', ' ')}
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3" role="tablist" aria-label="Profile sections">
+            <button 
+              onClick={() => onNavigate('myPrograms')}
+              disabled={user.parq_completed === 0}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-gold/10 text-gold border border-gold/20 hover:bg-gold/20 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+            >
+              <Lock className="w-4 h-4" aria-hidden="true" /> My Purchased Programs
+            </button>
             <button 
               onClick={() => {
                 if (onProgramSelect) {
@@ -554,6 +572,12 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
               </button>
             )}
             <button 
+              onClick={() => onNavigate('fitnessGoal')}
+              className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline"
+            >
+              <Target className="w-4 h-4" aria-hidden="true" /> Update Fitness Goal
+            </button>
+            <button 
               onClick={() => onNavigate('accountSettings')}
               className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
             >
@@ -565,6 +589,40 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
             >
               <LogOut className="w-4 h-4" aria-hidden="true" /> Logout
             </button>
+          </div>
+
+          <div className="mt-12 text-left">
+            <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-gold" /> Purchased Content
+            </h3>
+            {purchasedPrograms.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4">
+                {purchasedPrograms.map((prog, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center justify-between group hover:border-gold/30 transition-all">
+                    <div>
+                      <div className="text-[10px] font-bold text-gold uppercase tracking-widest mb-1">Active Program</div>
+                      <div className="text-sm font-black uppercase italic">{prog.replace(/-/g, ' ')}</div>
+                    </div>
+                    <button 
+                      onClick={() => onNavigate('myPrograms')}
+                      className="p-2 rounded-xl bg-white/5 group-hover:bg-gold group-hover:text-black transition-all"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white/5 border border-white/5 p-8 rounded-[32px] text-center">
+                <p className="text-white/30 text-xs font-bold uppercase tracking-widest mb-6">No purchased programs yet</p>
+                <button 
+                  onClick={() => onNavigate('shop')}
+                  className="btn-outline-accent !py-2 !text-[10px]"
+                >
+                  Visit Shop
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

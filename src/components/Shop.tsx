@@ -16,9 +16,9 @@ const Shop = (props: ShopProps) => {
   const [category, setCategory] = useState(initialCategory);
 
   const programs = [
-    { title: '52 Week Online Training Program', price: '$6000.00', img: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop' },
-    { title: '16 Week Online Training Program', price: '$3000.00', img: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=800&auto=format&fit=crop' },
-    { title: '8 Week Online Training Program', price: '$1500.00', img: 'https://images.unsplash.com/photo-1594882645126-14020914d58d?q=80&w=800&auto=format&fit=crop' },
+    { id: 'soccer-52-week', title: '52 Week Online Training Program', price: '$6000.00', img: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop' },
+    { id: '16-week-program', title: '16 Week Online Training Program', price: '$3000.00', img: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=800&auto=format&fit=crop' },
+    { id: '8-week-program', title: '8 Week Online Training Program', price: '$1500.00', img: 'https://images.unsplash.com/photo-1594882645126-14020914d58d?q=80&w=800&auto=format&fit=crop' },
   ];
 
   const personalTraining = [
@@ -28,9 +28,9 @@ const Shop = (props: ShopProps) => {
   ];
 
   const mobility = [
-    { title: '52 Week Flexibility & Mobility Online Program', price: '$299.00', img: 'https://images.unsplash.com/photo-1599058917212-d750089bc07e?q=80&w=800&auto=format&fit=crop' },
-    { title: '16 Week Flexibility & Mobility Online Program', price: '$2500.00', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop' },
-    { title: '8 Week Flexibility & Mobility Online Program', price: '$1500.00', img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=800&auto=format&fit=crop' },
+    { id: 'lower-back-rehab', title: '52 Week Flexibility & Mobility Online Program', price: '$299.00', img: 'https://images.unsplash.com/photo-1599058917212-d750089bc07e?q=80&w=800&auto=format&fit=crop' },
+    { id: '16-week-mobility', title: '16 Week Flexibility & Mobility Online Program', price: '$2500.00', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop' },
+    { id: '8-week-mobility', title: '8 Week Flexibility & Mobility Online Program', price: '$1500.00', img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=800&auto=format&fit=crop' },
   ];
 
   const nutrition = [
@@ -61,13 +61,14 @@ const Shop = (props: ShopProps) => {
         body: JSON.stringify({
           userId,
           itemName: item.title,
-          price: item.price ? parseFloat(item.price.replace('$', '')) : 0,
+          price: item.price ? parseFloat(item.price.replace('$', '').replace(',', '')) : 0,
+          programId: item.id
         })
       });
       
       const data = await response.json();
       if (data.url) {
-        window.open(data.url, '_blank');
+        window.location.href = data.url;
       } else {
         console.error('Failed to create checkout session:', data);
         alert(`Checkout failed: ${data.error || 'Unknown error'}`);

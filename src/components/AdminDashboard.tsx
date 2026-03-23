@@ -71,6 +71,7 @@ interface UserRecord {
   lastName?: string;
   avatar_url?: string;
   avatarUrl?: string;
+  fitness_goal?: string;
   role: 'athlete' | 'coach' | 'admin';
   status: 'active' | 'inactive' | 'pending';
   created_at: string;
@@ -778,6 +779,7 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                   <tr className="border-b border-white/5 bg-white/5">
                     <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Athlete</th>
                     <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Email</th>
+                    <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Goal</th>
                     <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Role</th>
                     <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Status</th>
                     <th className="p-6 text-[10px] font-black uppercase tracking-widest text-white/60">Joined</th>
@@ -826,6 +828,11 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                       </div>
                     </td>
                     <td className="p-6 text-sm text-white/70">{user.email}</td>
+                    <td className="p-6">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gold italic">
+                        {user.fitness_goal?.replace('-', ' ') || 'Not Set'}
+                      </span>
+                    </td>
                     <td className="p-6">
                       <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         user.role === 'admin' ? 'bg-gold/10 text-gold border border-gold/20' : 
@@ -954,6 +961,13 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
                         selectedUser.username}
                     </h3>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-1">Athlete Profile</p>
+                    {selectedUser.fitness_goal && (
+                      <div className="mt-4 px-4 py-2 bg-gold/10 border border-gold/20 rounded-full">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gold text-center">
+                          Goal: {selectedUser.fitness_goal.replace('-', ' ')}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">

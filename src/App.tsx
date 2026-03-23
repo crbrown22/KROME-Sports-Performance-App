@@ -52,6 +52,7 @@ import ProgressTracker from "./components/ProgressTracker";
 import NutritionDashboard from "./components/NutritionDashboard";
 import BodyCompositionTracker from "./components/BodyCompositionTracker";
 import BodyMetrics from "./components/BodyMetrics";
+import FitnessGoalOnboarding from "./components/FitnessGoalOnboarding";
 import { BodyMetricsData, INITIAL_DATA } from "./types";
 import VideoAnalyzer from "./components/VideoAnalyzer";
 import PARQ from "./components/PARQ";
@@ -99,7 +100,7 @@ const programs = [
   }
 ];
 
-type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'myPrograms' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings';
+type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'myPrograms' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings' | 'fitnessGoal';
 
 const programPrices: Record<string, number> = {
   'soccer-52-week': 99.99,
@@ -282,8 +283,12 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (user && user.parq_completed == 0 && currentView !== 'parq' && currentView !== 'profile') {
-      resetToView('profile');
+    if (user && user.role !== 'admin') {
+      if (!user.fitness_goal && currentView !== 'fitnessGoal') {
+        navigateTo('fitnessGoal');
+      } else if (user.parq_completed == 0 && currentView !== 'parq' && currentView !== 'profile' && user.fitness_goal) {
+        resetToView('profile');
+      }
     }
   }, [user, currentView]);
 
@@ -1020,6 +1025,22 @@ export default function App() {
           />
         )}
 
+        {currentView === 'fitnessGoal' && user && (
+          <FitnessGoalOnboarding 
+            user={user}
+            onComplete={(goal) => {
+              const updatedUser = { ...user, fitness_goal: goal };
+              setUser(updatedUser);
+              safeStorage.setItem('krome_user', JSON.stringify(updatedUser));
+              if (updatedUser.parq_completed === 0) {
+                resetToView('profile');
+              } else {
+                resetToView('home');
+              }
+            }}
+          />
+        )}
+
         {currentView === 'auth' && (
           <Auth 
             key="auth" 
@@ -1534,11 +1555,12 @@ export default function App() {
                     userId: user?.id,
                     itemName: selectedProgram.name,
                     price: programPrices[selectedProgram.id] || 0,
+                    programId: selectedProgram.id
                   })
                 });
                 const data = await response.json();
                 if (data.url) {
-                  window.open(data.url, '_blank');
+                  window.location.href = data.url;
                 } else {
                   alert('Failed to initiate purchase.');
                 }

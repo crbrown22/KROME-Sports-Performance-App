@@ -175,32 +175,41 @@ async function startServer() {
   app.post('/api/webhook', async (req, res) => {
     try {
       const event = req.body;
+      console.log('Square Webhook Event:', event.type, event.data?.id);
       
-      if (event.type === 'payment.created') {
+      if (event.type === 'payment.created' || event.type === 'payment.updated') {
         const payment = event.data.object.payment;
-        const orderId = payment.order_id;
         
-        if (orderId) {
-          const square = getSquare();
-          const response = await square.orders.get({ orderId });
-          const order = response.order;
+        if (payment.status === 'COMPLETED') {
+          const orderId = payment.order_id;
           
-          if (order && order.metadata) {
-            const userId = order.metadata.userId;
-            const itemName = order.metadata.itemName || 'Unknown Item';
-            const price = payment.amount_money?.amount ? Number(payment.amount_money.amount) / 100 : 0;
+          if (orderId) {
+            const square = getSquare();
+            const response = await square.orders.get({ orderId });
+            const order = response.order;
+            
+            if (order && order.metadata) {
+              const userId = order.metadata.userId;
+              const itemName = order.metadata.itemName || 'Unknown Item';
+              const price = payment.amount_money?.amount ? Number(payment.amount_money.amount) / 100 : 0;
 
-            if (userId) {
-              const programId = order.metadata.programId;
-              const sqliteId = resolveUserId(userId);
-              db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(sqliteId, itemName, price, orderId, programId);
-              
-              // Send notification
-              sendNotification(Number(userId), 'Purchase Confirmed', `Thank you for purchasing ${itemName}! Your program is now available in your profile.`, '/profile');
+              if (userId) {
+                const programId = order.metadata.programId;
+                const sqliteId = resolveUserId(userId);
+                
+                // Check if purchase already exists to avoid duplicates
+                const existing = db.prepare('SELECT id FROM purchases WHERE square_order_id = ?').get(orderId);
+                if (!existing) {
+                  db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(sqliteId, itemName, price, orderId, programId);
+                  
+                  // Send notification
+                  sendNotification(Number(sqliteId), 'Purchase Confirmed', `Thank you for purchasing ${itemName}! Your program is now available in your profile.`, '/profile');
 
-              // Auto-update user role if they bought a program
-              if (itemName.toLowerCase().includes('program') || itemName.toLowerCase().includes('plan')) {
-                db.prepare('UPDATE users SET role = ? WHERE id = ? AND role = ?').run('athlete', userId, 'athlete');
+                  // Auto-update user role if they bought a program
+                  if (itemName.toLowerCase().includes('program') || itemName.toLowerCase().includes('plan')) {
+                    db.prepare('UPDATE users SET role = ? WHERE id = ? AND role = ?').run('athlete', sqliteId, 'athlete');
+                  }
+                }
               }
             }
           }
@@ -491,7 +500,7 @@ async function startServer() {
         firstName: finalFirstName,
         lastName: finalLastName,
         username: username || email.split('@')[0],
-        role: email === 'swolecode@gmail.com' ? 'admin' : (role === 'user' ? 'athlete' : (role || 'athlete')),
+        role: (email === 'swolecode@gmail.com' || email === 'kromefitness@gmail.com') ? 'admin' : (role === 'user' ? 'athlete' : (role || 'athlete')),
         createdAt: new Date().toISOString()
       };
       await adminDb.collection('users').doc(uid).set(userData);
@@ -852,7 +861,7 @@ async function startServer() {
   // User: Update profile
   app.patch("/api/users/:id", async (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, email, avatar_url, firstName, lastName, avatarUrl, role, status, username } = req.body;
+    const { first_name, last_name, email, avatar_url, firstName, lastName, avatarUrl, role, status, username, fitness_goal } = req.body;
     try {
       const finalFirstName = first_name !== undefined ? first_name : firstName;
       const finalLastName = last_name !== undefined ? last_name : lastName;
@@ -869,6 +878,7 @@ async function startServer() {
       if (finalAvatarUrl !== undefined) { fields.push('avatar_url = ?'); params.push(finalAvatarUrl); }
       if (role !== undefined) { fields.push('role = ?'); params.push(role); }
       if (status !== undefined) { fields.push('status = ?'); params.push(status); }
+      if (fitness_goal !== undefined) { fields.push('fitness_goal = ?'); params.push(fitness_goal); }
       
       if (fields.length > 0) {
         params.push(id, id); // For uid = ? OR id = ?
@@ -892,6 +902,7 @@ async function startServer() {
         if (finalAvatarUrl !== undefined) firestoreUpdate.avatarUrl = finalAvatarUrl;
         if (role !== undefined) firestoreUpdate.role = role;
         if (status !== undefined) firestoreUpdate.status = status;
+        if (fitness_goal !== undefined) firestoreUpdate.fitnessGoal = fitness_goal;
 
         if (Object.keys(firestoreUpdate).length > 0) {
           await adminDb.collection('users').doc(uid).update(firestoreUpdate);
