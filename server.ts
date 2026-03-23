@@ -171,10 +171,82 @@ async function startServer() {
   // Serve uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-  // Square Webhook
-  app.post('/api/webhook', async (req, res) => {
-    try {
-      const event = req.body;
+  // Email Transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_PORT === '465',
+  requireTLS: true,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Helper for sending welcome email
+async function sendWelcomeEmail(email: string, firstName: string) {
+  const appUrl = process.env.APP_URL || 'https://krome-fitness.com';
+  
+  try {
+    await transporter.sendMail({
+      from: '"KROME Sports Performance" <kromefitness@gmail.com>',
+      to: email,
+      subject: 'Welcome to KROME Sports Performance!',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background-color: #000; color: #fff; padding: 40px; border-radius: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-block; width: 60px; height: 60px; background: linear-gradient(135deg, #D4AF37 0%, #F5E050 100%); border-radius: 15px; line-height: 60px; font-size: 30px; font-weight: 900; color: #000; font-style: italic;">K</div>
+            <h1 style="text-transform: uppercase; font-style: italic; letter-spacing: -1px; margin-top: 20px;">Welcome to the Nation</h1>
+          </div>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #ccc;">Hello ${firstName},</p>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #ccc;">Welcome to <strong>KROME Sports Performance</strong>! We're excited to help you reach your peak performance. Your account has been successfully created and you're now part of an elite community of athletes.</p>
+          
+          <div style="background-color: #111; border: 1px solid #333; padding: 25px; border-radius: 15px; margin: 30px 0;">
+            <h3 style="color: #D4AF37; text-transform: uppercase; margin-top: 0;">Your Onboarding Checklist:</h3>
+            <ul style="padding-left: 20px; color: #ccc;">
+              <li style="margin-bottom: 10px;"><strong>Complete your PAR-Q:</strong> Ensure you're cleared for high-intensity training.</li>
+              <li style="margin-bottom: 10px;"><strong>Set your Fitness Goals:</strong> Tell us what you want to achieve so we can tailor your experience.</li>
+              <li style="margin-bottom: 10px;"><strong>Browse the Catalog:</strong> Explore our 52-week programs and specialized training.</li>
+              <li style="margin-bottom: 10px;"><strong>Start Training:</strong> Log your first workout and begin tracking your progress.</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 40px 0;">
+            <a href="${appUrl}" style="background-color: #D4AF37; color: #000; padding: 15px 35px; text-decoration: none; border-radius: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Access Your Dashboard</a>
+          </div>
+          
+          <p style="font-size: 14px; color: #666; text-align: center; margin-top: 50px; border-top: 1px solid #222; padding-top: 20px;">
+            &copy; ${new Date().getFullYear()} KROME Sports Performance. All rights reserved.<br>
+            Fueling the next generation of elite athletes.
+          </p>
+        </div>
+      `,
+      text: `Hello ${firstName},\n\nWelcome to KROME Sports Performance! We're excited to have you on board. Your account has been successfully created.\n\nYour Onboarding Checklist:\n1. Complete your PAR-Q\n2. Set your Fitness Goals\n3. Browse the Catalog\n4. Start Training\n\nAccess your dashboard here: ${appUrl}\n\nBest regards,\nThe KROME Team`,
+    });
+  } catch (error) {
+    console.error('Error sending welcome email:', error);
+  }
+}
+
+// Helper for sending admin notification
+async function sendAdminRegistrationNotification(userData: any) {
+  try {
+    await transporter.sendMail({
+      from: '"KROME System" <kromefitness@gmail.com>',
+      to: 'kromefitness@gmail.com', // Admin email
+      subject: 'New Athlete Registered',
+      text: `A new athlete has registered:\n\nName: ${userData.firstName} ${userData.lastName}\nEmail: ${userData.email}\nUsername: ${userData.username}\nRole: ${userData.role}\n\nCheck the admin dashboard for more details.`,
+    });
+  } catch (error) {
+    console.error('Error sending admin notification:', error);
+  }
+}
+// Square Webhook
+app.post('/api/webhook', async (req, res) => {
+  try {
+    const event = req.body;
       console.log('Square Webhook Event:', event.type, event.data?.id);
       
       if (event.type === 'payment.created' || event.type === 'payment.updated') {
@@ -526,31 +598,8 @@ async function startServer() {
 
       // 3. Send Welcome Email to Athlete
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_PORT === '465',
-          requireTLS: true,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        await transporter.sendMail({
-          from: '"KROME Sports Performance" <kromefitness@gmail.com>',
-          to: email,
-          subject: 'Welcome to KROME Sports Performance!',
-          text: `Hello ${finalFirstName},\n\nWelcome to KROME Sports Performance! We're excited to have you on board. Your account has been successfully created.\n\nYou can now log in and start tracking your progress, workouts, and nutrition.\n\nBest regards,\nThe KROME Team`,
-        });
-
-        // 4. Send Notification Email to Admin
-        await transporter.sendMail({
-          from: '"KROME System" <kromefitness@gmail.com>',
-          to: 'kromefitness@gmail.com', // Admin email
-          subject: 'New Athlete Registered',
-          text: `A new athlete has registered:\n\nName: ${finalFirstName} ${finalLastName}\nEmail: ${email}\nUsername: ${userData.username}\nRole: ${userData.role}\n\nCheck the admin dashboard for more details.`,
-        });
+        await sendWelcomeEmail(email, finalFirstName);
+        await sendAdminRegistrationNotification(userData);
       } catch (emailErr) {
         console.error("Error sending registration emails:", emailErr);
         // Don't fail registration if emails fail
