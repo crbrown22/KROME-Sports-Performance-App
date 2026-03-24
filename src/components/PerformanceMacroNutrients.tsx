@@ -2,7 +2,7 @@ import { safeStorage } from '../utils/storage';
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentDate } from '../utils/date';
-import { ChevronLeft, Search, Plus, Trash2, PieChart, Activity, Flame, Droplets, Wheat, Beef, Calendar, ChevronRight, Sparkles, Loader2, X } from "lucide-react";
+import { ChevronLeft, Search, Plus, Trash2, PieChart, Activity, Flame, Droplets, Wheat, Beef, Calendar, ChevronRight, Sparkles, Loader2, X, ShieldCheck } from "lucide-react";
 import { foodDatabase, FoodItem, LoggedFood } from "../data/nutritionData";
 import { recipes, Recipe } from "../data/recipeData";
 import { calculateNutritionRecommendations } from "../utils/nutrition";
@@ -20,6 +20,16 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]); // State for user-saved recipes
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isEditingTargets, setIsEditingTargets] = useState(false);
+  
+  const [targets, setTargets] = useState({
+    calories: 2500,
+    protein: 180,
+    carbs: 300,
+    fat: 80
+  });
+
+  const [tempTargets, setTempTargets] = useState(targets);
   
   // AI Analysis State
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
@@ -32,15 +42,6 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [selectedMeal, setSelectedMeal] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>('Breakfast');
   
-  const [targets, setTargets] = useState({
-    calories: 2500,
-    protein: 180,
-    carbs: 300,
-    fat: 80
-  });
-
-  // ... (rest of the component)
-
   const handleAnalyzeNutrition = async () => {
     if (dailyLog.length === 0) return;
     
@@ -351,6 +352,39 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
     setTimeout(() => setIsSaved(false), 2000);
   };
 
+  const handleUpdateTargets = async () => {
+    setTargets(tempTargets);
+    if (userId !== 'guest') {
+      try {
+        // Fetch current metrics first to preserve other data
+        const res = await fetch(`/api/metrics/${userId}`);
+        let currentMetrics = {};
+        if (res.ok) {
+          currentMetrics = await res.json();
+        }
+
+        const updatedMetrics = {
+          ...currentMetrics,
+          recommendations: {
+            totalCalories: tempTargets.calories,
+            proteinGrams: tempTargets.protein,
+            carbsGrams: tempTargets.carbs,
+            fatGrams: tempTargets.fat
+          }
+        };
+
+        await fetch(`/api/metrics/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedMetrics)
+        });
+      } catch (error) {
+        console.error("Failed to update nutrition targets:", error);
+      }
+    }
+    setIsEditingTargets(false);
+  };
+
   const changeDate = (days: number) => {
     const [year, month, day] = selectedDate.split('-').map(Number);
     const date = new Date(year, month - 1, day + days);
@@ -461,22 +495,99 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
             </h1>
           </div>
           
-          {/* Date Selector */}
-          <div className="flex items-center gap-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-2">
-            <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-              <ChevronLeft className="w-5 h-5" />
+          <div className="flex flex-col items-end gap-4">
+            <button 
+              onClick={() => {
+                if (!isEditingTargets) setTempTargets(targets);
+                setIsEditingTargets(!isEditingTargets);
+              }}
+              className="btn-gold px-6 py-2 text-xs flex items-center gap-2"
+            >
+              <Activity className="w-4 h-4" /> {isEditingTargets ? 'Cancel Editing' : 'Adjust Macros'}
             </button>
-            <div className="flex items-center gap-2 px-2">
-              <Calendar className="w-4 h-4 text-gold" />
-              <span className="font-bold uppercase tracking-widest text-sm">
-                {displayDate()}
-              </span>
+
+            {/* Date Selector */}
+            <div className="flex items-center gap-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-2">
+              <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2 px-2">
+                <Calendar className="w-4 h-4 text-gold" />
+                <span className="font-bold uppercase tracking-widest text-sm">
+                  {displayDate()}
+                </span>
+              </div>
+              <button onClick={() => changeDate(1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
-            <button onClick={() => changeDate(1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </button>
           </div>
         </div>
+
+        {/* Editing Targets UI */}
+        {isEditingTargets && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-zinc-900/80 border border-gold/30 rounded-3xl"
+          >
+            <h3 className="text-lg font-black uppercase italic mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-gold" /> Adjust Daily Targets
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Calories (kcal)</label>
+                <input 
+                  type="number" 
+                  value={tempTargets.calories}
+                  onChange={(e) => setTempTargets({...tempTargets, calories: parseInt(e.target.value) || 0})}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Protein (g)</label>
+                <input 
+                  type="number" 
+                  value={tempTargets.protein}
+                  onChange={(e) => setTempTargets({...tempTargets, protein: parseInt(e.target.value) || 0})}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Carbs (g)</label>
+                <input 
+                  type="number" 
+                  value={tempTargets.carbs}
+                  onChange={(e) => setTempTargets({...tempTargets, carbs: parseInt(e.target.value) || 0})}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Fats (g)</label>
+                <input 
+                  type="number" 
+                  value={tempTargets.fat}
+                  onChange={(e) => setTempTargets({...tempTargets, fat: parseInt(e.target.value) || 0})}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setIsEditingTargets(false)}
+                className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdateTargets}
+                className="btn-gold px-8 py-2 text-xs flex items-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" /> Save Targets
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Dashboard */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">

@@ -516,11 +516,11 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
               <TrendingUp className="w-4 h-4" aria-hidden="true" /> Training Stats
             </button>
             <button 
-              onClick={() => onNavigate('nutritionDashboard')}
+              onClick={() => onNavigate('performanceMacroNutrients')}
               disabled={user.parq_completed === 0}
               className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
             >
-              <Apple className="w-4 h-4" aria-hidden="true" /> Nutrition
+              <Apple className="w-4 h-4" aria-hidden="true" /> Nutrition Tracker
             </button>
             <button 
               onClick={() => onNavigate('bodyComposition')}

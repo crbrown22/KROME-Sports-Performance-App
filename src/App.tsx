@@ -122,8 +122,12 @@ export default function App() {
   const [viewStack, setViewStack] = useState<View[]>(['home']);
   const currentView = viewStack[viewStack.length - 1];
 
-  const navigateTo = (view: View) => {
-    if (viewStack[viewStack.length - 1] === view) return;
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+
+  const navigateTo = (view: View, targetId?: string) => {
+    if (viewStack[viewStack.length - 1] === view && targetUserId === targetId) return;
+    if (targetId) setTargetUserId(targetId);
+    else setTargetUserId(null);
     setViewStack(prev => [...prev, view]);
   };
 
@@ -1153,7 +1157,7 @@ export default function App() {
               </button>
             </div>
             <NutritionDashboard 
-              user={user} 
+              user={targetUserId ? { ...user, id: targetUserId } : user} 
               onBack={goBack} 
               onLogout={handleLogout}
             />
@@ -1317,6 +1321,7 @@ export default function App() {
             adminId={user.id}
             user={user}
             onBack={goBack}
+            onNavigate={(view, targetId) => navigateTo(view as View, targetId)}
             initialTab={adminInitialTab}
             unreadSenderIds={unreadSenderIds}
           />
@@ -1474,7 +1479,7 @@ export default function App() {
           user ? (
             <PerformanceMacroNutrients 
               key="performanceMacroNutrients"
-              userId={user.id.toString()}
+              userId={targetUserId || user.id.toString()}
               onBack={goBack}
             />
           ) : (

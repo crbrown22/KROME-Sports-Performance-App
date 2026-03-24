@@ -82,11 +82,12 @@ interface AdminDashboardProps {
   adminId?: number;
   user: any;
   onBack: () => void;
+  onNavigate?: (view: string, targetUserId?: string) => void;
   initialTab?: 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand' | 'system';
   unreadSenderIds?: Set<number>;
 }
 
-export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, unreadSenderIds = new Set() }: AdminDashboardProps) {
+export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId = 1, user, unreadSenderIds = new Set() }: AdminDashboardProps) {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(() => {
@@ -1469,42 +1470,16 @@ export default function AdminDashboard({ onBack, initialTab, adminId = 1, user, 
 
                     <div className="flex justify-end">
                       <button 
-                        onClick={async () => {
-                          if (isEditingNutrition) {
-                            // Save changes
-                            try {
-                              await fetch(`/api/metrics/${selectedUser?.id}`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(bodyMetricsData)
-                              });
-                              
-                              await fetch('/api/activity', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  userId: selectedUser.id,
-                                  action: 'admin_updated_nutrition',
-                                  details: JSON.stringify({ message: 'Admin updated nutrition plan' })
-                                })
-                              });
-                            } catch (err) {
-                              showError("Failed to save nutrition changes");
-                            }
+                        onClick={() => {
+                          if (selectedUser && onNavigate) {
+                            onNavigate('performanceMacroNutrients', selectedUser.id.toString());
+                          } else {
+                            setIsEditingNutrition(!isEditingNutrition);
                           }
-                          setIsEditingNutrition(!isEditingNutrition);
                         }}
                         className="btn-gold px-6 py-2 text-xs flex items-center gap-2"
                       >
-                        {isEditingNutrition ? (
-                          <>
-                            <ShieldCheck className="w-4 h-4" /> Save Nutrition Plan
-                          </>
-                        ) : (
-                          <>
-                            <Apple className="w-4 h-4" /> Edit Nutrition Plan
-                          </>
-                        )}
+                        <Apple className="w-4 h-4" /> Edit Nutrition Plan
                       </button>
                     </div>
 
