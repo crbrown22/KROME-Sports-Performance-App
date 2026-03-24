@@ -166,6 +166,7 @@ try {
     preferred_times TEXT,
     preferred_days TEXT,
     positions TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
   );
@@ -323,6 +324,14 @@ try {
 } catch (err) {
   console.log('Adding program_id column to purchases table...');
   db.exec('ALTER TABLE purchases ADD COLUMN program_id TEXT');
+}
+
+// Migration: Add firestore_id column to leads table if it doesn't exist
+try {
+  db.prepare('SELECT firestore_id FROM leads LIMIT 1').get();
+} catch (err) {
+  console.log('Adding firestore_id column to leads table...');
+  db.exec('ALTER TABLE leads ADD COLUMN firestore_id TEXT');
 }
 
 // Create a default admin if none exists

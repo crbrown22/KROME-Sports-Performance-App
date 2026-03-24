@@ -127,8 +127,196 @@ async function sendNotification(userId: number, title: string, body: string, url
   }
 }
 
+// Rehydrate SQLite from Firestore on startup
+async function rehydrateDatabase() {
+  console.log("[Rehydrate] Starting database re-hydration from Firestore...");
+  try {
+    // 1. Rehydrate Users
+    const usersSnapshot = await adminDb.collection('users').get();
+    console.log(`[Rehydrate] Found ${usersSnapshot.size} users in Firestore.`);
+    for (const doc of usersSnapshot.docs) {
+      const data = doc.data();
+      db.prepare(`
+        INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET 
+          username=excluded.username,
+          first_name=excluded.first_name,
+          last_name=excluded.last_name,
+          role=excluded.role,
+          uid=excluded.uid,
+          status=excluded.status,
+          fitness_goal=excluded.fitness_goal,
+          avatar_url=excluded.avatar_url,
+          parq_completed=excluded.parq_completed,
+          email_notifications=excluded.email_notifications,
+          push_notifications=excluded.push_notifications
+      `).run(
+        data.username || data.name || data.email,
+        data.email,
+        data.firstName || data.first_name || "",
+        data.lastName || data.last_name || "",
+        data.role || 'athlete',
+        doc.id,
+        data.status || 'active',
+        data.fitnessGoal || null,
+        data.avatarUrl || null,
+        data.parq_completed ? 1 : 0,
+        data.email_notifications === false ? 0 : 1,
+        data.push_notifications === false ? 0 : 1
+      );
+    }
+
+    // 2. Rehydrate Leads
+    const leadsSnapshot = await adminDb.collection('leads').get();
+    console.log(`[Rehydrate] Found ${leadsSnapshot.size} leads in Firestore.`);
+    for (const doc of leadsSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(data.user_id);
+      db.prepare(`
+        INSERT INTO leads (name, email, status, value, sports, session_requests, preferred_times, preferred_days, positions, user_id, firestore_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(firestore_id) DO UPDATE SET
+          name=excluded.name,
+          email=excluded.email,
+          status=excluded.status,
+          value=excluded.value,
+          sports=excluded.sports,
+          session_requests=excluded.session_requests,
+          preferred_times=excluded.preferred_times,
+          preferred_days=excluded.preferred_days,
+          positions=excluded.positions,
+          user_id=excluded.user_id
+      `).run(
+        data.name,
+        data.email,
+        data.status,
+        data.value,
+        data.sports ? JSON.stringify(data.sports) : null,
+        data.sessionRequests ? JSON.stringify(data.sessionRequests) : null,
+        data.preferredTimes ? JSON.stringify(data.preferredTimes) : null,
+        data.preferredDays ? JSON.stringify(data.preferredDays) : null,
+        data.positions ? JSON.stringify(data.positions) : null,
+        sqliteUserId || null,
+        doc.id,
+        data.created_at || new Date().toISOString()
+      );
+    }
+
+    // 3. Rehydrate User Metrics
+    const metricsSnapshot = await adminDb.collection('user_metrics').get();
+    console.log(`[Rehydrate] Found ${metricsSnapshot.size} user metrics in Firestore.`);
+    for (const doc of metricsSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(doc.id); // doc.id is the uid
+      if (typeof sqliteUserId === 'number') {
+        db.prepare(`
+          INSERT INTO user_metrics (user_id, data, updated_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            data=excluded.data,
+            updated_at=excluded.updated_at
+        `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
+      }
+    }
+
+    // 4. Rehydrate Body Comp History
+    const bodyCompSnapshot = await adminDb.collection('body_comp_history').get();
+    console.log(`[Rehydrate] Found ${bodyCompSnapshot.size} body comp entries in Firestore.`);
+    for (const doc of bodyCompSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(data.user_id);
+      if (typeof sqliteUserId === 'number') {
+        db.prepare(`
+          INSERT INTO body_comp_history (id, user_id, week, date, weight, height, bmi, body_fat, lean_muscle, fat_mass, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            week=excluded.week,
+            date=excluded.date,
+            weight=excluded.weight,
+            height=excluded.height,
+            bmi=excluded.bmi,
+            body_fat=excluded.body_fat,
+            lean_muscle=excluded.lean_muscle,
+            fat_mass=excluded.fat_mass
+        `).run(
+          doc.id,
+          sqliteUserId,
+          data.week,
+          data.date,
+          data.weight,
+          data.height,
+          data.bmi,
+          data.bodyFat,
+          data.leanMuscle,
+          data.fatMass,
+          data.created_at || new Date().toISOString()
+        );
+      }
+    }
+
+    // 5. Rehydrate User PAR-Q
+    const parqSnapshot = await adminDb.collection('user_parq').get();
+    console.log(`[Rehydrate] Found ${parqSnapshot.size} PAR-Q entries in Firestore.`);
+    for (const doc of parqSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(doc.id); // doc.id is the uid
+      if (typeof sqliteUserId === 'number') {
+        db.prepare(`
+          INSERT INTO user_parq (user_id, data, updated_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            data=excluded.data,
+            updated_at=excluded.updated_at
+        `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
+      }
+    }
+
+    // 6. Rehydrate Purchases
+    const purchasesSnapshot = await adminDb.collection('purchases').get();
+    console.log(`[Rehydrate] Found ${purchasesSnapshot.size} purchases in Firestore.`);
+    for (const doc of purchasesSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(data.user_id);
+      if (typeof sqliteUserId === 'number') {
+        db.prepare(`
+          INSERT OR IGNORE INTO purchases (user_id, item_name, price, square_order_id, stripe_session_id, program_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          sqliteUserId,
+          data.item_name || 'Unknown Item',
+          data.price || 0,
+          data.square_order_id || null,
+          data.stripe_session_id || null,
+          data.program_id || null,
+          data.created_at || new Date().toISOString()
+        );
+      }
+    }
+
+    // 7. Rehydrate Push Subscriptions
+    const pushSnapshot = await adminDb.collection('push_subscriptions').get();
+    console.log(`[Rehydrate] Found ${pushSnapshot.size} push subscriptions in Firestore.`);
+    for (const doc of pushSnapshot.docs) {
+      const data = doc.data();
+      const sqliteUserId = resolveUserId(data.user_id);
+      if (typeof sqliteUserId === 'number') {
+        db.prepare(`
+          INSERT OR IGNORE INTO push_subscriptions (user_id, subscription)
+          VALUES (?, ?)
+        `).run(sqliteUserId, data.subscription);
+      }
+    }
+
+    console.log("[Rehydrate] Database re-hydration complete.");
+  } catch (err) {
+    console.error("[Rehydrate] Error during re-hydration:", err);
+  }
+}
+
 async function startServer() {
   console.log("startServer() called");
+  await rehydrateDatabase();
   console.log("Initializing express app...");
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -274,12 +462,24 @@ app.post('/api/webhook', async (req, res) => {
                 if (!existing) {
                   db.prepare('INSERT INTO purchases (user_id, item_name, price, square_order_id, program_id) VALUES (?, ?, ?, ?, ?)').run(sqliteId, itemName, price, orderId, programId);
                   
+                  // Sync to Firestore
+                  await adminDb.collection('purchases').add({
+                    user_id: userId,
+                    item_name: itemName,
+                    price: price,
+                    square_order_id: orderId,
+                    program_id: programId,
+                    created_at: new Date().toISOString()
+                  });
+
                   // Send notification
                   sendNotification(Number(sqliteId), 'Purchase Confirmed', `Thank you for purchasing ${itemName}! Your program is now available in your profile.`, '/profile');
 
                   // Auto-update user role if they bought a program
                   if (itemName.toLowerCase().includes('program') || itemName.toLowerCase().includes('plan')) {
                     db.prepare('UPDATE users SET role = ? WHERE id = ? AND role = ?').run('athlete', sqliteId, 'athlete');
+                    // Sync role to Firestore
+                    await adminDb.collection('users').doc(userId).update({ role: 'athlete' });
                   }
                 }
               }
@@ -344,13 +544,24 @@ app.post('/api/webhook', async (req, res) => {
   // --- API ROUTES ---
 
   // Push Subscriptions
-  app.post('/api/notifications/subscribe', (req, res) => {
+  app.post('/api/notifications/subscribe', async (req, res) => {
     const { userId, subscription } = req.body;
     const sqliteId = resolveUserId(userId);
     try {
-      db.prepare('INSERT INTO push_subscriptions (user_id, subscription) VALUES (?, ?)').run(sqliteId, JSON.stringify(subscription));
+      const subStr = JSON.stringify(subscription);
+      db.prepare('INSERT INTO push_subscriptions (user_id, subscription) VALUES (?, ?)').run(sqliteId, subStr);
+      
+      // Sync to Firestore
+      const subId = Buffer.from(subStr).toString('base64').substring(0, 50); // Create a deterministic ID
+      await adminDb.collection('push_subscriptions').doc(`${userId}_${subId}`).set({
+        user_id: userId,
+        subscription: subStr,
+        created_at: new Date().toISOString()
+      });
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Error subscribing to notifications:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -475,14 +686,32 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Leads: Add lead
-  app.post("/api/leads", (req, res) => {
+  app.post("/api/leads", async (req, res) => {
     const { name, email, status, value, sports, sessionRequests, preferredTimes, preferredDays, positions, userId } = req.body;
     try {
+      // 1. Save to Firestore first to get an ID
+      const leadData = {
+        name,
+        email,
+        status: status || 'New Lead',
+        value: value || 0,
+        sports: sports || [],
+        sessionRequests: sessionRequests || [],
+        preferredTimes: preferredTimes || [],
+        preferredDays: preferredDays || [],
+        positions: positions || [],
+        user_id: userId || null,
+        created_at: new Date().toISOString()
+      };
+      const firestoreRef = await adminDb.collection('leads').add(leadData);
+      const firestoreId = firestoreRef.id;
+
+      // 2. Save to SQLite with firestore_id
       const result = db.prepare(`
         INSERT INTO leads (
           name, email, status, value, sports, session_requests, 
-          preferred_times, preferred_days, positions, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          preferred_times, preferred_days, positions, user_id, firestore_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         name, 
         email, 
@@ -493,22 +722,16 @@ app.post('/api/webhook', async (req, res) => {
         preferredTimes ? JSON.stringify(preferredTimes) : null,
         preferredDays ? JSON.stringify(preferredDays) : null,
         positions ? JSON.stringify(positions) : null,
-        userId || null
+        userId || null,
+        firestoreId
       );
+
       res.json({ 
         id: result.lastInsertRowid,
-        name,
-        email,
-        status: status || 'New Lead',
-        value: value || 0,
-        userId: userId || null,
-        dateAdded: new Date().toISOString(),
-        lastContact: new Date().toISOString(),
-        sports: sports || [],
-        sessionRequests: sessionRequests || [],
-        preferredTimes: preferredTimes || [],
-        preferredDays: preferredDays || [],
-        positions: positions || []
+        firestoreId,
+        ...leadData,
+        dateAdded: leadData.created_at,
+        lastContact: leadData.created_at
       });
     } catch (err) {
       console.error("Database error adding lead:", err);
@@ -517,24 +740,55 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Leads: Update lead
-  const updateLeadHandler = (req: any, res: any) => {
+  const updateLeadHandler = async (req: any, res: any) => {
     const { id } = req.params;
     const { status, value, sports, sessionRequests, preferredTimes, preferredDays, positions } = req.body;
     try {
+      // 1. Get firestore_id from SQLite
+      const lead = db.prepare('SELECT firestore_id FROM leads WHERE id = ?').get(id) as { firestore_id: string } | undefined;
+      
       const updates: string[] = [];
       const params: any[] = [];
+      const firestoreUpdates: any = {};
 
-      if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-      if (value !== undefined) { updates.push('value = ?'); params.push(value); }
-      if (sports !== undefined) { updates.push('sports = ?'); params.push(JSON.stringify(sports)); }
-      if (sessionRequests !== undefined) { updates.push('session_requests = ?'); params.push(JSON.stringify(sessionRequests)); }
-      if (preferredTimes !== undefined) { updates.push('preferred_times = ?'); params.push(JSON.stringify(preferredTimes)); }
-      if (preferredDays !== undefined) { updates.push('preferred_days = ?'); params.push(JSON.stringify(preferredDays)); }
-      if (positions !== undefined) { updates.push('positions = ?'); params.push(JSON.stringify(positions)); }
+      if (status !== undefined) { 
+        updates.push('status = ?'); params.push(status); 
+        firestoreUpdates.status = status;
+      }
+      if (value !== undefined) { 
+        updates.push('value = ?'); params.push(value); 
+        firestoreUpdates.value = value;
+      }
+      if (sports !== undefined) { 
+        updates.push('sports = ?'); params.push(JSON.stringify(sports)); 
+        firestoreUpdates.sports = sports;
+      }
+      if (sessionRequests !== undefined) { 
+        updates.push('session_requests = ?'); params.push(JSON.stringify(sessionRequests)); 
+        firestoreUpdates.sessionRequests = sessionRequests;
+      }
+      if (preferredTimes !== undefined) { 
+        updates.push('preferred_times = ?'); params.push(JSON.stringify(preferredTimes)); 
+        firestoreUpdates.preferredTimes = preferredTimes;
+      }
+      if (preferredDays !== undefined) { 
+        updates.push('preferred_days = ?'); params.push(JSON.stringify(preferredDays)); 
+        firestoreUpdates.preferredDays = preferredDays;
+      }
+      if (positions !== undefined) { 
+        updates.push('positions = ?'); params.push(JSON.stringify(positions)); 
+        firestoreUpdates.positions = positions;
+      }
 
       if (updates.length > 0) {
+        // 2. Update SQLite
         params.push(id);
         db.prepare(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+        // 3. Update Firestore if firestore_id exists
+        if (lead?.firestore_id) {
+          await adminDb.collection('leads').doc(lead.firestore_id).update(firestoreUpdates);
+        }
       }
       
       res.json({ success: true });
@@ -548,12 +802,23 @@ app.post('/api/webhook', async (req, res) => {
   app.put("/api/leads/:id", updateLeadHandler);
 
   // Leads: Delete lead
-  app.delete("/api/leads/:id", (req, res) => {
+  app.delete("/api/leads/:id", async (req, res) => {
     const { id } = req.params;
     try {
+      // 1. Get firestore_id from SQLite
+      const lead = db.prepare('SELECT firestore_id FROM leads WHERE id = ?').get(id) as { firestore_id: string } | undefined;
+
+      // 2. Delete from SQLite
       db.prepare('DELETE FROM leads WHERE id = ?').run(id);
+
+      // 3. Delete from Firestore if firestore_id exists
+      if (lead?.firestore_id) {
+        await adminDb.collection('leads').doc(lead.firestore_id).delete();
+      }
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Database error deleting lead:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -779,11 +1044,21 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Admin: Assign program to user
-  app.post("/api/admin/assign-program", (req, res) => {
+  app.post("/api/admin/assign-program", async (req, res) => {
     const { userId, programId, itemName, price } = req.body;
     const sqliteId = resolveUserId(userId);
     try {
       db.prepare('INSERT INTO purchases (user_id, item_name, price, program_id) VALUES (?, ?, ?, ?)').run(sqliteId, itemName, price || 0, programId);
+      
+      // Sync to Firestore
+      await adminDb.collection('purchases').add({
+        user_id: userId,
+        item_name: itemName,
+        price: price || 0,
+        program_id: programId,
+        created_at: new Date().toISOString()
+      });
+
       res.json({ success: true });
     } catch (err) {
       console.error("Error assigning program:", err);
@@ -966,12 +1241,20 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // User: Mark PAR-Q as completed
-  app.patch("/api/users/:id/parq-complete", (req, res) => {
+  app.patch("/api/users/:id/parq-complete", async (req, res) => {
     const { id } = req.params;
     try {
       db.prepare('UPDATE users SET parq_completed = 1 WHERE id = ?').run(id);
+      
+      // Sync to Firestore
+      const user = db.prepare('SELECT uid FROM users WHERE id = ?').get(id) as any;
+      if (user?.uid) {
+        await adminDb.collection('users').doc(user.uid).update({ parq_completed: true });
+      }
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Error marking PAR-Q as completed:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -1050,11 +1333,12 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Metrics: Save user metrics
-  app.post("/api/metrics/:userId", (req, res) => {
+  app.post("/api/metrics/:userId", async (req, res) => {
     const { userId } = req.params;
     const sqliteId = resolveUserId(userId);
     const data = req.body;
     try {
+      // 1. Update SQLite
       db.prepare(`
         INSERT INTO user_metrics (user_id, data, updated_at) 
         VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -1062,8 +1346,16 @@ app.post('/api/webhook', async (req, res) => {
           data=excluded.data, 
           updated_at=CURRENT_TIMESTAMP
       `).run(sqliteId, JSON.stringify(data));
+
+      // 2. Update Firestore
+      await adminDb.collection('user_metrics').doc(userId).set({
+        data,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Error saving metrics:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -1091,7 +1383,7 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Body Comp History: Save user history
-  app.post("/api/body-comp/:userId", (req, res) => {
+  app.post("/api/body-comp/:userId", async (req, res) => {
     const { userId } = req.params;
     const sqliteId = resolveUserId(userId);
     const { history } = req.body;
@@ -1129,8 +1421,36 @@ app.post('/api/webhook', async (req, res) => {
           );
         }
       })();
+
+      // 2. Update Firestore
+      const batch = adminDb.batch();
+      
+      // Delete existing history for this user in Firestore
+      const snapshot = await adminDb.collection('body_comp_history').where('user_id', '==', userId).get();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+
+      // Add new history entries
+      for (const entry of history) {
+        const docRef = adminDb.collection('body_comp_history').doc(entry.id);
+        batch.set(docRef, {
+          user_id: userId,
+          week: entry.week,
+          date: entry.date,
+          weight: entry.weight,
+          height: entry.height,
+          bmi: entry.bmi,
+          bodyFat: entry.bodyFat,
+          leanMuscle: entry.leanMuscle,
+          fatMass: entry.fatMass,
+          created_at: new Date().toISOString()
+        });
+      }
+      
+      await batch.commit();
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Error saving body comp history:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -1153,11 +1473,12 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // PARQ: Save user PARQ
-  app.post("/api/parq/:userId", (req, res) => {
+  app.post("/api/parq/:userId", async (req, res) => {
     const { userId } = req.params;
     const sqliteId = resolveUserId(userId);
     const data = req.body;
     try {
+      // 1. Update SQLite
       db.prepare(`
         INSERT INTO user_parq (user_id, data, updated_at) 
         VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -1165,8 +1486,16 @@ app.post('/api/webhook', async (req, res) => {
           data=excluded.data, 
           updated_at=CURRENT_TIMESTAMP
       `).run(sqliteId, JSON.stringify(data));
+
+      // 2. Update Firestore
+      await adminDb.collection('user_parq').doc(userId).set({
+        data,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Error saving PAR-Q:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
