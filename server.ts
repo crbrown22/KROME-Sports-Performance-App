@@ -127,6 +127,13 @@ async function sendNotification(userId: number, title: string, body: string, url
   }
 }
 
+// Helper to format dates for SQLite (YYYY-MM-DD HH:MM:SS)
+function formatDateForSQLite(date: Date | string | number): string {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return new Date().toISOString().replace('T', ' ').replace(/\..+/, '');
+  return d.toISOString().replace('T', ' ').replace(/\..+/, '');
+}
+
 // Rehydrate SQLite from Firestore on startup
 async function rehydrateDatabase() {
   console.log("[Rehydrate] Starting database re-hydration from Firestore...");
@@ -137,8 +144,8 @@ async function rehydrateDatabase() {
     for (const doc of usersSnapshot.docs) {
       const data = doc.data();
       db.prepare(`
-        INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications, created_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(email) DO UPDATE SET 
           username=excluded.username,
           first_name=excluded.first_name,
@@ -150,7 +157,8 @@ async function rehydrateDatabase() {
           avatar_url=excluded.avatar_url,
           parq_completed=excluded.parq_completed,
           email_notifications=excluded.email_notifications,
-          push_notifications=excluded.push_notifications
+          push_notifications=excluded.push_notifications,
+          created_at=excluded.created_at
       `).run(
         data.username || data.name || data.email,
         data.email,
@@ -163,7 +171,8 @@ async function rehydrateDatabase() {
         data.avatarUrl || null,
         data.parq_completed ? 1 : 0,
         data.email_notifications === false ? 0 : 1,
-        data.push_notifications === false ? 0 : 1
+        data.push_notifications === false ? 0 : 1,
+        formatDateForSQLite(data.createdAt || data.created_at || new Date())
       );
     }
 
@@ -186,7 +195,8 @@ async function rehydrateDatabase() {
           preferred_times=excluded.preferred_times,
           preferred_days=excluded.preferred_days,
           positions=excluded.positions,
-          user_id=excluded.user_id
+          user_id=excluded.user_id,
+          created_at=excluded.created_at
       `).run(
         data.name,
         data.email,
@@ -199,7 +209,7 @@ async function rehydrateDatabase() {
         data.positions ? JSON.stringify(data.positions) : null,
         sqliteUserId || null,
         doc.id,
-        data.created_at || new Date().toISOString()
+        formatDateForSQLite(data.created_at || data.createdAt || new Date())
       );
     }
 
@@ -289,7 +299,7 @@ async function rehydrateDatabase() {
           data.square_order_id || null,
           data.stripe_session_id || null,
           data.program_id || null,
-          data.created_at || new Date().toISOString()
+          formatDateForSQLite(data.created_at || data.createdAt || new Date())
         );
       }
     }
@@ -1152,7 +1162,8 @@ app.post('/api/webhook', async (req, res) => {
       // Calculate Percentages (MTD vs PMTD)
       const calculateGrowth = (current: number, previous: number) => {
         if (!previous || previous === 0) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
+        const growth = ((current - previous) / previous) * 100;
+        return parseFloat(growth.toFixed(1));
       };
 
       const revenueGrowth = calculateGrowth(currentMonthRevenue.total || 0, prevMonthMTDRevenue.total || 0);
