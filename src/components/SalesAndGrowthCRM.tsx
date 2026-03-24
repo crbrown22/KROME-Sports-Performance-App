@@ -54,7 +54,7 @@ export const calculateKPIs = (users: any[], purchases: any[], leads: Lead[]) => 
   const consultations = Math.max(120, leads.filter(l => ['Consultation', 'Proposal', 'Closed Won'].includes(l.status)).length);
   const closedWon = Math.max(45, leads.filter(l => l.status === 'Closed Won').length);
 
-  const leadsPercentage = ((leadsGenerated / websiteVisitors) * 100).toFixed(1);
+  const leadsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
   const consultationsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
   const closedWonPercentage = consultations > 0 ? ((closedWon / consultations) * 100).toFixed(1) : '0.0';
 
@@ -317,7 +317,7 @@ export default function SalesAndGrowthCRM() {
             {[
               { 
                 label: 'Lead Conversion Rate', 
-                value: `${growthKPIs?.conversionRate || kpis.leadsPercentage}%`,
+                value: `${growthKPIs?.leadConversionRate || kpis.leadsPercentage}%`,
                 growth: growthKPIs?.leadGrowth
               },
               { 
@@ -326,7 +326,7 @@ export default function SalesAndGrowthCRM() {
               },
               { 
                 label: 'Close Rate', 
-                value: `${growthKPIs?.conversionRate || kpis.closedWonPercentage}%` 
+                value: `${growthKPIs?.closeRate || kpis.closedWonPercentage}%` 
               },
             ].map((kpi, i) => (
               <div key={i} className="bg-zinc-900 border border-white/10 p-6 rounded-3xl">

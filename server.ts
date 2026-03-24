@@ -1161,6 +1161,10 @@ app.post('/api/webhook', async (req, res) => {
 
       const mrr = currentMonthRevenue.total || 0;
       const ltv = totalUsers.count > 0 ? (totalRevenue.total || 0) / totalUsers.count : 0;
+      
+      const leadConversionRate = totalLeads.count > 0 ? Number(((consultations.count / totalLeads.count) * 100).toFixed(1)) : 0;
+      const consultationRate = totalLeads.count > 0 ? Number(((consultations.count / totalLeads.count) * 100).toFixed(1)) : 0; // Often same as lead conversion in this context
+      const closeRate = consultations.count > 0 ? Number(((closedWonLeads.count / consultations.count) * 100).toFixed(1)) : 0;
 
       res.json({
         totalRevenue: totalRevenue.total || 0,
@@ -1173,8 +1177,9 @@ app.post('/api/webhook', async (req, res) => {
         revenueGrowth: Number(revenueGrowth.toFixed(1)),
         userGrowth: Number(userGrowth.toFixed(1)),
         leadGrowth: Number(leadGrowth.toFixed(1)),
-        conversionRate: totalLeads.count > 0 ? Number(((closedWonLeads.count / totalLeads.count) * 100).toFixed(1)) : 0,
-        consultationRate: totalLeads.count > 0 ? Number(((consultations.count / totalLeads.count) * 100).toFixed(1)) : 0
+        leadConversionRate,
+        consultationRate,
+        closeRate
       });
     } catch (err) {
       console.error("Error calculating growth KPIs:", err);
