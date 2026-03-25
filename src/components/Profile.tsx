@@ -64,9 +64,11 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
   console.log("Profile mounted, user:", user, "initialTab:", initialTab);
   const [activeTab, setActiveTab] = useState(initialTab);
 
+  const needsOnboarding = !user.fitness_goal || user.parq_completed === 0;
+
   useEffect(() => {
-    console.log("Profile user changed:", user, "initialTab:", initialTab);
-    if (user.parq_completed == 0) {
+    console.log("Profile user changed:", user, "initialTab:", initialTab, "needsOnboarding:", needsOnboarding);
+    if (user.parq_completed === 0) {
       setActiveTab('parq');
     } else {
       setActiveTab(initialTab);
@@ -77,7 +79,7 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
       lastName: user.lastName || user.last_name || "",
       username: user.username || ""
     });
-  }, [user, initialTab]);
+  }, [user, initialTab, needsOnboarding]);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [formData, setFormData] = useState({ 
@@ -421,6 +423,37 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
             Logout <LogOut className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
+
+        {needsOnboarding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-gold/10 border border-gold/20 rounded-3xl space-y-4 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gold/5 blur-3xl -mr-16 -mt-16 group-hover:bg-gold/10 transition-all" />
+            
+            <div className="flex items-center gap-3 text-gold relative z-10">
+              <div className="w-10 h-10 rounded-2xl bg-gold/20 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black uppercase italic tracking-tighter text-lg leading-none">Action Required</h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gold/60 mt-1">Onboarding Incomplete</p>
+              </div>
+            </div>
+            
+            <p className="text-white/60 text-sm relative z-10 leading-relaxed">
+              To unlock all features and ensure your safety, please complete your PAR-Q and set your fitness goals.
+            </p>
+            
+            <button 
+              onClick={() => onNavigate('onboarding')}
+              className="btn-gold w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] relative z-10 shadow-xl shadow-gold/20 hover:shadow-gold/40 transition-all"
+            >
+              Complete Setup Now
+            </button>
+          </motion.div>
+        )}
 
         <div className="text-center">
           <div className="relative inline-block mb-6 md:mb-8 group">

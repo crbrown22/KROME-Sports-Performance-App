@@ -290,8 +290,9 @@ export default function App() {
   useEffect(() => {
     if (user && user.role !== 'admin') {
       const needsOnboarding = !user.fitness_goal || user.parq_completed == 0;
-      if (needsOnboarding && currentView !== 'onboarding') {
-        navigateTo('onboarding');
+      // Allow them to stay on profile to see the prompt, but redirect from other pages
+      if (needsOnboarding && currentView !== 'onboarding' && currentView !== 'profile') {
+        resetToView('onboarding');
       }
     }
   }, [user, currentView]);
@@ -348,7 +349,14 @@ export default function App() {
     console.log("Login success, user:", userData);
     setUser(userData);
     safeStorage.setItem('krome_user', JSON.stringify(userData));
-    resetToView('profile');
+    
+    const needsOnboarding = !userData.fitness_goal || userData.parq_completed === 0;
+    if (needsOnboarding && userData.role !== 'admin') {
+      resetToView('onboarding');
+    } else {
+      resetToView('profile');
+    }
+    
     logActivity(userData.id, 'login', { username: userData.username });
   };
 
