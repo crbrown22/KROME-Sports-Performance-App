@@ -172,7 +172,7 @@ export default function App() {
 
   const BottomNav = () => {
     const navItems = [
-      { id: 'messages', icon: <NotificationIcon userId={user?.id} onOpenChat={() => setShowChat(true)} onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); }} isAdmin={user?.role === 'admin'} unreadCount={unreadCount} />, label: 'Messages' },
+      { id: 'messages', icon: <NotificationIcon userId={user?.id} onOpenChat={() => setShowChat(true)} onOpenAdminChat={() => { setAdminInitialTab('chat'); navigateTo('admin'); safeStorage.setItem('krome_admin_active_tab', 'chat'); }} isAdmin={user?.role === 'admin'} unreadCount={unreadCount} standalone={false} />, label: 'Messages' },
       { id: 'programCatalog', icon: <Zap className="w-5 h-5" />, label: 'Programs' },
       { id: 'shop', icon: <ShoppingBag className="w-5 h-5" />, label: 'Shop' },
       { id: 'profile', icon: <User className="w-5 h-5" />, label: 'Profile' },

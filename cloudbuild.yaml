@@ -27,3 +27,5 @@ steps:
   - '--allow-unauthenticated' # Adjust based on your authentication needs
 images:
 - 'gcr.io/$PROJECT_ID/nodejs-app:$COMMIT_SHA'
+options:
+  logging: CLOUD_LOGGING_ONLY
