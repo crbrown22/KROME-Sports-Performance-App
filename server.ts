@@ -21,11 +21,26 @@ import { getFirestore } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+const serviceAccount = JSON.parse(serviceAccountKey || '{}');
+const projectId = serviceAccount.project_id || process.env.PROJECT_ID || 'unknown';
+console.log(`[Firebase] Initializing Admin SDK for project: ${projectId}`);
+
+if (!serviceAccountKey) {
+  console.warn("[Firebase] FIREBASE_SERVICE_ACCOUNT_KEY is not set. Admin SDK may not function correctly.");
+}
+
 export const adminApp = initializeApp({
   credential: cert(serviceAccount)
 });
-export const adminDb = getFirestore();
+
+// Support named databases if provided in env
+const firestoreDatabaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)';
+console.log(`[Firebase] Using Firestore database: ${firestoreDatabaseId}`);
+
+export const adminDb = (firestoreDatabaseId && firestoreDatabaseId !== '(default)') 
+  ? getFirestore(adminApp, firestoreDatabaseId)
+  : getFirestore(adminApp);
 
 // Helper to resolve string Firebase UID to numeric SQLite ID
 function resolveUserId(userId: string | number): number | string {
@@ -135,461 +150,463 @@ function formatDateForSQLite(date: Date | string | number): string {
 }
 
 // Rehydrate SQLite from Firestore on startup
+let isRehydrated = false;
+
 async function rehydrateDatabase() {
+  if (isRehydrated) return;
   console.log("[Rehydrate] Starting database re-hydration from Firestore...");
-  try {
-    // 1. Rehydrate Users
-    const usersSnapshot = await adminDb.collection('users').get();
-    console.log(`[Rehydrate] Found ${usersSnapshot.size} users in Firestore.`);
-    for (const doc of usersSnapshot.docs) {
-      const data = doc.data();
-      db.prepare(`
-        INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(email) DO UPDATE SET 
-          username=excluded.username,
-          first_name=excluded.first_name,
-          last_name=excluded.last_name,
-          role=excluded.role,
-          uid=excluded.uid,
-          status=excluded.status,
-          fitness_goal=excluded.fitness_goal,
-          avatar_url=excluded.avatar_url,
-          parq_completed=excluded.parq_completed,
-          email_notifications=excluded.email_notifications,
-          push_notifications=excluded.push_notifications,
-          created_at=excluded.created_at
-      `).run(
-        data.username || data.name || data.email,
-        data.email,
-        data.firstName || data.first_name || "",
-        data.lastName || data.last_name || "",
-        data.role || 'athlete',
-        doc.id,
-        data.status || 'active',
-        data.fitnessGoal || null,
-        data.avatarUrl || null,
-        data.parq_completed ? 1 : 0,
-        data.email_notifications === false ? 0 : 1,
-        data.push_notifications === false ? 0 : 1,
-        formatDateForSQLite(data.createdAt || data.created_at || new Date())
-      );
-    }
-
-    // 2. Rehydrate Leads
-    const leadsSnapshot = await adminDb.collection('leads').get();
-    console.log(`[Rehydrate] Found ${leadsSnapshot.size} leads in Firestore.`);
-    for (const doc of leadsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      db.prepare(`
-        INSERT INTO leads (name, email, status, value, sports, session_requests, preferred_times, preferred_days, positions, user_id, firestore_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(firestore_id) DO UPDATE SET
-          name=excluded.name,
-          email=excluded.email,
-          status=excluded.status,
-          value=excluded.value,
-          sports=excluded.sports,
-          session_requests=excluded.session_requests,
-          preferred_times=excluded.preferred_times,
-          preferred_days=excluded.preferred_days,
-          positions=excluded.positions,
-          user_id=excluded.user_id,
-          created_at=excluded.created_at
-      `).run(
-        data.name,
-        data.email,
-        data.status,
-        data.value,
-        data.sports ? JSON.stringify(data.sports) : null,
-        data.sessionRequests ? JSON.stringify(data.sessionRequests) : null,
-        data.preferredTimes ? JSON.stringify(data.preferredTimes) : null,
-        data.preferredDays ? JSON.stringify(data.preferredDays) : null,
-        data.positions ? JSON.stringify(data.positions) : null,
-        sqliteUserId || null,
-        doc.id,
-        formatDateForSQLite(data.created_at || data.createdAt || new Date())
-      );
-    }
-
-    // 3. Rehydrate User Metrics
-    const metricsSnapshot = await adminDb.collection('user_metrics').get();
-    console.log(`[Rehydrate] Found ${metricsSnapshot.size} user metrics in Firestore.`);
-    for (const doc of metricsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(doc.id); // doc.id is the uid
-      if (typeof sqliteUserId === 'number') {
+  
+  const collections = [
+    { name: 'users', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} users in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
         db.prepare(`
-          INSERT INTO user_metrics (user_id, data, updated_at)
-          VALUES (?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET
-            data=excluded.data,
-            updated_at=excluded.updated_at
-        `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
-      }
-    }
-
-    // 4. Rehydrate Body Comp History
-    const bodyCompSnapshot = await adminDb.collection('body_comp_history').get();
-    console.log(`[Rehydrate] Found ${bodyCompSnapshot.size} body comp entries in Firestore.`);
-    for (const doc of bodyCompSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO body_comp_history (id, user_id, week, date, weight, height, bmi, body_fat, lean_muscle, fat_mass, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            week=excluded.week,
-            date=excluded.date,
-            weight=excluded.weight,
-            height=excluded.height,
-            bmi=excluded.bmi,
-            body_fat=excluded.body_fat,
-            lean_muscle=excluded.lean_muscle,
-            fat_mass=excluded.fat_mass
-        `).run(
-          doc.id,
-          sqliteUserId,
-          data.week,
-          data.date,
-          data.weight,
-          data.height,
-          data.bmi,
-          data.bodyFat,
-          data.leanMuscle,
-          data.fatMass,
-          data.created_at || new Date().toISOString()
-        );
-      }
-    }
-
-    // 5. Rehydrate User PAR-Q
-    const parqSnapshot = await adminDb.collection('user_parq').get();
-    console.log(`[Rehydrate] Found ${parqSnapshot.size} PAR-Q entries in Firestore.`);
-    for (const doc of parqSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(doc.id); // doc.id is the uid
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO user_parq (user_id, data, updated_at)
-          VALUES (?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET
-            data=excluded.data,
-            updated_at=excluded.updated_at
-        `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
-      }
-    }
-
-    // 6. Rehydrate Purchases
-    const purchasesSnapshot = await adminDb.collection('purchases').get();
-    console.log(`[Rehydrate] Found ${purchasesSnapshot.size} purchases in Firestore.`);
-    for (const doc of purchasesSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO purchases (user_id, item_name, price, square_order_id, stripe_session_id, program_id, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            user_id=excluded.user_id,
-            item_name=excluded.item_name,
-            price=excluded.price,
-            square_order_id=excluded.square_order_id,
-            stripe_session_id=excluded.stripe_session_id,
-            program_id=excluded.program_id,
+          INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications, created_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(email) DO UPDATE SET 
+            username=excluded.username,
+            first_name=excluded.first_name,
+            last_name=excluded.last_name,
+            role=excluded.role,
+            uid=excluded.uid,
+            status=excluded.status,
+            fitness_goal=excluded.fitness_goal,
+            avatar_url=excluded.avatar_url,
+            parq_completed=excluded.parq_completed,
+            email_notifications=excluded.email_notifications,
+            push_notifications=excluded.push_notifications,
             created_at=excluded.created_at
         `).run(
-          sqliteUserId,
-          data.item_name || 'Unknown Item',
-          data.price || 0,
-          data.square_order_id || null,
-          data.stripe_session_id || null,
-          data.program_id || null,
+          data.username || data.name || data.email,
+          data.email,
+          data.firstName || data.first_name || "",
+          data.lastName || data.last_name || "",
+          data.role || 'athlete',
+          doc.id,
+          data.status || 'active',
+          data.fitnessGoal || null,
+          data.avatarUrl || null,
+          data.parq_completed ? 1 : 0,
+          data.email_notifications === false ? 0 : 1,
+          data.push_notifications === false ? 0 : 1,
+          formatDateForSQLite(data.createdAt || data.created_at || new Date())
+        );
+      }
+    }},
+    { name: 'leads', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} leads in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        db.prepare(`
+          INSERT INTO leads (name, email, status, value, sports, session_requests, preferred_times, preferred_days, positions, user_id, firestore_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(firestore_id) DO UPDATE SET
+            name=excluded.name,
+            email=excluded.email,
+            status=excluded.status,
+            value=excluded.value,
+            sports=excluded.sports,
+            session_requests=excluded.session_requests,
+            preferred_times=excluded.preferred_times,
+            preferred_days=excluded.preferred_days,
+            positions=excluded.positions,
+            user_id=excluded.user_id,
+            created_at=excluded.created_at
+        `).run(
+          data.name,
+          data.email,
+          data.status,
+          data.value,
+          data.sports ? JSON.stringify(data.sports) : null,
+          data.sessionRequests ? JSON.stringify(data.sessionRequests) : null,
+          data.preferredTimes ? JSON.stringify(data.preferredTimes) : null,
+          data.preferredDays ? JSON.stringify(data.preferredDays) : null,
+          data.positions ? JSON.stringify(data.positions) : null,
+          sqliteUserId || null,
           doc.id,
           formatDateForSQLite(data.created_at || data.createdAt || new Date())
         );
       }
-    }
-
-    // 7. Rehydrate Push Subscriptions
-    const pushSnapshot = await adminDb.collection('push_subscriptions').get();
-    console.log(`[Rehydrate] Found ${pushSnapshot.size} push subscriptions in Firestore.`);
-    for (const doc of pushSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT OR IGNORE INTO push_subscriptions (user_id, subscription)
-          VALUES (?, ?)
-        `).run(sqliteUserId, data.subscription);
+    }},
+    { name: 'user_metrics', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} user metrics in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(doc.id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO user_metrics (user_id, data, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              data=excluded.data,
+              updated_at=excluded.updated_at
+          `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
+        }
       }
-    }
-
-    // 8. Rehydrate Progress
-    const progressSnapshot = await adminDb.collection('progress').get();
-    console.log(`[Rehydrate] Found ${progressSnapshot.size} progress entries in Firestore.`);
-    for (const doc of progressSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO progress (user_id, metric_name, metric_value, unit, firestore_id, recorded_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            metric_name=excluded.metric_name,
-            metric_value=excluded.metric_value,
-            unit=excluded.unit,
-            recorded_at=excluded.recorded_at
-        `).run(sqliteUserId, data.metric_name, data.metric_value, data.unit, doc.id, data.recorded_at || new Date().toISOString());
+    }},
+    { name: 'body_comp_history', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} body comp entries in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO body_comp_history (id, user_id, week, date, weight, height, bmi, body_fat, lean_muscle, fat_mass, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              week=excluded.week,
+              date=excluded.date,
+              weight=excluded.weight,
+              height=excluded.height,
+              bmi=excluded.bmi,
+              body_fat=excluded.body_fat,
+              lean_muscle=excluded.lean_muscle,
+              fat_mass=excluded.fat_mass
+          `).run(
+            doc.id,
+            sqliteUserId,
+            data.week,
+            data.date,
+            data.weight,
+            data.height,
+            data.bmi,
+            data.bodyFat,
+            data.leanMuscle,
+            data.fatMass,
+            data.created_at || new Date().toISOString()
+          );
+        }
       }
-    }
-
-    // 9. Rehydrate Nutrition Logs
-    const nutritionSnapshot = await adminDb.collection('nutrition_logs').get();
-    console.log(`[Rehydrate] Found ${nutritionSnapshot.size} nutrition logs in Firestore.`);
-    for (const doc of nutritionSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO nutrition_logs (user_id, log_id, food_id, name, category, meal, date, servings, serving_size, calories, protein, carbs, fat, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(log_id) DO UPDATE SET
-            name=excluded.name,
-            servings=excluded.servings,
-            calories=excluded.calories,
-            protein=excluded.protein,
-            carbs=excluded.carbs,
-            fat=excluded.fat
-        `).run(
-          sqliteUserId, 
-          data.logId || doc.id, 
-          data.foodId || null, 
-          data.name, 
-          data.category || null, 
-          data.meal || null, 
-          data.date, 
-          data.servings, 
-          data.servingSize || null, 
-          data.calories, 
-          data.protein, 
-          data.carbs, 
-          data.fat, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
+    }},
+    { name: 'user_parq', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} PAR-Q entries in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(doc.id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO user_parq (user_id, data, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              data=excluded.data,
+              updated_at=excluded.updated_at
+          `).run(sqliteUserId, JSON.stringify(data.data), data.updated_at || new Date().toISOString());
+        }
       }
-    }
-
-    // 10. Rehydrate Workout Logs
-    const workoutLogsSnapshot = await adminDb.collection('workout_logs').get();
-    console.log(`[Rehydrate] Found ${workoutLogsSnapshot.size} workout logs in Firestore.`);
-    for (const doc of workoutLogsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
+    }},
+    { name: 'purchases', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} purchases in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO purchases (user_id, item_name, price, square_order_id, stripe_session_id, program_id, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              user_id=excluded.user_id,
+              item_name=excluded.item_name,
+              price=excluded.price,
+              square_order_id=excluded.square_order_id,
+              stripe_session_id=excluded.stripe_session_id,
+              program_id=excluded.program_id,
+              created_at=excluded.created_at
+          `).run(
+            sqliteUserId,
+            data.item_name || 'Unknown Item',
+            data.price || 0,
+            data.square_order_id || null,
+            data.stripe_session_id || null,
+            data.program_id || null,
+            doc.id,
+            formatDateForSQLite(data.created_at || data.createdAt || new Date())
+          );
+        }
+      }
+    }},
+    { name: 'push_subscriptions', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} push subscriptions in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT OR IGNORE INTO push_subscriptions (user_id, subscription)
+            VALUES (?, ?)
+          `).run(sqliteUserId, data.subscription);
+        }
+      }
+    }},
+    { name: 'progress', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} progress entries in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO progress (user_id, metric_name, metric_value, unit, firestore_id, recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              metric_name=excluded.metric_name,
+              metric_value=excluded.metric_value,
+              unit=excluded.unit,
+              recorded_at=excluded.recorded_at
+          `).run(sqliteUserId, data.metric_name, data.metric_value, data.unit, doc.id, data.recorded_at || new Date().toISOString());
+        }
+      }
+    }},
+    { name: 'nutrition_logs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} nutrition logs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO nutrition_logs (user_id, log_id, food_id, name, category, meal, date, servings, serving_size, calories, protein, carbs, fat, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(log_id) DO UPDATE SET
+              name=excluded.name,
+              servings=excluded.servings,
+              calories=excluded.calories,
+              protein=excluded.protein,
+              carbs=excluded.carbs,
+              fat=excluded.fat
+          `).run(
+            sqliteUserId, 
+            data.logId || doc.id, 
+            data.foodId || null, 
+            data.name, 
+            data.category || null, 
+            data.meal || null, 
+            data.date, 
+            data.servings, 
+            data.servingSize || null, 
+            data.calories, 
+            data.protein, 
+            data.carbs, 
+            data.fat, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'workout_logs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} workout logs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO workout_logs (user_id, workout_id, exercise_id, completed, date, edited_data, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              completed=excluded.completed,
+              edited_data=excluded.edited_data
+          `).run(
+            sqliteUserId, 
+            data.workout_id, 
+            data.exercise_id, 
+            data.completed ? 1 : 0, 
+            data.date, 
+            data.edited_data ? JSON.stringify(data.edited_data) : null, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'program_progress', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} program progress entries in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO program_progress (user_id, program_id, phase, week, day, completed, date, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              completed=excluded.completed,
+              date=excluded.date
+          `).run(
+            sqliteUserId, 
+            data.program_id, 
+            data.phase, 
+            data.week, 
+            data.day, 
+            data.completed ? 1 : 0, 
+            data.date, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'user_activity_logs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} activity logs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO user_activity_logs (user_id, action, details, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              action=excluded.action,
+              details=excluded.details
+          `).run(
+            sqliteUserId, 
+            data.action, 
+            data.details, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'body_composition_logs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} body composition logs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO body_composition_logs (user_id, image_url, analysis, feedback, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              image_url=excluded.image_url,
+              analysis=excluded.analysis,
+              feedback=excluded.feedback
+          `).run(
+            sqliteUserId, 
+            data.image_url, 
+            data.analysis, 
+            data.feedback, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'fitness_overviews', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} fitness overviews in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO fitness_overviews (user_id, overview, firestore_id, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              overview=excluded.overview
+          `).run(
+            sqliteUserId, 
+            data.overview, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'custom_programs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} custom programs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO custom_programs (user_id, name, description, data, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              name=excluded.name,
+              description=excluded.description,
+              data=excluded.data
+          `).run(
+            sqliteUserId, 
+            data.name, 
+            data.description, 
+            JSON.stringify(data.data), 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'messages', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} messages in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteSenderId = resolveUserId(data.sender_id);
+        const sqliteReceiverId = resolveUserId(data.receiver_id);
         db.prepare(`
-          INSERT INTO workout_logs (user_id, workout_id, exercise_id, completed, date, edited_data, firestore_id, created_at)
+          INSERT INTO messages (sender_id, receiver_id, message, is_read, is_deleted, firestore_id, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(firestore_id) DO UPDATE SET
-            completed=excluded.completed,
-            edited_data=excluded.edited_data
+            is_read=excluded.is_read,
+            is_deleted=excluded.is_deleted,
+            updated_at=excluded.updated_at
         `).run(
-          sqliteUserId, 
-          data.workout_id, 
-          data.exercise_id, 
-          data.completed ? 1 : 0, 
-          data.date, 
-          data.edited_data ? JSON.stringify(data.edited_data) : null, 
+          sqliteSenderId, 
+          sqliteReceiverId, 
+          data.message, 
+          data.is_read ? 1 : 0, 
+          data.is_deleted ? 1 : 0, 
           doc.id,
-          data.created_at || new Date().toISOString()
+          data.created_at || new Date().toISOString(),
+          data.updated_at || new Date().toISOString()
         );
       }
-    }
-
-    // 11. Rehydrate Program Progress
-    const programProgressSnapshot = await adminDb.collection('program_progress').get();
-    console.log(`[Rehydrate] Found ${programProgressSnapshot.size} program progress entries in Firestore.`);
-    for (const doc of programProgressSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO program_progress (user_id, program_id, phase, week, day, completed, date, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            completed=excluded.completed,
-            date=excluded.date
-        `).run(
-          sqliteUserId, 
-          data.program_id, 
-          data.phase, 
-          data.week, 
-          data.day, 
-          data.completed ? 1 : 0, 
-          data.date, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
+    }},
+    { name: 'workout_feedback', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} workout feedback entries in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO workout_feedback (user_id, workout_id, program_id, rating, comment, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(firestore_id) DO UPDATE SET
+              rating=excluded.rating,
+              comment=excluded.comment
+          `).run(
+            sqliteUserId, 
+            data.workout_id, 
+            data.program_id, 
+            data.rating, 
+            data.comment, 
+            doc.id,
+            data.created_at || new Date().toISOString()
+          );
+        }
       }
-    }
+    }}
+  ];
 
-    // 12. Rehydrate User Activity Logs
-    const activityLogsSnapshot = await adminDb.collection('user_activity_logs').get();
-    console.log(`[Rehydrate] Found ${activityLogsSnapshot.size} activity logs in Firestore.`);
-    for (const doc of activityLogsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO user_activity_logs (user_id, action, details, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            action=excluded.action,
-            details=excluded.details
-        `).run(
-          sqliteUserId, 
-          data.action, 
-          data.details, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
+  for (const col of collections) {
+    try {
+      console.log(`[Rehydrate] Fetching collection: ${col.name} from Firestore...`);
+      const snapshot = await adminDb.collection(col.name).get();
+      console.log(`[Rehydrate] Successfully fetched ${snapshot.size} documents from collection: ${col.name}`);
+      await col.handler(snapshot);
+    } catch (err: any) {
+      console.error(`[Rehydrate] Error rehydrating collection ${col.name}:`, err.message || err);
+      if (err.code === 5) {
+        console.error(`[Rehydrate] Collection ${col.name} was not found (NOT_FOUND). Check if the collection exists in your Firestore database.`);
       }
+      // Continue with next collection
     }
-
-    // 13. Rehydrate Body Composition Logs
-    const bodyCompLogsSnapshot = await adminDb.collection('body_composition_logs').get();
-    console.log(`[Rehydrate] Found ${bodyCompLogsSnapshot.size} body composition logs in Firestore.`);
-    for (const doc of bodyCompLogsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO body_composition_logs (user_id, image_url, analysis, feedback, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            image_url=excluded.image_url,
-            analysis=excluded.analysis,
-            feedback=excluded.feedback
-        `).run(
-          sqliteUserId, 
-          data.image_url, 
-          data.analysis, 
-          data.feedback, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
-      }
-    }
-
-    // 14. Rehydrate Fitness Overviews
-    const fitnessOverviewsSnapshot = await adminDb.collection('fitness_overviews').get();
-    console.log(`[Rehydrate] Found ${fitnessOverviewsSnapshot.size} fitness overviews in Firestore.`);
-    for (const doc of fitnessOverviewsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO fitness_overviews (user_id, overview, firestore_id, created_at)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            overview=excluded.overview
-        `).run(
-          sqliteUserId, 
-          data.overview, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
-      }
-    }
-
-    // 15. Rehydrate Custom Programs
-    const customProgramsSnapshot = await adminDb.collection('custom_programs').get();
-    console.log(`[Rehydrate] Found ${customProgramsSnapshot.size} custom programs in Firestore.`);
-    for (const doc of customProgramsSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO custom_programs (user_id, name, description, data, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            name=excluded.name,
-            description=excluded.description,
-            data=excluded.data
-        `).run(
-          sqliteUserId, 
-          data.name, 
-          data.description, 
-          JSON.stringify(data.data), 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
-      }
-    }
-
-    // 16. Rehydrate Messages
-    const messagesSnapshot = await adminDb.collection('messages').get();
-    console.log(`[Rehydrate] Found ${messagesSnapshot.size} messages in Firestore.`);
-    for (const doc of messagesSnapshot.docs) {
-      const data = doc.data();
-      const sqliteSenderId = resolveUserId(data.sender_id);
-      const sqliteReceiverId = resolveUserId(data.receiver_id);
-      db.prepare(`
-        INSERT INTO messages (sender_id, receiver_id, message, is_read, is_deleted, firestore_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(firestore_id) DO UPDATE SET
-          is_read=excluded.is_read,
-          is_deleted=excluded.is_deleted,
-          updated_at=excluded.updated_at
-      `).run(
-        sqliteSenderId, 
-        sqliteReceiverId, 
-        data.message, 
-        data.is_read ? 1 : 0, 
-        data.is_deleted ? 1 : 0, 
-        doc.id,
-        data.created_at || new Date().toISOString(),
-        data.updated_at || new Date().toISOString()
-      );
-    }
-
-    // 17. Rehydrate Workout Feedback
-    const feedbackSnapshot = await adminDb.collection('workout_feedback').get();
-    console.log(`[Rehydrate] Found ${feedbackSnapshot.size} workout feedback entries in Firestore.`);
-    for (const doc of feedbackSnapshot.docs) {
-      const data = doc.data();
-      const sqliteUserId = resolveUserId(data.user_id);
-      if (typeof sqliteUserId === 'number') {
-        db.prepare(`
-          INSERT INTO workout_feedback (user_id, workout_id, program_id, rating, comment, firestore_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(firestore_id) DO UPDATE SET
-            rating=excluded.rating,
-            comment=excluded.comment
-        `).run(
-          sqliteUserId, 
-          data.workout_id, 
-          data.program_id, 
-          data.rating, 
-          data.comment, 
-          doc.id,
-          data.created_at || new Date().toISOString()
-        );
-      }
-    }
-
-    console.log("[Rehydrate] Database re-hydration complete.");
-  } catch (err) {
-    console.error("[Rehydrate] Error during re-hydration:", err);
   }
+
+  console.log("[Rehydrate] Database re-hydration process finished.");
+  isRehydrated = true;
 }
 
 async function startServer() {
   console.log("startServer() called");
-  await rehydrateDatabase();
+  
   console.log("Initializing express app...");
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -611,6 +628,11 @@ async function startServer() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ limit: '5mb', extended: true }));
   
+  // Middleware to check if rehydration is complete (optional, but good for health checks)
+  app.get('/api/rehydration-status', (req, res) => {
+    res.json({ isRehydrated });
+  });
+
   // Logging middleware
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.url} - Host: ${req.headers.host}`);
@@ -625,7 +647,8 @@ async function startServer() {
       status: 'ok', 
       timestamp: new Date().toISOString(),
       env: process.env.NODE_ENV,
-      appUrl: process.env.APP_URL
+      appUrl: process.env.APP_URL,
+      isRehydrated
     });
   });
 
@@ -2549,7 +2572,7 @@ app.post('/api/webhook', async (req, res) => {
   
   // Explicitly check NODE_ENV or if we are in Cloud Run (K_SERVICE is set)
   // Default to production unless explicitly set to development
-  const isProduction = process.env.NODE_ENV !== 'development';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV}`);
   console.log(`[Server] Cloud Run Service: ${process.env.K_SERVICE || 'none'}`);
@@ -2627,6 +2650,12 @@ app.post('/api/webhook', async (req, res) => {
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Local access: http://localhost:${PORT}`);
+    
+    // Start rehydration in background after server is listening
+    console.log("[Server] Starting background rehydration...");
+    rehydrateDatabase().catch(err => {
+      console.error("[Server] Background rehydration failed:", err);
+    });
   });
   
   server.on('error', (err) => {
