@@ -53,6 +53,7 @@ import NutritionDashboard from "./components/NutritionDashboard";
 import BodyCompositionTracker from "./components/BodyCompositionTracker";
 import BodyMetrics from "./components/BodyMetrics";
 import FitnessGoalOnboarding from "./components/FitnessGoalOnboarding";
+import OnboardingFlow from "./components/OnboardingFlow";
 import { BodyMetricsData, INITIAL_DATA } from "./types";
 import VideoAnalyzer from "./components/VideoAnalyzer";
 import PARQ from "./components/PARQ";
@@ -100,7 +101,7 @@ const programs = [
   }
 ];
 
-type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'myPrograms' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings' | 'fitnessGoal';
+type View = 'home' | 'programIntro' | 'specialized' | 'auth' | 'profile' | 'admin' | 'flexibilityMobility' | 'strengthPower' | 'conditioningSpeed' | 'aerobicCapacityFoundation' | 'performanceMacroNutrients' | 'micronutrientOptimization' | 'recipeLibrary' | 'specializedLanding' | 'shop' | 'contact' | 'programBuilder' | 'programViewer' | 'programCatalog' | 'myPrograms' | 'breakPrograms' | 'movementPrograms' | 'productDescription' | 'movementLanding' | 'nutritionLanding' | 'breakProgramsLanding' | 'workoutTracker' | 'fitnessOverview' | 'progressTracker' | 'nutritionDashboard' | 'bodyComposition' | 'bodyMetrics' | 'videoAnalysis' | 'parq' | 'programCalendar' | 'accountSettings' | 'fitnessGoal' | 'onboarding';
 
 const programPrices: Record<string, number> = {
   'soccer-52-week': 99.99,
@@ -288,10 +289,9 @@ export default function App() {
 
   useEffect(() => {
     if (user && user.role !== 'admin') {
-      if (!user.fitness_goal && currentView !== 'fitnessGoal') {
-        navigateTo('fitnessGoal');
-      } else if (user.parq_completed == 0 && currentView !== 'parq' && currentView !== 'profile' && user.fitness_goal) {
-        resetToView('profile');
+      const needsOnboarding = !user.fitness_goal || user.parq_completed == 0;
+      if (needsOnboarding && currentView !== 'onboarding') {
+        navigateTo('onboarding');
       }
     }
   }, [user, currentView]);
@@ -1041,6 +1041,30 @@ export default function App() {
               } else {
                 resetToView('home');
               }
+            }}
+          />
+        )}
+
+        {currentView === 'onboarding' && user && (
+          <OnboardingFlow 
+            user={user}
+            onComplete={() => {
+              // Refresh user data to get updated fitness_goal and parq_completed
+              fetch(`/api/users/${user.id}`)
+                .then(res => res.json())
+                .then(updatedUser => {
+                  setUser(updatedUser);
+                  safeStorage.setItem('krome_user', JSON.stringify(updatedUser));
+                  resetToView('home');
+                })
+                .catch(err => {
+                  console.error('Failed to refresh user after onboarding:', err);
+                  // Fallback: just update local state if fetch fails
+                  const finalUser = { ...user, fitness_goal: user.fitness_goal || 'General Fitness', parq_completed: 1 };
+                  setUser(finalUser);
+                  safeStorage.setItem('krome_user', JSON.stringify(finalUser));
+                  resetToView('home');
+                });
             }}
           />
         )}

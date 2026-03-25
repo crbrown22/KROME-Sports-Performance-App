@@ -43,6 +43,8 @@ interface BodyMetricsProps {
   userId: string;
   data: BodyMetricsData;
   setData: React.Dispatch<React.SetStateAction<BodyMetricsData>>;
+  onComplete?: () => void;
+  initialEditing?: boolean;
 }
 
 const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }: { title: string, icon: any, id: string, expandedSection: string | null, toggleSection: (id: string) => void }) => (
@@ -68,9 +70,9 @@ const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }
   </button>
 );
 
-export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps) {
+export default function BodyMetrics({ userId, data, setData, onComplete, initialEditing = false }: BodyMetricsProps) {
   const [bodyCompHistory, setBodyCompHistory] = useState<BodyCompEntry[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [expandedSection, setExpandedSection] = useState<string | null>('bodyComp');
 
   function calculateRMR() {
@@ -219,6 +221,7 @@ export default function BodyMetrics({ userId, data, setData }: BodyMetricsProps)
     }
     
     setIsEditing(false);
+    if (onComplete) onComplete();
   };
 
   const addBodyCompEntry = () => {
