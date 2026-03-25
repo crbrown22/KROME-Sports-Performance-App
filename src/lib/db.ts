@@ -4,7 +4,8 @@ import path from 'path';
 let db: any;
 try {
   db = new Database(path.join(process.cwd(), 'database.db'));
-  console.log("Database connected successfully.");
+  db.pragma('journal_mode = WAL');
+  console.log("Database connected successfully in WAL mode.");
 } catch (err) {
   console.error("Failed to connect to database:", err);
   // Fallback to in-memory database if file fails
@@ -29,6 +30,7 @@ try {
     fitness_goal TEXT,
     email_notifications INTEGER DEFAULT 1,
     push_notifications INTEGER DEFAULT 1,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -38,6 +40,7 @@ try {
     metric_name TEXT,
     metric_value REAL,
     unit TEXT,
+    firestore_id TEXT UNIQUE,
     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -57,6 +60,7 @@ try {
     protein REAL,
     carbs REAL,
     fat REAL,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -98,6 +102,9 @@ try {
     completed INTEGER DEFAULT 0,
     date TEXT,
     edited_data TEXT,
+    workout_start_time TEXT,
+    workout_end_time TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(user_id, workout_id, exercise_id, date)
@@ -112,6 +119,7 @@ try {
     day INTEGER,
     completed INTEGER DEFAULT 0,
     date TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(user_id, program_id, phase, week, day)
@@ -122,6 +130,7 @@ try {
     user_id INTEGER,
     action TEXT,
     details TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -132,6 +141,7 @@ try {
     image_url TEXT,
     analysis TEXT,
     feedback TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -140,6 +150,7 @@ try {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     overview TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -177,6 +188,7 @@ try {
     name TEXT,
     description TEXT,
     data TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -188,6 +200,7 @@ try {
     message TEXT,
     is_read INTEGER DEFAULT 0,
     is_deleted INTEGER DEFAULT 0,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -209,6 +222,7 @@ try {
     program_id TEXT,
     rating INTEGER,
     comment TEXT,
+    firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
@@ -341,6 +355,38 @@ try {
 } catch (err) {
   console.log('Adding firestore_id column to leads table...');
   db.exec('ALTER TABLE leads ADD COLUMN firestore_id TEXT');
+}
+
+// Migration: Add workout_start_time and workout_end_time to workout_logs
+try {
+  db.prepare('SELECT workout_start_time FROM workout_logs LIMIT 1').get();
+} catch (err) {
+  console.log('Adding workout_start_time and workout_end_time to workout_logs...');
+  try {
+    db.exec('ALTER TABLE workout_logs ADD COLUMN workout_start_time TEXT');
+    db.exec('ALTER TABLE workout_logs ADD COLUMN workout_end_time TEXT');
+  } catch (e) {}
+}
+
+// Migration: Add firestore_id column to various tables if they don't exist
+const tablesToMigrate = [
+  'progress', 'nutrition_logs', 'workout_logs', 'program_progress', 
+  'user_activity_logs', 'body_composition_logs', 'fitness_overviews', 
+  'custom_programs', 'messages', 'workout_feedback'
+];
+
+for (const table of tablesToMigrate) {
+  try {
+    db.prepare(`SELECT firestore_id FROM ${table} LIMIT 1`).get();
+  } catch (err) {
+    console.log(`Adding firestore_id column to ${table} table...`);
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN firestore_id TEXT`);
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_firestore_id ON ${table}(firestore_id)`);
+    } catch (alterErr) {
+      console.error(`Failed to migrate ${table}:`, alterErr);
+    }
+  }
 }
 
 // Create a default admin if none exists
