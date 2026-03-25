@@ -318,6 +318,15 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN push_notifications INTEGER DEFAULT 1");
 }
 
+// Migration: Add firestore_id column to purchases table if it doesn't exist
+try {
+  db.prepare('SELECT firestore_id FROM purchases LIMIT 1').get();
+} catch (err) {
+  console.log('Adding firestore_id column to purchases table...');
+  db.exec('ALTER TABLE purchases ADD COLUMN firestore_id TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_firestore_id ON purchases(firestore_id)');
+}
+
 // Migration: Add program_id column to purchases table if it doesn't exist
 try {
   db.prepare('SELECT program_id FROM purchases LIMIT 1').get();

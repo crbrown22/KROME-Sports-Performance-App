@@ -290,8 +290,16 @@ async function rehydrateDatabase() {
       const sqliteUserId = resolveUserId(data.user_id);
       if (typeof sqliteUserId === 'number') {
         db.prepare(`
-          INSERT OR IGNORE INTO purchases (user_id, item_name, price, square_order_id, stripe_session_id, program_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO purchases (user_id, item_name, price, square_order_id, stripe_session_id, program_id, firestore_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(firestore_id) DO UPDATE SET
+            user_id=excluded.user_id,
+            item_name=excluded.item_name,
+            price=excluded.price,
+            square_order_id=excluded.square_order_id,
+            stripe_session_id=excluded.stripe_session_id,
+            program_id=excluded.program_id,
+            created_at=excluded.created_at
         `).run(
           sqliteUserId,
           data.item_name || 'Unknown Item',
@@ -299,6 +307,7 @@ async function rehydrateDatabase() {
           data.square_order_id || null,
           data.stripe_session_id || null,
           data.program_id || null,
+          doc.id,
           formatDateForSQLite(data.created_at || data.createdAt || new Date())
         );
       }
@@ -1096,25 +1105,31 @@ app.post('/api/webhook', async (req, res) => {
   app.get("/api/admin/growth-kpis", (req, res) => {
     try {
       const now = new Date();
-      const currentDay = now.getDate();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
       
+      const formatMonth = (m: number) => m.toString().padStart(2, '0');
+
+      // Current Month Start
+      const currentMonthStart = `${currentYear}-${formatMonth(currentMonth)}-01 00:00:00`;
+      
+      // Previous Month Start
       const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = prevMonthDate.getMonth() + 1;
       const prevYear = prevMonthDate.getFullYear();
-      
-      // For PMTD (Previous Month-to-Date), handle cases where previous month has fewer days
-      const lastDayOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-      const compareDay = Math.min(currentDay, lastDayOfPrevMonth);
-
-      const formatMonth = (m: number) => m.toString().padStart(2, '0');
-      const formatDay = (d: number) => d.toString().padStart(2, '0');
-
-      // Date strings for SQLite comparison (YYYY-MM-DD HH:MM:SS)
-      const currentMonthStart = `${currentYear}-${formatMonth(currentMonth)}-01 00:00:00`;
       const prevMonthStart = `${prevYear}-${formatMonth(prevMonth)}-01 00:00:00`;
-      const prevMonthMTDEnd = `${prevYear}-${formatMonth(prevMonth)}-${formatDay(compareDay)} 23:59:59`;
+
+      // Previous Month-to-Date End (Precise comparison up to the same point in the month)
+      const currentMonthStartObj = new Date(currentYear, now.getMonth(), 1);
+      const durationInMonth = now.getTime() - currentMonthStartObj.getTime();
+      
+      const prevMonthStartObj = new Date(prevYear, prevMonth - 1, 1);
+      const prevMonthMTDEndObj = new Date(prevMonthStartObj.getTime() + durationInMonth);
+      
+      // Cap at the end of the previous month
+      const lastDayOfPrevMonth = new Date(currentYear, now.getMonth(), 0, 23, 59, 59, 999);
+      const cappedPrevMonthMTDEndObj = prevMonthMTDEndObj > lastDayOfPrevMonth ? lastDayOfPrevMonth : prevMonthMTDEndObj;
+      const prevMonthMTDEnd = formatDateForSQLite(cappedPrevMonthMTDEndObj);
 
       // 1. Revenue Metrics
       const totalRevenue = db.prepare('SELECT SUM(price) as total FROM purchases').get() as { total: number };
