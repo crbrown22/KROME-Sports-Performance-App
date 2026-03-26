@@ -22,25 +22,45 @@ import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin
 const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-const serviceAccount = JSON.parse(serviceAccountKey || '{}');
-const projectId = serviceAccount.project_id || process.env.PROJECT_ID || 'unknown';
-console.log(`[Firebase] Initializing Admin SDK for project: ${projectId}`);
-
-if (!serviceAccountKey) {
-  console.warn("[Firebase] FIREBASE_SERVICE_ACCOUNT_KEY is not set. Admin SDK may not function correctly.");
+let serviceAccount = {};
+try {
+  serviceAccount = JSON.parse(serviceAccountKey || '{}');
+} catch (e) {
+  console.error("[Firebase] Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:", e);
 }
 
-export const adminApp = initializeApp({
-  credential: cert(serviceAccount)
-});
+const projectId = (serviceAccount as any).project_id || process.env.PROJECT_ID || 'unknown';
+console.log(`[Firebase] Initializing Admin SDK for project: ${projectId}`);
+
+let adminApp;
+if (serviceAccountKey) {
+  try {
+    adminApp = initializeApp({
+      credential: cert(serviceAccount)
+    });
+    console.log("[Firebase] Admin SDK initialized successfully");
+  } catch (e) {
+    console.error("[Firebase] Error initializing Admin SDK:", e);
+    adminApp = initializeApp(); // Fallback to default credentials if possible
+  }
+} else {
+  console.warn("[Firebase] FIREBASE_SERVICE_ACCOUNT_KEY is not set. Admin SDK may not function correctly.");
+  try {
+    adminApp = initializeApp(); // Try default credentials
+  } catch (e) {
+    console.warn("[Firebase] Could not initialize default Admin SDK:", e);
+  }
+}
+
+export { adminApp };
 
 // Support named databases if provided in env
 const firestoreDatabaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)';
 console.log(`[Firebase] Using Firestore database: ${firestoreDatabaseId}`);
 
-export const adminDb = (firestoreDatabaseId && firestoreDatabaseId !== '(default)') 
+export const adminDb = (adminApp && firestoreDatabaseId && firestoreDatabaseId !== '(default)') 
   ? getFirestore(adminApp, firestoreDatabaseId)
-  : getFirestore(adminApp);
+  : (adminApp ? getFirestore(adminApp) : null);
 
 // Helper to resolve string Firebase UID to numeric SQLite ID
 function resolveUserId(userId: string | number): number | string {
@@ -154,6 +174,11 @@ let isRehydrated = false;
 
 async function rehydrateDatabase() {
   if (isRehydrated) return;
+  if (!adminDb) {
+    console.warn("[Rehydrate] adminDb is not initialized. Skipping re-hydration.");
+    isRehydrated = true;
+    return;
+  }
   console.log("[Rehydrate] Starting database re-hydration from Firestore...");
   
   const collections = [
