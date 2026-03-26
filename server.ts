@@ -5,7 +5,7 @@ import express from "express";
 console.log("[Server] Express imported");
 import { createServer as createViteServer } from "vite";
 console.log("[Server] Vite imported");
-import db from "./src/lib/db.js";
+import db from "./src/lib/db.ts";
 console.log("[Server] Database imported");
 import path from "path";
 import { SquareClient, SquareEnvironment } from 'square';
@@ -609,7 +609,7 @@ async function startServer() {
   
   console.log("Initializing express app...");
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = Number(process.env.PORT) || 8080;
 
   // Trust proxy for correct protocol/IP detection behind nginx
   app.set('trust proxy', true);
