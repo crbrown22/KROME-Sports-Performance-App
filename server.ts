@@ -1602,7 +1602,7 @@ app.post('/api/webhook', async (req, res) => {
         if (fitness_goal !== undefined) firestoreUpdate.fitnessGoal = fitness_goal;
 
         if (Object.keys(firestoreUpdate).length > 0 && adminDb) {
-          await adminDb.collection('users').doc(uid).update(firestoreUpdate);
+          await adminDb.collection('users').doc(uid).set(firestoreUpdate, { merge: true });
         }
       }
       
@@ -1622,7 +1622,7 @@ app.post('/api/webhook', async (req, res) => {
       // Sync to Firestore
       const user = db.prepare('SELECT uid FROM users WHERE id = ?').get(id) as any;
       if (user?.uid && adminDb) {
-        await adminDb.collection('users').doc(user.uid).update({ parq_completed: true });
+        await adminDb.collection('users').doc(user.uid).set({ parq_completed: true }, { merge: true });
       }
 
       res.json({ success: true });
@@ -2442,8 +2442,11 @@ app.post('/api/webhook', async (req, res) => {
       
       // Fetch sender usernames
       const senderIds = [...new Set(messages.map(m => m.sender_id))];
-      const usersSnapshot = await adminDb.collection('users').where('id', 'in', senderIds).get();
-      const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.data().id, doc.data().username]));
+      let usersMap = new Map();
+      if (senderIds.length > 0) {
+        const usersSnapshot = await adminDb.collection('users').where('id', 'in', senderIds).get();
+        usersMap = new Map(usersSnapshot.docs.map(doc => [doc.data().id, doc.data().username]));
+      }
       
       const result = messages.map(m => ({ ...m, sender_username: usersMap.get(m.sender_id) }));
       res.json(result);

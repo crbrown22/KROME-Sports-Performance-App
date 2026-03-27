@@ -128,6 +128,7 @@ try {
   CREATE TABLE IF NOT EXISTS user_activity_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
+    username TEXT,
     action TEXT,
     details TEXT,
     firestore_id TEXT UNIQUE,
@@ -387,6 +388,14 @@ for (const table of tablesToMigrate) {
       console.error(`Failed to migrate ${table}:`, alterErr);
     }
   }
+}
+
+// Migration: Add username column to user_activity_logs if it doesn't exist
+try {
+  db.prepare('SELECT username FROM user_activity_logs LIMIT 1').get();
+} catch (err) {
+  console.log('Adding username column to user_activity_logs table...');
+  db.exec('ALTER TABLE user_activity_logs ADD COLUMN username TEXT');
 }
 
 // Create a default admin if none exists
