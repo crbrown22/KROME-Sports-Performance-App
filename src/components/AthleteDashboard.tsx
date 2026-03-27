@@ -31,6 +31,7 @@ export default function AthleteDashboard({ user, onNavigate }: AthleteDashboardP
   const [metrics, setMetrics] = useState<any>(null);
   const [nutrition, setNutrition] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,16 +41,33 @@ export default function AthleteDashboard({ user, onNavigate }: AthleteDashboardP
           fetch(`/api/nutrition/${user.id}/latest`)
         ]);
 
-        if (metricsRes.ok) setMetrics(await metricsRes.json());
-        if (nutritionRes.ok) setNutrition(await nutritionRes.json());
+        if (metricsRes.ok) {
+          setMetrics(await metricsRes.json());
+        }
+        
+        if (nutritionRes.ok) {
+          setNutrition(await nutritionRes.json());
+        } else if (nutritionRes.status === 503) {
+          const data = await nutritionRes.json();
+          setError(data.details || "Firebase service is currently unavailable.");
+        }
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
+        setError("Failed to connect to the server. Please check your connection.");
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, [user.id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold"></div>
+      </div>
+    );
+  }
 
   const stats = [
     { 
@@ -88,6 +106,23 @@ export default function AthleteDashboard({ user, onNavigate }: AthleteDashboardP
 
   return (
     <div className="space-y-8">
+      {/* Error Alert */}
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3"
+        >
+          <div className="p-2 bg-red-500/20 rounded-lg">
+            <Activity className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <h3 className="text-red-500 font-bold text-sm uppercase tracking-wider">Service Alert</h3>
+            <p className="text-white/60 text-xs mt-1">{error}</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
