@@ -1601,7 +1601,7 @@ app.post('/api/webhook', async (req, res) => {
         if (status !== undefined) firestoreUpdate.status = status;
         if (fitness_goal !== undefined) firestoreUpdate.fitnessGoal = fitness_goal;
 
-        if (Object.keys(firestoreUpdate).length > 0) {
+        if (Object.keys(firestoreUpdate).length > 0 && adminDb) {
           await adminDb.collection('users').doc(uid).update(firestoreUpdate);
         }
       }
@@ -1621,7 +1621,7 @@ app.post('/api/webhook', async (req, res) => {
       
       // Sync to Firestore
       const user = db.prepare('SELECT uid FROM users WHERE id = ?').get(id) as any;
-      if (user?.uid) {
+      if (user?.uid && adminDb) {
         await adminDb.collection('users').doc(user.uid).update({ parq_completed: true });
       }
 

@@ -79,6 +79,7 @@ export default function FitnessGoalOnboarding({ user, onComplete }: FitnessGoalO
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [step, setStep] = useState<'goal' | 'suggestions'>('goal');
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGoalSelect = (goalId: string) => {
     setSelectedGoal(goalId);
@@ -93,17 +94,26 @@ export default function FitnessGoalOnboarding({ user, onComplete }: FitnessGoalO
   const handleSave = async () => {
     if (!selectedGoal) return;
     setIsSaving(true);
+    setError(null);
     try {
+      console.log(`Saving fitness goal: ${selectedGoal} for user ${user.id}`);
       const response = await fetch(`/api/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fitness_goal: selectedGoal })
       });
+      
       if (response.ok) {
+        console.log("Fitness goal saved successfully");
         onComplete(selectedGoal);
+      } else {
+        const data = await response.json();
+        console.error("Failed to save fitness goal:", data);
+        setError(data.error || "Failed to save your goal. Please try again.");
       }
     } catch (err) {
-      console.error("Failed to save fitness goal", err);
+      console.error("Error saving fitness goal:", err);
+      setError("A network error occurred. Please check your connection.");
     } finally {
       setIsSaving(false);
     }
@@ -216,6 +226,12 @@ export default function FitnessGoalOnboarding({ user, onComplete }: FitnessGoalO
                     </motion.div>
                   ))}
                 </div>
+
+                {error && (
+                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm">
+                    {error}
+                  </div>
+                )}
 
                 <button
                   onClick={handleSave}
