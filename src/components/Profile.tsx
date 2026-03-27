@@ -1,7 +1,8 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from "react";
 import { getCurrentDate } from '../utils/date';
+import AthleteDashboard from "./AthleteDashboard";
 import { 
   User, 
   Mail, 
@@ -28,7 +29,9 @@ import {
   Dumbbell,
   Video,
   Target,
-  Lock
+  Lock,
+  LayoutDashboard,
+  PieChart
 } from "lucide-react";
 import ProgressTracker from "./ProgressTracker";
 import BodyMetrics from "./BodyMetrics";
@@ -57,12 +60,12 @@ interface ProfileProps {
   onDelete: () => void;
   onNavigate: (view: string) => void;
   onProgramSelect?: (programId: string) => void;
-  initialTab?: 'account' | 'progress' | 'nutrition' | 'metrics' | 'parq' | 'workouts' | 'composition' | 'overview' | 'videoAnalysis' | 'programs' | 'builder' | 'schedule';
+  initialTab?: 'dashboard' | 'training' | 'progress' | 'nutrition' | 'account' | 'metrics' | 'parq' | 'workouts' | 'composition' | 'overview' | 'videoAnalysis' | 'programs' | 'builder' | 'schedule';
 }
 
-export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, onNavigate, onProgramSelect, initialTab = 'account' }: ProfileProps) {
+export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, onNavigate, onProgramSelect, initialTab = 'dashboard' }: ProfileProps) {
   console.log("Profile mounted, user:", user, "initialTab:", initialTab);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'training' | 'progress' | 'nutrition' | 'account' | 'metrics' | 'parq' | 'workouts' | 'composition' | 'overview' | 'videoAnalysis' | 'programs' | 'builder' | 'schedule'>(initialTab as any);
 
   const needsOnboarding = !user.fitness_goal || user.parq_completed === 0;
 
@@ -404,34 +407,43 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-24 md:pt-32 pb-24 bg-black px-4 md:px-6"
+      className="min-h-screen pt-24 md:pt-32 pb-32 bg-black px-4 md:px-6"
     >
-      <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-8 md:mb-12">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
           <button 
             onClick={onBack}
             className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all !outline-none"
-            aria-label="Go back to home page"
           >
-            <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back
+            <ChevronLeft className="w-4 h-4" /> Back
           </button>
-          <button 
-            onClick={onLogout}
-            className="flex items-center gap-2 text-red-500 font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all !outline-none"
-            aria-label="Logout from your account"
-          >
-            Logout <LogOut className="w-4 h-4" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-4">
+            {user.role === 'admin' && (
+              <button 
+                onClick={() => onNavigate('admin')}
+                className="p-2 bg-gold/10 border border-gold/20 rounded-xl text-gold hover:bg-gold/20 transition-all"
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
+            <button 
+              onClick={() => setActiveTab('account')}
+              className={`p-2 rounded-xl transition-all ${activeTab === 'account' ? 'bg-gold text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {needsOnboarding && (
+        {/* Onboarding Alert */}
+        {needsOnboarding && activeTab === 'dashboard' && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 p-6 bg-gold/10 border border-gold/20 rounded-3xl space-y-4 relative overflow-hidden group"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-gold/5 blur-3xl -mr-16 -mt-16 group-hover:bg-gold/10 transition-all" />
-            
             <div className="flex items-center gap-3 text-gold relative z-10">
               <div className="w-10 h-10 rounded-2xl bg-gold/20 flex items-center justify-center">
                 <AlertCircle className="w-6 h-6" />
@@ -441,11 +453,9 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
                 <p className="text-[10px] font-bold uppercase tracking-widest text-gold/60 mt-1">Onboarding Incomplete</p>
               </div>
             </div>
-            
             <p className="text-white/60 text-sm relative z-10 leading-relaxed">
               To unlock all features and ensure your safety, please complete your PAR-Q and set your fitness goals.
             </p>
-            
             <button 
               onClick={() => onNavigate('onboarding')}
               className="btn-gold w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] relative z-10 shadow-xl shadow-gold/20 hover:shadow-gold/40 transition-all"
@@ -455,208 +465,247 @@ export default function Profile({ user, onLogout, onBack, onUpdate, onDelete, on
           </motion.div>
         )}
 
-        <div className="text-center">
-          <div className="relative inline-block mb-6 md:mb-8 group">
-            <div className="w-32 h-32 md:w-40 md:h-40 rounded-3xl gold-gradient p-1 shadow-2xl shadow-gold/20">
-              <div className="w-full h-full bg-zinc-900 rounded-[22px] flex items-center justify-center overflow-hidden relative">
-                {formData.avatar_url ? (
-                  <img 
-                    src={formData.avatar_url} 
-                    alt={user.username} 
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <User className="w-20 h-20 text-gold/20" />
-                )}
-                {uploading && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <label className="absolute -bottom-3 -right-3 w-12 h-12 bg-zinc-800 border border-white/10 rounded-2xl flex items-center justify-center text-gold shadow-xl cursor-pointer hover:bg-zinc-700 transition-colors" aria-label="Change profile picture">
-              <Camera className="w-5 h-5" aria-hidden="true" />
-              <input 
-                type="file" 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleFileChange}
-                aria-label="Upload new profile picture"
-              />
-            </label>
-          </div>
-          <h2 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter mb-2">{user.username}</h2>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <p className="text-white/60 font-bold uppercase tracking-widest text-xs md:text-sm italic">
-              {user.firstName || user.lastName || user.first_name || user.last_name ? 
-                `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
-                'Name Not Set'}
-            </p>
-          </div>
-          <p className="text-gold font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2 italic">Elite Member</p>
-          
-          {user.fitness_goal && (
-            <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-gold/10 border border-gold/20 rounded-full">
-              <Target className="w-3 h-3 text-gold" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-gold">
-                Goal: {user.fitness_goal.replace('-', ' ')}
-              </span>
-            </div>
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+            >
+              <AthleteDashboard user={user} onNavigate={onNavigate} />
+            </motion.div>
           )}
 
-          <div className="grid grid-cols-1 gap-3" role="tablist" aria-label="Profile sections">
-            <button 
-              onClick={() => onNavigate('myPrograms')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-gold/10 text-gold border border-gold/20 hover:bg-gold/20 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
+          {activeTab === 'training' && (
+            <motion.div
+              key="training"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
             >
-              <Lock className="w-4 h-4" aria-hidden="true" /> My Purchased Programs
-            </button>
-            <button 
-              onClick={() => {
-                if (onProgramSelect) {
-                  onProgramSelect('');
-                } else {
-                  onNavigate('programViewer');
-                }
-              }}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Calendar className="w-4 h-4" aria-hidden="true" /> Training Programs
-            </button>
-            <button 
-              onClick={() => onNavigate('workoutTracker')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <History className="w-4 h-4" aria-hidden="true" /> Training History
-            </button>
-            <button 
-              onClick={() => onNavigate('fitnessOverview')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <TrendingUp className="w-4 h-4" aria-hidden="true" /> Fitness Overview
-            </button>
-            <button 
-              onClick={() => onNavigate('progressTracker')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <TrendingUp className="w-4 h-4" aria-hidden="true" /> Training Stats
-            </button>
-            <button 
-              onClick={() => onNavigate('performanceMacroNutrients')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Apple className="w-4 h-4" aria-hidden="true" /> Nutrition Tracker
-            </button>
-            <button 
-              onClick={() => onNavigate('bodyComposition')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Camera className="w-4 h-4" aria-hidden="true" /> Body Composition
-            </button>
-            <button 
-              onClick={() => onNavigate('bodyMetrics')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Activity className="w-4 h-4" aria-hidden="true" /> Body Metrics
-            </button>
-            <button 
-              onClick={() => onNavigate('videoAnalysis')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Video className="w-4 h-4" aria-hidden="true" /> Video Analysis
-            </button>
-            <button 
-              onClick={() => onNavigate('programBuilder')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Edit3 className="w-4 h-4" aria-hidden="true" /> Program Creator
-            </button>
-            <button 
-              onClick={() => onNavigate('parq')}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
-            >
-              <ShieldAlert className="w-4 h-4" aria-hidden="true" /> PAR-Q
-            </button>
-            <button 
-              onClick={() => onNavigate('programCalendar')}
-              disabled={user.parq_completed === 0}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 ${user.parq_completed === 0 ? 'opacity-50 cursor-not-allowed' : ''} krome-outline`}
-            >
-              <Calendar className="w-4 h-4" aria-hidden="true" /> Schedule
-            </button>
-            {user.role === 'admin' && (
-              <button 
-                onClick={() => onNavigate('admin')}
-                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-gold/10 text-gold hover:bg-gold/20 krome-outline`}
-              >
-                <Shield className="w-4 h-4" aria-hidden="true" /> Admin Dashboard
-              </button>
-            )}
-            <button 
-              onClick={() => onNavigate('fitnessGoal')}
-              className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline"
-            >
-              <Target className="w-4 h-4" aria-hidden="true" /> Update Fitness Goal
-            </button>
-            <button 
-              onClick={() => onNavigate('accountSettings')}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline`}
-            >
-              <Settings className="w-4 h-4" aria-hidden="true" /> Account Settings
-            </button>
-            <button 
-              onClick={onLogout}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all bg-red-500/10 text-red-500 hover:bg-red-500/20 mt-4`}
-            >
-              <LogOut className="w-4 h-4" aria-hidden="true" /> Logout
-            </button>
-          </div>
-
-          <div className="mt-12 text-left">
-            <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-gold" /> Purchased Content
-            </h3>
-            {purchasedPrograms.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
-                {purchasedPrograms.map((prog, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center justify-between group hover:border-gold/30 transition-all">
-                    <div>
-                      <div className="text-[10px] font-bold text-gold uppercase tracking-widest mb-1">Active Program</div>
-                      <div className="text-sm font-black uppercase italic">{prog.replace(/-/g, ' ')}</div>
-                    </div>
-                    <button 
-                      onClick={() => onNavigate('myPrograms')}
-                      className="p-2 rounded-xl bg-white/5 group-hover:bg-gold group-hover:text-black transition-all"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-6">Training Hub</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onClick={() => onNavigate('myPrograms')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-gold/10 text-gold"><Lock className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">My Programs</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Purchased Content</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white/5 border border-white/5 p-8 rounded-[32px] text-center">
-                <p className="text-white/30 text-xs font-bold uppercase tracking-widest mb-6">No purchased programs yet</p>
-                <button 
-                  onClick={() => onNavigate('shop')}
-                  className="btn-outline-accent !py-2 !text-[10px]"
-                >
-                  Visit Shop
+                </button>
+                <button onClick={() => onNavigate('programViewer')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Calendar className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Training Programs</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Browse Catalog</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('workoutTracker')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><History className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Training History</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Log & Review</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('programCalendar')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Calendar className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Schedule</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Weekly Planner</p>
+                  </div>
                 </button>
               </div>
-            )}
-          </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'progress' && (
+            <motion.div
+              key="progress"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-6">Progress & Stats</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onClick={() => onNavigate('progressTracker')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><TrendingUp className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Training Stats</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Performance Metrics</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('bodyMetrics')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Activity className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Body Metrics</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Weight & Measurements</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('bodyComposition')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Camera className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Body Composition</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Photos & Analysis</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('videoAnalysis')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Video className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Video Analysis</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Form Review</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'nutrition' && (
+            <motion.div
+              key="nutrition"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-6">Nutrition Hub</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onClick={() => onNavigate('performanceMacroNutrients')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><Apple className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Nutrition Tracker</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Macros & Calories</p>
+                  </div>
+                </button>
+                <button onClick={() => onNavigate('nutritionDashboard')} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all group">
+                  <div className="p-3 rounded-2xl bg-white/5 text-white/60"><PieChart className="w-6 h-6" /></div>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase italic">Nutrition Insights</p>
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest">Detailed Analysis</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'account' && (
+            <motion.div
+              key="account"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-8"
+            >
+              <div className="text-center">
+                <div className="relative inline-block mb-6 group">
+                  <div className="w-32 h-32 rounded-3xl gold-gradient p-1 shadow-2xl shadow-gold/20">
+                    <div className="w-full h-full bg-zinc-900 rounded-[22px] flex items-center justify-center overflow-hidden relative">
+                      {formData.avatar_url ? (
+                        <img 
+                          src={formData.avatar_url} 
+                          alt={user.username} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <User className="w-20 h-20 text-gold/20" />
+                      )}
+                      {uploading && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <label className="absolute -bottom-3 -right-3 w-12 h-12 bg-zinc-800 border border-white/10 rounded-2xl flex items-center justify-center text-gold shadow-xl cursor-pointer hover:bg-zinc-700 transition-colors">
+                    <Camera className="w-5 h-5" />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                  </label>
+                </div>
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-1">{user.username}</h2>
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-6 italic">Elite Member</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <button onClick={() => onNavigate('accountSettings')} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all">
+                  <Settings className="w-4 h-4" /> Account Settings
+                </button>
+                <button onClick={() => onNavigate('parq')} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all">
+                  <ShieldAlert className="w-4 h-4" /> PAR-Q Status
+                </button>
+                <button onClick={() => onNavigate('fitnessGoal')} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all">
+                  <Target className="w-4 h-4" /> Update Fitness Goal
+                </button>
+                <button onClick={onLogout} className="w-full py-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all mt-4">
+                  <LogOut className="w-4 h-4" /> Logout
+                </button>
+              </div>
+
+              {/* Notification Settings */}
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
+                <h3 className="text-xs font-black uppercase italic mb-6 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-gold" /> Notification Settings
+                </h3>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase italic tracking-widest">Email Notifications</p>
+                      <p className="text-[9px] text-white/40 uppercase tracking-widest mt-1">Receive updates via email</p>
+                    </div>
+                    <button 
+                      onClick={() => handleUpdateNotificationSettings(!emailNotifications, globalPushEnabled)}
+                      className={`w-12 h-6 rounded-full relative transition-all ${emailNotifications ? 'bg-gold' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${emailNotifications ? 'right-1' : 'left-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase italic tracking-widest">Push Notifications</p>
+                      <p className="text-[9px] text-white/40 uppercase tracking-widest mt-1">Real-time alerts on this device</p>
+                    </div>
+                    <button 
+                      onClick={() => handleUpdateNotificationSettings(emailNotifications, !globalPushEnabled)}
+                      className={`w-12 h-6 rounded-full relative transition-all ${globalPushEnabled ? 'bg-gold' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${globalPushEnabled ? 'right-1' : 'left-1'}`} />
+                    </button>
+                  </div>
+                  {!pushEnabled && (
+                    <button 
+                      onClick={handleEnableNotifications}
+                      disabled={notificationLoading}
+                      className="w-full py-3 bg-gold text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {notificationLoading ? 'Enabling...' : 'Enable Device Push'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Bottom Tab Bar */}
+        <div className="fixed bottom-0 left-0 w-full bg-black/90 backdrop-blur-xl border-t border-white/10 px-4 py-3 flex justify-between items-center z-[100] pb-[calc(12px+var(--safe-area-bottom))]">
+          {[
+            { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
+            { id: 'training', icon: Dumbbell, label: 'Training' },
+            { id: 'progress', icon: TrendingUp, label: 'Progress' },
+            { id: 'nutrition', icon: Apple, label: 'Nutrition' },
+            { id: 'account', icon: User, label: 'Profile' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? 'text-gold' : 'text-white/40'}`}
+            >
+              <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'scale-110' : ''}`} />
+              <span className="text-[8px] font-black uppercase tracking-widest">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </motion.div>

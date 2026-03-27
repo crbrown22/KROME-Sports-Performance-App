@@ -73,6 +73,18 @@ function resolveUserId(userId: string | number): number | string {
 
 const upload = multer({ dest: 'uploads/' });
 
+// Middleware to check if Firebase is initialized
+const firebaseDbCheck = (req: any, res: any, next: any) => {
+  if (!adminDb) {
+    console.warn(`[Firebase] adminDb not initialized for ${req.method} ${req.path}`);
+    return res.status(503).json({ 
+      error: "Firebase service unavailable", 
+      details: "The server is currently unable to connect to Firestore. Please check your configuration." 
+    });
+  }
+  next();
+};
+
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
@@ -633,7 +645,18 @@ async function startServer() {
   console.log("startServer() called");
   
   console.log("Initializing express app...");
-  const app = express();
+  // Log environment variable presence (without values)
+console.log('Environment Check:', {
+  VAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: !!process.env.VAPID_PRIVATE_KEY,
+  SMTP_HOST: !!process.env.SMTP_HOST,
+  SMTP_USER: !!process.env.SMTP_USER,
+  SMTP_PASS: !!process.env.SMTP_PASS,
+  APP_URL: !!process.env.APP_URL,
+  FIREBASE_SERVICE_ACCOUNT_KEY: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+});
+
+const app = express();
   const PORT = Number(process.env.PORT) || 8080;
 
   // Trust proxy for correct protocol/IP detection behind nginx
@@ -742,12 +765,24 @@ async function sendWelcomeEmail(email: string, firstName: string) {
 // Helper for sending admin notification
 async function sendAdminRegistrationNotification(userData: any) {
   try {
+    // 1. Send Email
     await transporter.sendMail({
       from: '"KROME System" <kromefitness@gmail.com>',
       to: 'kromefitness@gmail.com', // Admin email
       subject: 'New Athlete Registered',
       text: `A new athlete has registered:\n\nName: ${userData.firstName} ${userData.lastName}\nEmail: ${userData.email}\nUsername: ${userData.username}\nRole: ${userData.role}\n\nCheck the admin dashboard for more details.`,
     });
+
+    // 2. Send Push to all Admins
+    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin'").all() as { id: number }[];
+    for (const admin of admins) {
+      await sendNotification(
+        admin.id, 
+        'New Athlete Registered', 
+        `${userData.firstName} ${userData.lastName} has joined KROME.`, 
+        '/admin'
+      );
+    }
   } catch (error) {
     console.error('Error sending admin notification:', error);
   }
@@ -1598,7 +1633,7 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Progress: Get user progress
-  app.get("/api/progress/:userId", async (req, res) => {
+  app.get("/api/progress/:userId", firebaseDbCheck, async (req, res) => {
     const { userId } = req.params;
     try {
       const snapshot = await adminDb.collection('progress').where('user_id', '==', userId).orderBy('recorded_at', 'asc').get();
@@ -1611,7 +1646,7 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Progress: Add progress entry
-  app.post("/api/progress", async (req, res) => {
+  app.post("/api/progress", firebaseDbCheck, async (req, res) => {
     const { user_id, metric_name, metric_value, unit } = req.body;
     const sqliteId = resolveUserId(user_id);
     try {
@@ -1638,7 +1673,7 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Progress: Delete entry
-  app.delete("/api/progress/:id", async (req, res) => {
+  app.delete("/api/progress/:id", firebaseDbCheck, async (req, res) => {
     const { id } = req.params;
     try {
       await adminDb.collection('progress').doc(id).delete();
@@ -1650,7 +1685,7 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Nutrition: Get user logs
-  app.get("/api/nutrition/:userId", async (req, res) => {
+  app.get("/api/nutrition/:userId", firebaseDbCheck, async (req, res) => {
     const { userId } = req.params;
     console.log(`Fetching nutrition for user: ${userId}`);
     try {
@@ -1659,6 +1694,28 @@ app.post('/api/webhook', async (req, res) => {
       res.json(logs);
     } catch (err) {
       console.error("Error fetching nutrition logs:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Nutrition: Get latest log
+  app.get("/api/nutrition/:userId/latest", firebaseDbCheck, async (req, res) => {
+    const { userId } = req.params;
+    try {
+      const snapshot = await adminDb.collection('nutrition_logs')
+        .where('user_id', '==', userId)
+        .orderBy('created_at', 'desc')
+        .limit(1)
+        .get();
+      
+      if (snapshot.empty) {
+        return res.json(null);
+      }
+      
+      const log = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      res.json(log);
+    } catch (err) {
+      console.error("Error fetching latest nutrition log:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
