@@ -63,12 +63,17 @@ export const adminDb = (adminApp && firestoreDatabaseId && firestoreDatabaseId !
   : (adminApp ? getFirestore(adminApp) : null);
 
 // Helper to resolve string Firebase UID to numeric SQLite ID
-function resolveUserId(userId: string | number): number | string {
+function resolveUserId(userId: string | number): number | null {
   if (typeof userId === 'number') return userId;
   if (!isNaN(Number(userId))) return Number(userId);
   
-  const user = db.prepare('SELECT id FROM users WHERE uid = ?').get(userId) as { id: number } | undefined;
-  return user ? user.id : userId;
+  try {
+    const user = db.prepare('SELECT id FROM users WHERE uid = ? OR firestore_id = ?').get(userId, userId) as { id: number } | undefined;
+    return user ? user.id : null;
+  } catch (err) {
+    console.error("Error resolving user ID:", err);
+    return null;
+  }
 }
 
 const upload = multer({ dest: 'uploads/' });
@@ -462,19 +467,23 @@ async function rehydrateDatabase() {
         const sqliteUserId = resolveUserId(data.user_id);
         if (typeof sqliteUserId === 'number') {
           db.prepare(`
-            INSERT INTO program_progress (user_id, program_id, phase, week, day, completed, date, firestore_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO program_progress (user_id, program_id, workout_id, phase, week, day, completed, date, scheduled_time, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(firestore_id) DO UPDATE SET
               completed=excluded.completed,
-              date=excluded.date
+              date=excluded.date,
+              scheduled_time=excluded.scheduled_time,
+              workout_id=excluded.workout_id
           `).run(
             sqliteUserId, 
             data.program_id, 
+            data.workout_id || null,
             data.phase, 
             data.week, 
             data.day, 
             data.completed ? 1 : 0, 
             data.date, 
+            data.scheduled_time || null,
             doc.id,
             data.created_at || new Date().toISOString()
           );
@@ -619,6 +628,74 @@ async function rehydrateDatabase() {
           );
         }
       }
+    }},
+    { name: 'custom_foods', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} custom foods in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.user_id);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO custom_foods (user_id, name, calories, protein, carbs, fat, portion, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            sqliteUserId, 
+            data.name, 
+            data.calories, 
+            data.protein, 
+            data.carbs, 
+            data.fat, 
+            data.portion,
+            data.created_at || new Date().toISOString()
+          );
+        }
+      }
+    }},
+    { name: 'program_templates', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} program templates in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        db.prepare(`
+          INSERT INTO program_templates (id, name, description, price, data, firestore_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name=excluded.name,
+            description=excluded.description,
+            price=excluded.price,
+            data=excluded.data
+        `).run(
+          doc.id, 
+          data.name, 
+          data.description, 
+          data.price || 0, 
+          JSON.stringify({ phases: data.phases }), 
+          doc.id,
+          data.created_at || new Date().toISOString()
+        );
+      }
+    }},
+    { name: 'assigned_programs', handler: async (snapshot: any) => {
+      console.log(`[Rehydrate] Found ${snapshot.size} assigned programs in Firestore.`);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sqliteUserId = resolveUserId(data.userId);
+        const sqliteAdminId = resolveUserId(data.assignedBy);
+        if (typeof sqliteUserId === 'number') {
+          db.prepare(`
+            INSERT INTO program_assignments (user_id, program_id, assigned_by, firestore_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, program_id) DO UPDATE SET
+              assigned_by=excluded.assigned_by,
+              firestore_id=excluded.firestore_id
+          `).run(
+            sqliteUserId, 
+            data.programId, 
+            sqliteAdminId || null, 
+            doc.id,
+            data.assignedAt || new Date().toISOString()
+          );
+        }
+      }
     }}
   ];
 
@@ -641,10 +718,38 @@ async function rehydrateDatabase() {
   isRehydrated = true;
 }
 
+async function ensureAdminsExist() {
+  if (!adminDb) return;
+  const adminEmails = ['swolecode@gmail.com', 'kromefitness@gmail.com'];
+  console.log("[Admin] Ensuring admin roles for:", adminEmails);
+  
+  for (const email of adminEmails) {
+    try {
+      const snapshot = await adminDb.collection('users').where('email', '==', email).get();
+      if (!snapshot.empty) {
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          if (data.role !== 'admin') {
+            console.log(`[Admin] Promoting ${email} to admin in Firestore...`);
+            await adminDb.collection('users').doc(doc.id).update({ role: 'admin' });
+            
+            // Also update SQLite
+            db.prepare('UPDATE users SET role = ? WHERE email = ?').run('admin', email);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[Admin] Error promoting ${email}:`, err);
+    }
+  }
+}
+
 async function startServer() {
   console.log("startServer() called");
   
   console.log("Initializing express app...");
+  await rehydrateDatabase();
+  await ensureAdminsExist();
   // Log environment variable presence (without values)
 console.log('Environment Check:', {
   VAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
@@ -774,7 +879,7 @@ async function sendAdminRegistrationNotification(userData: any) {
     });
 
     // 2. Send Push to all Admins
-    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin'").all() as { id: number }[];
+    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' OR role = 'coach'").all() as { id: number }[];
     for (const admin of admins) {
       await sendNotification(
         admin.id, 
@@ -1005,7 +1110,7 @@ app.post('/api/webhook', async (req, res) => {
           id: doc.id,
           username: data.name || data.email,
           email: data.email,
-          role: data.role === 'admin' ? 'admin' : 'user',
+          role: (data.role === 'admin' || data.role === 'coach') ? data.role : 'athlete',
           status: 'active', // Default status
           avatarUrl: data.avatarUrl
         };
@@ -1046,28 +1151,13 @@ app.post('/api/webhook', async (req, res) => {
   app.post("/api/leads", async (req, res) => {
     const { name, email, status, value, sports, sessionRequests, preferredTimes, preferredDays, positions, userId } = req.body;
     try {
-      // 1. Save to Firestore first to get an ID
-      const leadData = {
-        name,
-        email,
-        status: status || 'New Lead',
-        value: value || 0,
-        sports: sports || [],
-        sessionRequests: sessionRequests || [],
-        preferredTimes: preferredTimes || [],
-        preferredDays: preferredDays || [],
-        positions: positions || [],
-        user_id: userId || null,
-        created_at: new Date().toISOString()
-      };
-      const firestoreRef = await adminDb.collection('leads').add(leadData);
-      const firestoreId = firestoreRef.id;
-
-      // 2. Save to SQLite with firestore_id
+      const createdAt = new Date().toISOString();
+      
+      // 1. Save to SQLite first
       const result = db.prepare(`
         INSERT INTO leads (
           name, email, status, value, sports, session_requests, 
-          preferred_times, preferred_days, positions, user_id, firestore_id
+          preferred_times, preferred_days, positions, user_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         name, 
@@ -1080,15 +1170,45 @@ app.post('/api/webhook', async (req, res) => {
         preferredDays ? JSON.stringify(preferredDays) : null,
         positions ? JSON.stringify(positions) : null,
         userId || null,
-        firestoreId
+        createdAt
       );
 
+      const insertId = result.lastInsertRowid;
+      let firestoreId = insertId.toString();
+
+      const leadData = {
+        name,
+        email,
+        status: status || 'New Lead',
+        value: value || 0,
+        sports: sports || [],
+        sessionRequests: sessionRequests || [],
+        preferredTimes: preferredTimes || [],
+        preferredDays: preferredDays || [],
+        positions: positions || [],
+        user_id: userId || null,
+        created_at: createdAt
+      };
+
+      // 2. Sync with Firestore
+      if (adminDb) {
+        try {
+          const firestoreRef = await adminDb.collection('leads').add(leadData);
+          firestoreId = firestoreRef.id;
+          
+          // Update SQLite with firestore_id
+          db.prepare('UPDATE leads SET firestore_id = ? WHERE id = ?').run(firestoreId, insertId);
+        } catch (firestoreErr) {
+          console.error("Error adding lead to Firestore (Quota Exceeded?), but saved to SQLite:", firestoreErr);
+        }
+      }
+
       res.json({ 
-        id: result.lastInsertRowid,
+        id: insertId,
         firestoreId,
         ...leadData,
-        dateAdded: leadData.created_at,
-        lastContact: leadData.created_at
+        dateAdded: createdAt,
+        lastContact: createdAt
       });
     } catch (err) {
       console.error("Database error adding lead:", err);
@@ -1143,8 +1263,12 @@ app.post('/api/webhook', async (req, res) => {
         db.prepare(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
         // 3. Update Firestore if firestore_id exists
-        if (lead?.firestore_id) {
-          await adminDb.collection('leads').doc(lead.firestore_id).update(firestoreUpdates);
+        if (lead?.firestore_id && adminDb) {
+          try {
+            await adminDb.collection('leads').doc(lead.firestore_id).update(firestoreUpdates);
+          } catch (firestoreErr) {
+            console.error("Error updating lead in Firestore (Quota Exceeded?), but saved to SQLite:", firestoreErr);
+          }
         }
       }
       
@@ -1169,8 +1293,12 @@ app.post('/api/webhook', async (req, res) => {
       db.prepare('DELETE FROM leads WHERE id = ?').run(id);
 
       // 3. Delete from Firestore if firestore_id exists
-      if (lead?.firestore_id) {
-        await adminDb.collection('leads').doc(lead.firestore_id).delete();
+      if (lead?.firestore_id && adminDb) {
+        try {
+          await adminDb.collection('leads').doc(lead.firestore_id).delete();
+        } catch (firestoreErr) {
+          console.error("Error deleting lead from Firestore (Quota Exceeded?), but deleted from SQLite:", firestoreErr);
+        }
       }
 
       res.json({ success: true });
@@ -1194,49 +1322,58 @@ app.post('/api/webhook', async (req, res) => {
         firstName: finalFirstName,
         lastName: finalLastName,
         username: username || email.split('@')[0],
-        role: (email === 'swolecode@gmail.com' || email === 'kromefitness@gmail.com') ? 'admin' : (role === 'user' ? 'athlete' : (role || 'athlete')),
+        role: (email === 'swolecode@gmail.com' || email === 'kromefitness@gmail.com') ? 'admin' : (role === 'coach' ? 'coach' : (role === 'user' ? 'athlete' : (role || 'athlete'))),
         createdAt: new Date().toISOString()
       };
       await adminDb.collection('users').doc(uid).set(userData);
 
       // 2. Sync with SQLite
-      const insert = db.prepare(`
-        INSERT INTO users (username, email, first_name, last_name, role, uid) 
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(email) DO UPDATE SET 
-          username=excluded.username,
-          first_name=excluded.first_name,
-          last_name=excluded.last_name,
-          uid=excluded.uid
-      `);
-      const result = insert.run(
-        userData.username,
-        email,
-        userData.firstName,
-        userData.lastName,
-        userData.role,
-        uid
-      );
-
-      // 3. Send Welcome Email to Athlete
       try {
-        await sendWelcomeEmail(email, finalFirstName);
-        await sendAdminRegistrationNotification(userData);
-      } catch (emailErr) {
-        console.error("Error sending registration emails:", emailErr);
-        // Don't fail registration if emails fail
-      }
+        const insert = db.prepare(`
+          INSERT INTO users (username, email, first_name, last_name, role, uid) 
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(email) DO UPDATE SET 
+            username=excluded.username,
+            first_name=excluded.first_name,
+            last_name=excluded.last_name,
+            uid=excluded.uid
+        `);
+        const result = insert.run(
+          userData.username,
+          email,
+          userData.firstName,
+          userData.lastName,
+          userData.role,
+          uid
+        );
+        
+        // 3. Send Welcome Email to Athlete
+        try {
+          await sendWelcomeEmail(email, finalFirstName);
+          await sendAdminRegistrationNotification(userData);
+        } catch (emailErr) {
+          console.error("Error sending registration emails:", emailErr);
+          // Don't fail registration if emails fail
+        }
 
-      res.json({ 
-        id: uid, 
-        sqliteId: result.lastInsertRowid, 
-        ...userData,
-        first_name: userData.firstName,
-        last_name: userData.lastName
-      });
-    } catch (err) {
+        res.json({ 
+          id: uid, 
+          sqliteId: result.lastInsertRowid, 
+          ...userData,
+          first_name: userData.firstName,
+          last_name: userData.lastName
+        });
+      } catch (sqliteErr: any) {
+        if (sqliteErr.message && sqliteErr.message.includes('UNIQUE constraint failed: users.username')) {
+          // Rollback Firestore if SQLite fails
+          await adminDb.collection('users').doc(uid).delete();
+          return res.status(400).json({ error: "Username is already taken" });
+        }
+        throw sqliteErr;
+      }
+    } catch (err: any) {
       console.error("Registration sync error:", err);
-      res.status(500).json({ error: "Registration sync failed" });
+      res.status(500).json({ error: err.message || "Registration sync failed" });
     }
   });
 
@@ -1277,11 +1414,41 @@ app.post('/api/webhook', async (req, res) => {
       if (doc.exists) {
         const data = doc.data();
         // Also get SQLite ID if needed
-        const sqliteUser = db.prepare('SELECT id FROM users WHERE uid = ? OR email = ?').get(id, data?.email);
+        let sqliteUser = db.prepare('SELECT id FROM users WHERE uid = ? OR email = ?').get(id, data?.email) as { id: number } | undefined;
+        
+        if (!sqliteUser) {
+          // Insert into SQLite to ensure they exist
+          const result = db.prepare(`
+            INSERT INTO users (username, email, first_name, last_name, role, uid, status, fitness_goal, avatar_url, parq_completed, email_notifications, push_notifications, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            data?.username || data?.name || data?.email,
+            data?.email,
+            data?.firstName || data?.first_name || "",
+            data?.lastName || data?.last_name || "",
+            data?.role || 'athlete',
+            id,
+            data?.status || 'active',
+            data?.fitnessGoal || null,
+            data?.avatarUrl || null,
+            data?.parq_completed ? 1 : 0,
+            data?.email_notifications === false ? 0 : 1,
+            data?.push_notifications === false ? 0 : 1,
+            formatDateForSQLite(data?.createdAt || data?.created_at || new Date())
+          );
+          sqliteUser = { id: result.lastInsertRowid as number };
+        }
+
+        // Force admin role for specific emails
+        const finalRole = (data?.email === 'swolecode@gmail.com' || data?.email === 'kromefitness@gmail.com') ? 'admin' : data?.role;
+        
         return res.json({ 
           id, 
           sqliteId: sqliteUser?.id, 
           ...data,
+          role: finalRole,
+          fitness_goal: data?.fitness_goal || data?.fitnessGoal || "",
+          parq_completed: (data?.parq_completed === true || data?.parq_completed === 1 || data?.parq_completed === '1') ? 1 : 0,
           first_name: data?.firstName || data?.first_name,
           last_name: data?.lastName || data?.last_name,
           firstName: data?.firstName || data?.first_name,
@@ -1290,12 +1457,18 @@ app.post('/api/webhook', async (req, res) => {
       }
 
       // Fallback to SQLite
-      const user = db.prepare('SELECT * FROM users WHERE uid = ? OR id = ?').get(id, id);
+      const user = db.prepare('SELECT * FROM users WHERE uid = ? OR id = ?').get(id, id) as any;
       if (user) {
+        // Force admin role for specific emails
+        const finalRole = (user.email === 'swolecode@gmail.com' || user.email === 'kromefitness@gmail.com') ? 'admin' : user.role;
+        
         return res.json({
           ...user,
+          role: finalRole,
           id: user.uid || String(user.id),
           sqliteId: user.id,
+          fitness_goal: user.fitness_goal || "",
+          parq_completed: (user.parq_completed === 1 || user.parq_completed === true || user.parq_completed === '1') ? 1 : 0,
           firstName: user.first_name,
           lastName: user.last_name,
           first_name: user.first_name,
@@ -1305,8 +1478,30 @@ app.post('/api/webhook', async (req, res) => {
 
       res.status(404).json({ error: "User not found" });
     } catch (err) {
-      console.error("Error fetching user:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching user from Firestore, falling back to SQLite:", err);
+      try {
+        const user = db.prepare('SELECT * FROM users WHERE uid = ? OR id = ?').get(id, id) as any;
+        if (user) {
+          const finalRole = (user.email === 'swolecode@gmail.com' || user.email === 'kromefitness@gmail.com') ? 'admin' : user.role;
+          
+          return res.json({
+            ...user,
+            role: finalRole,
+            id: user.uid || String(user.id),
+            sqliteId: user.id,
+            fitness_goal: user.fitness_goal || "",
+            parq_completed: (user.parq_completed === 1 || user.parq_completed === true || user.parq_completed === '1') ? 1 : 0,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            first_name: user.first_name,
+            last_name: user.last_name
+          });
+        }
+        res.status(404).json({ error: "User not found" });
+      } catch (sqliteErr) {
+        console.error("Error fetching user from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
@@ -1314,7 +1509,18 @@ app.post('/api/webhook', async (req, res) => {
   app.delete("/api/users/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      await adminDb.collection('users').doc(id).delete();
+      // 1. Delete from SQLite
+      db.prepare('DELETE FROM users WHERE uid = ? OR id = ?').run(id, id);
+
+      // 2. Delete from Firestore
+      if (adminDb) {
+        try {
+          await adminDb.collection('users').doc(id).delete();
+        } catch (firestoreErr) {
+          console.error("Error deleting user from Firestore (Quota Exceeded?), but deleted from SQLite:", firestoreErr);
+        }
+      }
+      
       res.json({ success: true });
     } catch (err) {
       console.error("Error deleting user:", err);
@@ -1342,23 +1548,60 @@ app.post('/api/webhook', async (req, res) => {
   app.get("/api/admin/users", async (req, res) => {
     console.log("Fetching users...");
     try {
-      const snapshot = await adminDb.collection('users').get();
-      const users = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          username: data.firstName ? `${data.firstName} ${data.lastName}` : data.email,
-          email: data.email,
-          first_name: data.firstName,
-          last_name: data.lastName,
-          avatar_url: data.avatarUrl,
-          role: data.role,
-          status: 'active',
-          created_at: data.createdAt
-        };
-      });
-      console.log("Users fetched:", users);
-      res.json(users);
+      // Sync users from Firestore to SQLite to ensure consistency
+      try {
+        const snapshot = await adminDb.collection('users').get();
+        const firestoreUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        
+        const insertStmt = db.prepare(`
+          INSERT INTO users (username, email, first_name, last_name, role, uid, status, created_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(email) DO UPDATE SET 
+            username=excluded.username,
+            first_name=excluded.first_name,
+            last_name=excluded.last_name,
+            role=excluded.role,
+            uid=excluded.uid,
+            status=excluded.status
+        `);
+
+        db.transaction(() => {
+          for (const user of firestoreUsers) {
+            try {
+              insertStmt.run(
+                user.username || user.name || user.email,
+                user.email,
+                user.firstName || user.first_name || "",
+                user.lastName || user.last_name || "",
+                user.role || 'athlete',
+                user.id,
+                user.status || 'active',
+                formatDateForSQLite(user.createdAt || user.created_at || new Date())
+              );
+            } catch (e) {
+              console.error(`Failed to sync user ${user.id} to SQLite:`, e);
+            }
+          }
+        })();
+      } catch (syncErr) {
+        console.error("Failed to sync users from Firestore:", syncErr);
+        // Continue to fetch from SQLite even if sync fails
+      }
+
+      const users = db.prepare('SELECT * FROM users').all() as any[];
+      const mappedUsers = users.map(user => ({
+        id: user.uid || user.id,
+        username: user.username || user.email,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        avatar_url: user.avatar_url,
+        role: user.role,
+        status: user.status || 'active',
+        created_at: user.created_at || new Date().toISOString()
+      }));
+      console.log("Users fetched:", mappedUsers.length);
+      res.json(mappedUsers);
     } catch (err) {
       console.error("Database error in /api/admin/users:", err);
       res.status(500).json({ error: "Database error" });
@@ -1374,8 +1617,8 @@ app.post('/api/webhook', async (req, res) => {
     if (adminId) {
       const adminDoc = await adminDb.collection('users').doc(adminId).get();
       const admin = adminDoc.data();
-      if (admin?.role !== 'admin') {
-        return res.status(403).json({ error: "Forbidden: Only admins can change roles" });
+      if (admin?.role !== 'admin' && admin?.role !== 'coach') {
+        return res.status(403).json({ error: "Forbidden: Only admins and coaches can change roles" });
       }
     }
 
@@ -1391,8 +1634,37 @@ app.post('/api/webhook', async (req, res) => {
   // Admin: Delete user
   app.delete("/api/admin/users/:id", async (req, res) => {
     const { id } = req.params;
+    const { adminId } = req.query; // Expecting adminId in query for DELETE requests
+    
     try {
-      await adminDb.collection('users').doc(id).delete();
+      if (adminId && adminDb) {
+        try {
+          const adminDoc = await adminDb.collection('users').doc(adminId as string).get();
+          const admin = adminDoc.data();
+          if (admin?.role !== 'admin' && admin?.role !== 'coach') {
+            return res.status(403).json({ error: "Forbidden: Only admins and coaches can delete users" });
+          }
+        } catch (firestoreErr) {
+          console.error("Error verifying admin role in Firestore, falling back to SQLite:", firestoreErr);
+          const admin = db.prepare('SELECT role FROM users WHERE uid = ? OR id = ?').get(adminId, adminId) as any;
+          if (admin?.role !== 'admin' && admin?.role !== 'coach') {
+            return res.status(403).json({ error: "Forbidden: Only admins and coaches can delete users" });
+          }
+        }
+      }
+      
+      // 1. Delete from SQLite
+      db.prepare('DELETE FROM users WHERE uid = ? OR id = ?').run(id, id);
+
+      // 2. Delete from Firestore
+      if (adminDb) {
+        try {
+          await adminDb.collection('users').doc(id).delete();
+        } catch (firestoreErr) {
+          console.error("Error deleting user from Firestore (Quota Exceeded?), but deleted from SQLite:", firestoreErr);
+        }
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error("Error deleting user:", err);
@@ -1400,29 +1672,15 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
-  // Admin: Assign program to user
-  app.post("/api/admin/assign-program", async (req, res) => {
-    const { userId, programId, itemName, price } = req.body;
+  // Users: Get purchased programs
+  app.get("/api/users/:userId/programs", (req, res) => {
+    const { userId } = req.params;
     const sqliteId = resolveUserId(userId);
     try {
-      // 1. Save to Firestore first to get an ID
-      const firestoreRef = await adminDb.collection('purchases').add({
-        user_id: userId,
-        item_name: itemName,
-        price: price || 0,
-        program_id: programId,
-        created_at: new Date().toISOString()
-      });
-
-      // 2. Sync with SQLite
-      db.prepare(`
-        INSERT INTO purchases (user_id, item_name, price, program_id, firestore_id) 
-        VALUES (?, ?, ?, ?, ?)
-      `).run(sqliteId, itemName, price || 0, programId, firestoreRef.id);
-
-      res.json({ success: true });
+      const purchases = db.prepare('SELECT program_id FROM purchases WHERE user_id = ? AND program_id IS NOT NULL').all(sqliteId) as { program_id: string }[];
+      res.json(purchases.map(p => p.program_id));
     } catch (err) {
-      console.error("Error assigning program:", err);
+      console.error("Database error in /api/users/:userId/programs:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -1555,6 +1813,22 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
+  // Analytics: Get analytics for a specific program template
+  app.get("/api/analytics/program/:programId", async (req, res) => {
+    const { programId } = req.params;
+    try {
+      const logs = db.prepare(`
+        SELECT * FROM workout_logs 
+        WHERE workout_id LIKE ?
+      `).all(`${programId}%`);
+      
+      res.json({ logs });
+    } catch (err) {
+      console.error("Error fetching program analytics:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // User: Update profile
   app.patch("/api/users/:id", async (req, res) => {
     const { id } = req.params;
@@ -1617,12 +1891,16 @@ app.post('/api/webhook', async (req, res) => {
   app.patch("/api/users/:id/parq-complete", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare('UPDATE users SET parq_completed = 1 WHERE id = ?').run(id);
+      db.prepare('UPDATE users SET parq_completed = 1 WHERE uid = ? OR id = ?').run(id, id);
       
       // Sync to Firestore
-      const user = db.prepare('SELECT uid FROM users WHERE id = ?').get(id) as any;
+      const user = db.prepare('SELECT uid FROM users WHERE uid = ? OR id = ?').get(id, id) as any;
       if (user?.uid && adminDb) {
-        await adminDb.collection('users').doc(user.uid).set({ parq_completed: true }, { merge: true });
+        try {
+          await adminDb.collection('users').doc(user.uid).set({ parq_completed: true }, { merge: true });
+        } catch (firestoreErr) {
+          console.error("Error marking PAR-Q as completed in Firestore (Quota Exceeded?), but saved to SQLite:", firestoreErr);
+        }
       }
 
       res.json({ success: true });
@@ -1640,32 +1918,61 @@ app.post('/api/webhook', async (req, res) => {
       const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(progress);
     } catch (err) {
-      console.error("Error fetching progress:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching progress from Firestore, falling back to SQLite:", err);
+      try {
+        const sqliteId = resolveUserId(userId);
+        const progress = db.prepare('SELECT * FROM progress WHERE user_id = ? ORDER BY recorded_at ASC').all(sqliteId) as any[];
+        res.json(progress.map(p => ({
+          id: p.firestore_id || p.id.toString(),
+          user_id: userId,
+          metric_name: p.metric_name,
+          metric_value: p.metric_value,
+          unit: p.unit,
+          recorded_at: p.recorded_at
+        })));
+      } catch (sqliteErr) {
+        console.error("Error fetching progress from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
   // Progress: Add progress entry
-  app.post("/api/progress", firebaseDbCheck, async (req, res) => {
+  app.post("/api/progress", async (req, res) => {
     const { user_id, metric_name, metric_value, unit } = req.body;
     const sqliteId = resolveUserId(user_id);
     try {
       const recordedAt = new Date().toISOString();
-      const docRef = await adminDb.collection('progress').add({
-        user_id,
-        metric_name,
-        metric_value,
-        unit,
-        recorded_at: recordedAt
-      });
+      
+      // 1. Save to SQLite first
+      const result = db.prepare(`
+        INSERT INTO progress (user_id, metric_name, metric_value, unit, recorded_at) 
+        VALUES (?, ?, ?, ?, ?)
+      `).run(sqliteId, metric_name, metric_value, unit, recordedAt);
+      
+      const insertId = result.lastInsertRowid;
+      let firestoreId = insertId.toString();
 
-      // Sync with SQLite
-      db.prepare(`
-        INSERT INTO progress (user_id, metric_name, metric_value, unit, recorded_at, firestore_id) 
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(sqliteId, metric_name, metric_value, unit, recordedAt, docRef.id);
+      // 2. Sync with Firestore
+      if (adminDb) {
+        try {
+          const docRef = await adminDb.collection('progress').add({
+            user_id,
+            metric_name,
+            metric_value,
+            unit,
+            recorded_at: recordedAt
+          });
+          firestoreId = docRef.id;
+          
+          // Update SQLite with firestore_id
+          db.prepare('UPDATE progress SET firestore_id = ? WHERE id = ?').run(firestoreId, insertId);
+        } catch (firestoreErr) {
+          console.error("Error adding progress to Firestore (Quota Exceeded?), but saved to SQLite:", firestoreErr);
+        }
+      }
 
-      res.json({ id: docRef.id, user_id, metric_name, metric_value, unit });
+      res.json({ id: firestoreId, user_id, metric_name, metric_value, unit });
     } catch (err) {
       console.error("Error adding progress entry:", err);
       res.status(500).json({ error: "Database error" });
@@ -1673,10 +1980,21 @@ app.post('/api/webhook', async (req, res) => {
   });
 
   // Progress: Delete entry
-  app.delete("/api/progress/:id", firebaseDbCheck, async (req, res) => {
+  app.delete("/api/progress/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      await adminDb.collection('progress').doc(id).delete();
+      // 1. Delete from SQLite
+      db.prepare('DELETE FROM progress WHERE firestore_id = ? OR id = ?').run(id, id);
+
+      // 2. Delete from Firestore
+      if (adminDb) {
+        try {
+          await adminDb.collection('progress').doc(id).delete();
+        } catch (firestoreErr) {
+          console.error("Error deleting progress from Firestore (Quota Exceeded?), but deleted from SQLite:", firestoreErr);
+        }
+      }
+      
       res.json({ success: true });
     } catch (err) {
       console.error("Error deleting progress entry:", err);
@@ -1693,8 +2011,31 @@ app.post('/api/webhook', async (req, res) => {
       const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (err) {
-      console.error("Error fetching nutrition logs:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching nutrition logs from Firestore, falling back to SQLite:", err);
+      try {
+        const sqliteId = resolveUserId(userId);
+        const logs = db.prepare('SELECT * FROM nutrition_logs WHERE user_id = ? ORDER BY created_at DESC').all(sqliteId) as any[];
+        res.json(logs.map(log => ({
+          id: log.firestore_id || log.log_id,
+          log_id: log.log_id,
+          user_id: userId,
+          food_id: log.food_id,
+          name: log.name,
+          category: log.category,
+          meal: log.meal,
+          date: log.date,
+          servings: log.servings,
+          serving_size: log.serving_size,
+          calories: log.calories,
+          protein: log.protein,
+          carbs: log.carbs,
+          fat: log.fat,
+          created_at: log.created_at
+        })));
+      } catch (sqliteErr) {
+        console.error("Error fetching nutrition logs from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
@@ -1712,7 +2053,16 @@ app.post('/api/webhook', async (req, res) => {
         return res.json(null);
       }
       
-      const log = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      const log = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+      
+      // Check if the log is from today
+      const logDate = new Date(log.created_at).toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (logDate !== today) {
+        return res.json(null);
+      }
+      
       res.json(log);
     } catch (err) {
       console.error("Error fetching latest nutrition log:", err);
@@ -1743,13 +2093,15 @@ app.post('/api/webhook', async (req, res) => {
     const data = req.body;
     try {
       // 1. Update SQLite
-      db.prepare(`
-        INSERT INTO user_metrics (user_id, data, updated_at) 
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET 
-          data=excluded.data, 
-          updated_at=CURRENT_TIMESTAMP
-      `).run(sqliteId, JSON.stringify(data));
+      if (sqliteId) {
+        db.prepare(`
+          INSERT INTO user_metrics (user_id, data, updated_at) 
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET 
+            data=excluded.data, 
+            updated_at=CURRENT_TIMESTAMP
+        `).run(sqliteId, JSON.stringify(data));
+      }
 
       // 2. Update Firestore
       await adminDb.collection('user_metrics').doc(userId).set({
@@ -1883,19 +2235,25 @@ app.post('/api/webhook', async (req, res) => {
     const data = req.body;
     try {
       // 1. Update SQLite
-      db.prepare(`
-        INSERT INTO user_parq (user_id, data, updated_at) 
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET 
-          data=excluded.data, 
-          updated_at=CURRENT_TIMESTAMP
-      `).run(sqliteId, JSON.stringify(data));
+      if (sqliteId) {
+        db.prepare(`
+          INSERT INTO user_parq (user_id, data, updated_at) 
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET 
+            data=excluded.data, 
+            updated_at=CURRENT_TIMESTAMP
+        `).run(sqliteId, JSON.stringify(data));
+      }
 
       // 2. Update Firestore
-      await adminDb.collection('user_parq').doc(userId).set({
-        data,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
+      try {
+        await adminDb.collection('user_parq').doc(userId).set({
+          data,
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (firestoreErr) {
+        console.error("Error saving PAR-Q to Firestore (Quota Exceeded?), but saved to SQLite:", firestoreErr);
+      }
 
       res.json({ success: true });
     } catch (err) {
@@ -1967,6 +2325,38 @@ app.post('/api/webhook', async (req, res) => {
         );
       }
       
+      // Calculate daily calories
+      const dailyCalories: Record<string, number> = {};
+      for (const log of logs) {
+        const date = log.date;
+        if (!dailyCalories[date]) dailyCalories[date] = 0;
+        dailyCalories[date] += log.serving.calories * log.servings;
+      }
+
+      // Fetch current metrics
+      const metricsDoc = await adminDb.collection('user_metrics').doc(userId).get();
+      const metricsData = metricsDoc.exists ? metricsDoc.data()?.data || {} : {};
+
+      // Update metrics
+      metricsData.dailyCalories = dailyCalories;
+
+      // Save metrics to Firestore
+      await adminDb.collection('user_metrics').doc(userId).set({
+        data: metricsData,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
+      // Save metrics to SQLite
+      if (sqliteId) {
+        db.prepare(`
+          INSERT INTO user_metrics (user_id, data, updated_at) 
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET 
+            data=excluded.data, 
+            updated_at=CURRENT_TIMESTAMP
+        `).run(sqliteId, JSON.stringify(metricsData));
+      }
+      
       await batch.commit();
       res.json({ success: true });
     } catch (err) {
@@ -1993,10 +2383,15 @@ app.post('/api/webhook', async (req, res) => {
   app.post("/api/workout-logs/:userId", async (req, res) => {
     const { userId } = req.params;
     const { logs } = req.body;
+    console.log(`Saving workout logs for user: ${userId}`, logs);
     try {
-      const batch = adminDb.batch();
-      
       const sqliteId = resolveUserId(userId);
+      if (sqliteId === null) {
+        console.error(`Could not resolve SQLite ID for user: ${userId}`);
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const batch = adminDb.batch();
       const insertStmt = db.prepare(`
         INSERT INTO workout_logs (
           user_id, workout_id, exercise_id, completed, date, edited_data, 
@@ -2011,16 +2406,20 @@ app.post('/api/webhook', async (req, res) => {
       `);
 
       for (const log of logs) {
+        const workoutId = log.workoutId || log.workout_id || 'default_workout';
+        const exerciseId = log.exerciseId || log.exercise_id || 'default_exercise';
+        const date = log.date || new Date().toISOString().split('T')[0];
+        
         // Create a unique ID for the log entry based on the conflict key
-        const logId = `${userId}_${log.workoutId}_${log.exerciseId}_${log.date}`;
+        const logId = `${userId}_${workoutId}_${exerciseId}_${date}`;
         const logRef = adminDb.collection('workout_logs').doc(logId);
         
         batch.set(logRef, {
           user_id: userId,
-          workout_id: log.workoutId,
-          exercise_id: log.exerciseId,
+          workout_id: workoutId,
+          exercise_id: exerciseId,
           completed: log.completed ? true : false,
-          date: log.date,
+          date: date,
           edited_data: log.editedData || {},
           workout_start_time: log.workoutStartTime || null,
           workout_end_time: log.workoutEndTime || null
@@ -2028,7 +2427,7 @@ app.post('/api/webhook', async (req, res) => {
 
         // Sync with SQLite
         insertStmt.run(
-          sqliteId, log.workoutId, log.exerciseId, log.completed ? 1 : 0, log.date, 
+          sqliteId, workoutId, exerciseId, log.completed ? 1 : 0, date, 
           JSON.stringify(log.editedData || {}), 
           log.workoutStartTime || null, log.workoutEndTime || null, logId
         );
@@ -2108,38 +2507,69 @@ app.post('/api/webhook', async (req, res) => {
   app.post("/api/program-progress/:userId", async (req, res) => {
     const { userId } = req.params;
     const { progress } = req.body;
+    console.log(`Saving program progress for user: ${userId}`, progress);
     try {
-      const batch = adminDb.batch();
-      
       const sqliteId = resolveUserId(userId);
+      if (sqliteId === null) {
+        console.error(`Could not resolve SQLite ID for user: ${userId}`);
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const batch = adminDb.batch();
       const insertStmt = db.prepare(`
         INSERT INTO program_progress (
-          user_id, program_id, phase, week, day, completed, date, firestore_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          user_id, program_id, workout_id, phase, week, day, completed, date, scheduled_time, firestore_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id, program_id, phase, week, day) DO UPDATE SET
           completed = excluded.completed,
-          date = excluded.date,
-          firestore_id = excluded.firestore_id
+          date = COALESCE(excluded.date, date),
+          scheduled_time = COALESCE(excluded.scheduled_time, scheduled_time),
+          firestore_id = COALESCE(excluded.firestore_id, firestore_id),
+          workout_id = COALESCE(excluded.workout_id, workout_id)
       `);
 
       for (const p of progress) {
+        const programId = p.programId || p.program_id || 'default_program';
+        const workoutId = p.workoutId || p.workout_id || null;
+        const phase = p.phase || 'Phase 1';
+        const week = p.week || 1;
+        const day = p.day || 1;
+        
         // Create a unique ID for the progress entry based on the conflict key
-        const progressId = `${userId}_${p.programId}_${p.phase}_${p.week}_${p.day}`;
+        const progressId = `${userId}_${programId}_${phase}_${week}_${day}`;
         const progressRef = adminDb.collection('program_progress').doc(progressId);
         
-        batch.set(progressRef, {
+        const updateData: any = {
           user_id: userId,
-          program_id: p.programId,
-          phase: p.phase,
-          week: p.week,
-          day: p.day,
+          program_id: programId,
+          workout_id: workoutId,
+          phase: phase,
+          week: week,
+          day: day,
           completed: p.completed ? true : false,
-          date: p.date
-        }, { merge: true });
+        };
+        
+        let finalDate = p.date || null;
+        let finalScheduledTime = p.scheduled_time || null;
+
+        if (p.completed && !finalDate) {
+          // If completing and no date provided, try to preserve existing date and scheduled_time
+          const existingDoc = await progressRef.get();
+          if (existingDoc.exists) {
+            const data = existingDoc.data();
+            if (data?.date) finalDate = data.date;
+            if (data?.scheduled_time) finalScheduledTime = data.scheduled_time;
+          }
+        }
+
+        if (finalDate !== null) updateData.date = finalDate;
+        if (finalScheduledTime !== null) updateData.scheduled_time = finalScheduledTime;
+
+        batch.set(progressRef, updateData, { merge: true });
 
         // Sync with SQLite
         insertStmt.run(
-          sqliteId, p.programId, p.phase, p.week, p.day, p.completed ? 1 : 0, p.date, progressId
+          sqliteId, programId, workoutId, phase, week, day, p.completed ? 1 : 0, finalDate, finalScheduledTime, progressId
         );
       }
       
@@ -2151,12 +2581,40 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
+  // Program Progress: Delete user program progress
+  app.delete("/api/program-progress/:userId", async (req, res) => {
+    const { userId } = req.params;
+    const { programId, phase, week, day, date } = req.body;
+    console.log(`Deleting program progress for user: ${userId}`, { programId, phase, week, day, date });
+    try {
+      const sqliteId = resolveUserId(userId);
+      if (sqliteId === null) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // 1. Delete from SQLite
+      db.prepare(`
+        DELETE FROM program_progress 
+        WHERE user_id = ? AND program_id = ? AND phase = ? AND week = ? AND day = ? AND date = ?
+      `).run(sqliteId, programId, phase, week, day, date);
+
+      // 2. Delete from Firestore
+      const progressId = `${userId}_${programId}_${phase}_${week}_${day}`;
+      await adminDb.collection('program_progress').doc(progressId).delete();
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting program progress:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // Activity: Log user activity
   app.post("/api/activity", async (req, res) => {
     const { user_id, action, details } = req.body;
     try {
       const logData: any = {
-        user_id,
+        user_id: user_id || null,
         action,
         details: JSON.stringify(details || {}),
         created_at: new Date().toISOString()
@@ -2165,8 +2623,12 @@ app.post('/api/webhook', async (req, res) => {
       if (user_id) {
         const userDoc = await adminDb.collection('users').doc(user_id).get();
         if (userDoc.exists) {
-          logData.username = userDoc.data()?.username;
+          logData.username = userDoc.data()?.username || null;
+        } else {
+          logData.username = null;
         }
+      } else {
+        logData.username = null;
       }
 
       const docRef = await adminDb.collection('user_activity_logs').add(logData);
@@ -2262,8 +2724,22 @@ app.post('/api/webhook', async (req, res) => {
       const purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(purchases);
     } catch (err) {
-      console.error("Error fetching purchases:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching purchases from Firestore, falling back to SQLite:", err);
+      try {
+        const sqliteId = resolveUserId(userId);
+        const purchases = db.prepare('SELECT * FROM purchases WHERE user_id = ?').all(sqliteId) as any[];
+        res.json(purchases.map(p => ({
+          id: p.firestore_id || p.id.toString(),
+          user_id: userId,
+          item_name: p.item_name,
+          price: p.price,
+          program_id: p.program_id,
+          created_at: p.created_at
+        })));
+      } catch (sqliteErr) {
+        console.error("Error fetching purchases from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
@@ -2363,34 +2839,56 @@ app.post('/api/webhook', async (req, res) => {
       const programs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(programs);
     } catch (err) {
-      console.error("Error fetching custom programs:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching custom programs from Firestore, falling back to SQLite:", err);
+      try {
+        const sqliteId = resolveUserId(userId);
+        const programs = db.prepare('SELECT * FROM custom_programs WHERE user_id = ? ORDER BY created_at DESC').all(sqliteId) as any[];
+        res.json(programs.map(p => ({
+          id: p.firestore_id || p.id.toString(),
+          user_id: userId,
+          name: p.name,
+          description: p.description,
+          data: typeof p.data === 'string' ? JSON.parse(p.data) : p.data,
+          created_at: p.created_at
+        })));
+      } catch (sqliteErr) {
+        console.error("Error fetching custom programs from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
   // Custom Programs: Save a custom program
   app.post("/api/custom-programs/:userId", async (req, res) => {
     const { userId } = req.params;
-    const { name, description, data } = req.body;
+    let { name, description, phases, data } = req.body;
+    
+    // Support both direct fields and nested 'data' field
+    if (data && !phases) phases = data.phases;
+    if (data && !name) name = data.name || data.programName;
+    if (data && !description) description = data.description;
+
     try {
+      const sqliteId = resolveUserId(userId);
+      if (sqliteId === null) {
+        console.error(`Could not resolve SQLite ID for user: ${userId}`);
+        return res.status(404).json({ error: "User not found" });
+      }
+
       const createdAt = new Date().toISOString();
       const docRef = await adminDb.collection('custom_programs').add({
         user_id: userId,
         name,
         description,
-        data: JSON.stringify(data),
+        phases,
         created_at: createdAt
       });
       
       // Sync with SQLite
-      const sqliteId = resolveUserId(userId);
       db.prepare(`
         INSERT INTO custom_programs (user_id, name, description, data, firestore_id, created_at) 
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(sqliteId, name, description, JSON.stringify(data), docRef.id, createdAt);
-
-      // Send notification to user
-      sendNotification(Number(sqliteId), 'New Program Assigned', `A new custom program "${name}" has been assigned to you.`, '/profile');
+      `).run(sqliteId, name, description, JSON.stringify({ phases }), docRef.id, createdAt);
 
       res.json({ id: docRef.id, success: true });
     } catch (err) {
@@ -2399,16 +2897,76 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
+  // Custom Foods: Save a custom food
+  app.post("/api/custom-food/:userId", firebaseDbCheck, async (req, res) => {
+    const { userId } = req.params;
+    const { name, calories, protein, carbs, fat, portion } = req.body;
+    
+    try {
+      // Save to Firestore
+      const docRef = await adminDb.collection('custom_foods').add({
+        user_id: userId,
+        name,
+        calories,
+        protein,
+        carbs,
+        fat,
+        portion,
+        created_at: new Date().toISOString()
+      });
+  
+      // Save to SQLite
+      const sqliteId = resolveUserId(userId);
+      const stmt = db.prepare(`
+        INSERT INTO custom_foods (user_id, name, calories, protein, carbs, fat, portion)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(sqliteId, name, calories, protein, carbs, fat, portion);
+  
+      res.json({ id: docRef.id, success: true });
+    } catch (err) {
+      console.error("Error saving custom food:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  app.get("/api/custom-food/:userId", firebaseDbCheck, async (req, res) => {
+    const { userId } = req.params;
+    try {
+      const sqliteId = resolveUserId(userId);
+      const foods = db.prepare('SELECT * FROM custom_foods WHERE user_id = ?').all(sqliteId) as any[];
+      res.json(foods);
+    } catch (err) {
+      console.error("Error fetching custom foods:", err);
+      res.status(500).json({ error: "Failed to fetch custom foods" });
+    }
+  });
+
   // Custom Programs: Update a custom program
   app.patch("/api/custom-programs/:userId/:id", async (req, res) => {
     const { userId, id } = req.params;
-    const { name, description, data } = req.body;
+    let { name, description, phases, data } = req.body;
+
+    // Support both direct fields and nested 'data' field
+    if (data && !phases) phases = data.phases;
+    if (data && !name) name = data.name || data.programName;
+    if (data && !description) description = data.description;
+
     try {
-      await adminDb.collection('custom_programs').doc(id).update({
-        name,
-        description,
-        data: JSON.stringify(data)
-      });
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (phases !== undefined) updateData.phases = phases;
+
+      if (Object.keys(updateData).length > 0) {
+        await adminDb.collection('custom_programs').doc(id).update(updateData);
+      }
+
+      // Update SQLite
+      if (name !== undefined) db.prepare('UPDATE custom_programs SET name = ? WHERE firestore_id = ?').run(name, id);
+      if (description !== undefined) db.prepare('UPDATE custom_programs SET description = ? WHERE firestore_id = ?').run(description, id);
+      if (phases !== undefined) db.prepare('UPDATE custom_programs SET data = ? WHERE firestore_id = ?').run(JSON.stringify({ phases }), id);
+
       res.json({ success: true });
     } catch (err) {
       console.error("Database error updating custom program:", err);
@@ -2421,9 +2979,171 @@ app.post('/api/webhook', async (req, res) => {
     const { userId, id } = req.params;
     try {
       await adminDb.collection('custom_programs').doc(id).delete();
+      const sqliteId = resolveUserId(userId);
+      db.prepare('DELETE FROM custom_programs WHERE user_id = ? AND (firestore_id = ? OR id = ?)').run(sqliteId, id, id);
       res.json({ success: true });
     } catch (err) {
       console.error("Database error deleting custom program:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Program Templates (Global)
+  app.get("/api/program-templates", async (req, res) => {
+    try {
+      const snapshot = await adminDb.collection('program_templates').orderBy('created_at', 'desc').get();
+      const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(templates);
+    } catch (err) {
+      console.error("Error fetching program templates from Firestore, falling back to SQLite:", err);
+      try {
+        const templates = db.prepare('SELECT * FROM program_templates ORDER BY created_at DESC').all() as any[];
+        res.json(templates.map(t => {
+          const parsedData = typeof t.data === 'string' ? JSON.parse(t.data) : t.data;
+          return {
+            id: t.firestore_id || t.id,
+            name: t.name,
+            description: t.description,
+            price: t.price,
+            ...parsedData,
+            created_at: t.created_at
+          };
+        }));
+      } catch (sqliteErr) {
+        console.error("Error fetching program templates from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
+    }
+  });
+
+  app.post("/api/program-templates", async (req, res) => {
+    const { name, description, price, phases } = req.body;
+    try {
+      const docRef = await adminDb.collection('program_templates').add({
+        name,
+        description,
+        price: Number(price) || 0,
+        phases,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      db.prepare('INSERT INTO program_templates (id, name, description, price, data, firestore_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(docRef.id, name, description, Number(price) || 0, JSON.stringify({ phases }), docRef.id);
+
+      res.json({ id: docRef.id, success: true });
+    } catch (err) {
+      console.error("Error creating program template:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  app.patch("/api/program-templates/:id", async (req, res) => {
+    const { id } = req.params;
+    const { name, description, price, phases } = req.body;
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (price !== undefined) updateData.price = Number(price);
+      if (phases !== undefined) updateData.phases = phases;
+
+      await adminDb.collection('program_templates').doc(id).update(updateData);
+
+      // Update SQLite
+      if (name !== undefined) db.prepare('UPDATE program_templates SET name = ? WHERE id = ? OR firestore_id = ?').run(name, id, id);
+      if (description !== undefined) db.prepare('UPDATE program_templates SET description = ? WHERE id = ? OR firestore_id = ?').run(description, id, id);
+      if (price !== undefined) db.prepare('UPDATE program_templates SET price = ? WHERE id = ? OR firestore_id = ?').run(Number(price), id, id);
+      if (phases !== undefined) db.prepare('UPDATE program_templates SET data = ? WHERE id = ? OR firestore_id = ?').run(JSON.stringify({ phases }), id, id);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error updating program template:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  app.delete("/api/program-templates/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      await adminDb.collection('program_templates').doc(id).delete();
+      db.prepare('DELETE FROM program_templates WHERE id = ? OR firestore_id = ?').run(id, id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting program template:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Assigned Programs
+  app.get("/api/assigned-programs/:userId", async (req, res) => {
+    const { userId } = req.params;
+    try {
+      const snapshot = await adminDb.collection('assigned_programs')
+        .where('userId', '==', userId)
+        .get();
+      const assignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(assignments);
+    } catch (err) {
+      console.error("Error fetching assigned programs:", err);
+      // Fallback to SQLite
+      try {
+        const sqliteUserId = resolveUserId(userId);
+        const assignments = db.prepare('SELECT * FROM program_assignments WHERE user_id = ?').all(sqliteUserId);
+        res.json(assignments.map((a: any) => ({
+          id: a.firestore_id || a.id,
+          userId: userId,
+          programId: a.program_id,
+          assignedBy: a.assigned_by,
+          assignedAt: a.created_at
+        })));
+      } catch (sqliteErr) {
+        res.status(500).json({ error: "Database error" });
+      }
+    }
+  });
+
+  app.post("/api/admin/assign-program", async (req, res) => {
+    const { userId, programId, assignedBy } = req.body;
+    try {
+      // Check if already assigned
+      const existing = await adminDb.collection('assigned_programs')
+        .where('userId', '==', userId)
+        .where('programId', '==', programId)
+        .get();
+      
+      if (!existing.empty) {
+        return res.status(400).json({ error: "Program already assigned to this user" });
+      }
+
+      const docRef = await adminDb.collection('assigned_programs').add({
+        userId,
+        programId,
+        assignedBy,
+        assignedAt: new Date().toISOString()
+      });
+
+      // Update SQLite
+      const sqliteUserId = resolveUserId(userId);
+      const sqliteAdminId = resolveUserId(assignedBy);
+      db.prepare('INSERT INTO program_assignments (user_id, program_id, assigned_by, firestore_id) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING')
+        .run(sqliteUserId, programId, sqliteAdminId, docRef.id);
+
+      // Notify user
+      if (sqliteUserId) {
+        await sendNotification(
+          sqliteUserId,
+          "New Program Assigned",
+          "An admin has assigned a new training program to your account. You now have full access.",
+          "/programs"
+        );
+      }
+
+      res.json({ id: docRef.id, success: true });
+    } catch (err) {
+      console.error("Error assigning program:", err);
       res.status(500).json({ error: "Database error" });
     }
   });
@@ -2451,8 +3171,41 @@ app.post('/api/webhook', async (req, res) => {
       const result = messages.map(m => ({ ...m, sender_username: usersMap.get(m.sender_id) }));
       res.json(result);
     } catch (err) {
-      console.error("Error fetching unread messages:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error fetching unread messages from Firestore, falling back to SQLite:", err);
+      try {
+        let messages: any[];
+        if (userId) {
+          const sqliteId = resolveUserId(userId as string);
+          messages = db.prepare(`
+            SELECT m.*, u.username as sender_username, u.uid as sender_uid
+            FROM messages m
+            LEFT JOIN users u ON m.sender_id = u.id
+            WHERE m.receiver_id = ? AND m.is_read = 0
+            ORDER BY m.created_at DESC
+          `).all(sqliteId) as any[];
+        } else {
+          messages = db.prepare(`
+            SELECT m.*, u.username as sender_username, u.uid as sender_uid
+            FROM messages m
+            LEFT JOIN users u ON m.sender_id = u.id
+            WHERE m.is_read = 0
+            ORDER BY m.created_at DESC
+          `).all() as any[];
+        }
+        
+        res.json(messages.map(m => ({
+          id: m.firestore_id || m.id.toString(),
+          sender_id: m.sender_uid || m.sender_id.toString(),
+          receiver_id: userId,
+          message: m.message,
+          is_read: false,
+          created_at: m.created_at,
+          sender_username: m.sender_username
+        })));
+      } catch (sqliteErr) {
+        console.error("Error fetching unread messages from SQLite:", sqliteErr);
+        res.status(500).json({ error: "Database error" });
+      }
     }
   });
 
@@ -2712,7 +3465,7 @@ app.post('/api/webhook', async (req, res) => {
       app.use(vite.middlewares);
       
       app.get("*", async (req, res, next) => {
-        if (req.url.startsWith('/api/') || req.url.includes('.')) {
+        if (req.url.startsWith('/api/') || req.url.includes('.') || req.url.startsWith('/src/')) {
           return next();
         }
         try {

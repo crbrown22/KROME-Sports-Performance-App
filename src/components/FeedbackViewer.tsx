@@ -82,7 +82,7 @@ export default function FeedbackViewer() {
                   </div>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-white/40">
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(item.created_at)}</span>
-                    <span className="flex items-center gap-1 text-gold"><MessageSquare className="w-3 h-3" /> {item.workout_id.replace(/-/g, ' ')}</span>
+                    <span className="flex items-center gap-1 text-gold"><MessageSquare className="w-3 h-3" /> {item.workout_id?.replace(/-/g, ' ') || 'Workout'}</span>
                   </div>
                 </div>
               </div>

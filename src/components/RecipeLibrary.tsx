@@ -1,11 +1,50 @@
 import { safeStorage } from '../utils/storage';
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Search, Clock, Flame, ChefHat, Calendar, ArrowRight, Utensils, Sparkles, Loader2, X, Plus } from "lucide-react";
+import { 
+  ChevronLeft, 
+  Search, 
+  Clock, 
+  Flame, 
+  ChefHat, 
+  Calendar, 
+  ArrowRight, 
+  Utensils, 
+  Sparkles, 
+  Loader2, 
+  X, 
+  Plus,
+  Save,
+  PlusCircle,
+  Info
+} from "lucide-react";
 import { recipes, Recipe } from "../data/recipeData";
 import { GoogleGenAI } from "@google/genai";
 import { getCurrentDate } from "../utils/date";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { ScrollArea } from "./ui/scroll-area";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogDescription,
+  DialogFooter
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "./ui/select";
+import { Separator } from "./ui/separator";
 
 interface Props {
   key?: string;
@@ -41,6 +80,7 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
     ingredients: "",
     instructions: ""
   });
+
 
   const days = ["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const mealTypes = ["All", "Breakfast", "Lunch", "Dinner", "Snack", "Dessert"];
@@ -200,147 +240,273 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
       exit={{ opacity: 0 }}
       className="min-h-screen bg-black text-white pt-24 pb-12 overflow-x-hidden"
     >
+      {/* AI Chef Modal */}
+      <Dialog open={showAiModal} onOpenChange={setShowAiModal}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl font-black uppercase italic">
+              <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              AI Chef
+            </DialogTitle>
+            <DialogDescription className="text-white/70">
+              Describe what you want to eat, and I'll create a custom recipe for you.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!generatedRecipe ? (
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-prompt" className="text-xs font-bold uppercase tracking-widest text-white/70">Your Request</Label>
+                <Textarea
+                  id="ai-prompt"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="e.g., high protein vegetarian dinner, post-workout meal with chicken..."
+                  className="bg-black/50 border-white/10 min-h-[120px] focus:border-gold/50"
+                />
+              </div>
+
+              <Button
+                onClick={handleGenerateRecipe}
+                disabled={!aiPrompt.trim() || isGenerating}
+                className="w-full bg-gold hover:bg-gold/90 text-black font-black uppercase italic tracking-widest"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Creating Recipe...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Generate Recipe
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <Badge variant="outline" className="text-gold border-gold/30 mb-2">Generated Recipe</Badge>
+                  <h3 className="text-2xl font-black uppercase italic">{generatedRecipe.name}</h3>
+                </div>
+                <Button 
+                  variant="link"
+                  onClick={() => {
+                    setGeneratedRecipe(null);
+                    setAiPrompt("");
+                  }}
+                  className="text-xs text-white/70 hover:text-white underline p-0 h-auto"
+                >
+                  Create Another
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
+                  <div className="text-[10px] text-white/70 uppercase font-bold">Cal</div>
+                  <div className="font-black text-orange-400 italic">{generatedRecipe.calories}</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
+                  <div className="text-[10px] text-white/70 uppercase font-bold">Pro</div>
+                  <div className="font-black text-blue-400 italic">{generatedRecipe.protein}g</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
+                  <div className="text-[10px] text-white/70 uppercase font-bold">Carb</div>
+                  <div className="font-black text-green-400 italic">{generatedRecipe.carbs}g</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
+                  <div className="text-[10px] text-white/70 uppercase font-bold">Fat</div>
+                  <div className="font-black text-yellow-400 italic">{generatedRecipe.fat}g</div>
+                </div>
+              </div>
+
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
+                      <Utensils className="w-3 h-3" /> Ingredients
+                    </h4>
+                    <p className="text-sm text-white/90 leading-relaxed">{generatedRecipe.ingredients}</p>
+                  </div>
+                  <Separator className="bg-white/5" />
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
+                      <ChefHat className="w-3 h-3" /> Instructions
+                    </h4>
+                    <p className="text-sm text-white/90 leading-relaxed whitespace-pre-line">{generatedRecipe.instructions}</p>
+                  </div>
+                </div>
+              </ScrollArea>
+
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedRecipe(generatedRecipe);
+                    setShowAiModal(false);
+                  }}
+                  className="flex-1 border-white/10 hover:bg-white/5 font-bold uppercase tracking-widest"
+                >
+                  View Details
+                </Button>
+                <Button
+                  onClick={handleSaveRecipe}
+                  className={`flex-1 font-black uppercase italic tracking-widest transition-all ${isSaved ? 'bg-green-500 hover:bg-green-600 text-black' : 'bg-gold hover:bg-gold/90 text-black'}`}
+                >
+                  {isSaved ? 'Saved!' : 'Save Recipe'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Recipe Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl font-black uppercase italic">
+              <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold">
+                <ChefHat className="w-5 h-5" />
+              </div>
+              Create Recipe
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-white/70">Recipe Name</Label>
+                <Input 
+                  value={newRecipe.name}
+                  onChange={(e) => setNewRecipe({...newRecipe, name: e.target.value})}
+                  className="bg-black/50 border-white/10 focus:border-gold/50"
+                  placeholder="e.g. Grilled Chicken Salad"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-white/70">Meal Type</Label>
+                  <Select 
+                    value={newRecipe.mealType}
+                    onValueChange={(val) => setNewRecipe({...newRecipe, mealType: val as any})}
+                  >
+                    <SelectTrigger className="bg-black/50 border-white/10">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                      {mealTypes.filter(t => t !== 'All').map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-white/70">Day</Label>
+                  <Select 
+                    value={newRecipe.day}
+                    onValueChange={(val) => setNewRecipe({...newRecipe, day: val as any})}
+                  >
+                    <SelectTrigger className="bg-black/50 border-white/10">
+                      <SelectValue placeholder="Select day" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                      <SelectItem value="Any">Any</SelectItem>
+                      {days.filter(d => d !== 'All').map(day => (
+                        <SelectItem key={day} value={day}>{day}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-white/70">Calories</Label>
+                  <Input 
+                    type="number" 
+                    value={newRecipe.calories}
+                    onChange={(e) => setNewRecipe({...newRecipe, calories: Number(e.target.value)})}
+                    className="bg-black/50 border-white/10 text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-white/70">Protein (g)</Label>
+                  <Input 
+                    type="number" 
+                    value={newRecipe.protein}
+                    onChange={(e) => setNewRecipe({...newRecipe, protein: Number(e.target.value)})}
+                    className="bg-black/50 border-white/10 text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-white/70">Carbs (g)</Label>
+                  <Input 
+                    type="number" 
+                    value={newRecipe.carbs}
+                    onChange={(e) => setNewRecipe({...newRecipe, carbs: Number(e.target.value)})}
+                    className="bg-black/50 border-white/10 text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-white/70">Fat (g)</Label>
+                  <Input 
+                    type="number" 
+                    value={newRecipe.fat}
+                    onChange={(e) => setNewRecipe({...newRecipe, fat: Number(e.target.value)})}
+                    className="bg-black/50 border-white/10 text-center"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-white/70">Ingredients (comma separated)</Label>
+                <Textarea 
+                  value={newRecipe.ingredients}
+                  onChange={(e) => setNewRecipe({...newRecipe, ingredients: e.target.value})}
+                  className="bg-black/50 border-white/10 focus:border-gold/50 min-h-[80px]"
+                  placeholder="Chicken breast, Olive oil, Salt..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-white/70">Instructions</Label>
+                <Textarea 
+                  value={newRecipe.instructions}
+                  onChange={(e) => setNewRecipe({...newRecipe, instructions: e.target.value})}
+                  className="bg-black/50 border-white/10 focus:border-gold/50 min-h-[120px]"
+                  placeholder="1. Preheat oven..."
+                />
+              </div>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="pt-4">
+            <Button
+              onClick={handleCreateRecipe}
+              className="w-full bg-gold hover:bg-gold/90 text-black font-black uppercase italic tracking-widest"
+            >
+              Save Recipe
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img 
-          src="https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2000&auto=format&fit=crop" 
+          src="https://images.unsplash.com/photo-1542362567-b07e54276754?q=80&w=2000&auto=format&fit=crop" 
           className="w-full h-full object-cover opacity-20 grayscale mix-blend-overlay"
           alt="Recipe Background"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-black/90 to-orange-900/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black via-black/90 to-gold/10" />
       </div>
-
-      {/* AI Modal */}
-      {createPortal(
-        <AnimatePresence>
-          {showAiModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-2xl w-full relative overflow-hidden"
-              >
-                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold to-accent" />
-                 <button 
-                  onClick={() => setShowAiModal(false)}
-                  className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <h2 className="text-2xl font-black uppercase italic">AI Chef</h2>
-                </div>
-
-                {!generatedRecipe ? (
-                  <>
-                    <p className="text-white/60 mb-6">
-                      Describe what you want to eat (e.g., "high protein vegetarian dinner", "post-workout meal with chicken"), and I'll create a custom recipe for you.
-                    </p>
-                    
-                    <textarea
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      placeholder="Enter your request..."
-                      className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all min-h-[120px] mb-6"
-                    />
-
-                    <button
-                      onClick={handleGenerateRecipe}
-                      disabled={!aiPrompt.trim() || isGenerating}
-                      className="w-full btn-gold flex items-center justify-center gap-2"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Creating Recipe...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5" />
-                          Generate Recipe
-                        </>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-gold text-xs font-black uppercase tracking-widest mb-1">Generated Recipe</div>
-                        <h3 className="text-2xl font-black uppercase italic">{generatedRecipe.name}</h3>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setGeneratedRecipe(null);
-                          setAiPrompt("");
-                        }}
-                        className="text-xs text-white/40 hover:text-white underline"
-                      >
-                        Create Another
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2">
-                      <div className="bg-white/5 p-2 rounded-lg text-center">
-                        <div className="text-[10px] text-white/40 uppercase">Cal</div>
-                        <div className="font-bold text-orange-400">{generatedRecipe.calories}</div>
-                      </div>
-                      <div className="bg-white/5 p-2 rounded-lg text-center">
-                        <div className="text-[10px] text-white/40 uppercase">Pro</div>
-                        <div className="font-bold text-blue-400">{generatedRecipe.protein}g</div>
-                      </div>
-                      <div className="bg-white/5 p-2 rounded-lg text-center">
-                        <div className="text-[10px] text-white/40 uppercase">Carb</div>
-                        <div className="font-bold text-green-400">{generatedRecipe.carbs}g</div>
-                      </div>
-                      <div className="bg-white/5 p-2 rounded-lg text-center">
-                        <div className="text-[10px] text-white/40 uppercase">Fat</div>
-                        <div className="font-bold text-yellow-400">{generatedRecipe.fat}g</div>
-                      </div>
-                    </div>
-
-                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2">Ingredients</h4>
-                        <p className="text-sm text-white/80 leading-relaxed">{generatedRecipe.ingredients}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-2">Instructions</h4>
-                        <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">{generatedRecipe.instructions}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => {
-                          setSelectedRecipe(generatedRecipe);
-                          setShowAiModal(false);
-                        }}
-                        className="flex-1 btn-outline-accent"
-                      >
-                        View Full Details
-                      </button>
-                      <button
-                        onClick={handleSaveRecipe}
-                        className={`flex-1 btn-gold transition-all ${isSaved ? 'bg-green-500 text-black border-green-500' : ''}`}
-                      >
-                        {isSaved ? 'Saved to Library!' : 'Save to My Recipes'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
 
       <div className="relative z-10 max-w-6xl mx-auto px-6">
         <button 
@@ -362,206 +528,68 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
           <div className="flex gap-4">
             <button 
               onClick={() => setShowAiModal(true)}
-              className="btn-gold flex items-center gap-2 shadow-lg shadow-gold/20 hover:scale-105 transition-transform"
+              className="px-6 py-3 bg-gold text-black rounded-xl font-black uppercase italic tracking-widest text-xs flex items-center gap-2 hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20"
             >
-              <Sparkles className="w-5 h-5" />
-              <span>AI Chef</span>
+              <Sparkles className="w-4 h-4" /> AI Chef
             </button>
             <button 
               onClick={() => setShowAddModal(true)}
-              className="btn-outline-gold flex items-center gap-2"
+              className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-xl font-black uppercase italic tracking-widest text-xs flex items-center gap-2 hover:bg-white/10 transition-all"
             >
-              <Plus className="w-5 h-5" />
-              <span>Add Recipe</span>
+              <Plus className="w-4 h-4" /> Add Recipe
             </button>
           </div>
         </div>
-
-        {/* Add Recipe Modal */}
-        {createPortal(
-          <AnimatePresence>
-            {showAddModal && (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-2xl w-full relative overflow-hidden max-h-[90vh] overflow-y-auto custom-scrollbar"
-                >
-                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold to-accent" />
-                   <button 
-                    onClick={() => setShowAddModal(false)}
-                    className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold">
-                      <ChefHat className="w-5 h-5" />
-                    </div>
-                    <h2 className="text-2xl font-black uppercase italic">Create Recipe</h2>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1 block">Recipe Name</label>
-                      <input 
-                        type="text" 
-                        value={newRecipe.name}
-                        onChange={(e) => setNewRecipe({...newRecipe, name: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-gold/50 outline-none"
-                        placeholder="e.g. Grilled Chicken Salad"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1 block">Meal Type</label>
-                        <select 
-                          value={newRecipe.mealType}
-                          onChange={(e) => setNewRecipe({...newRecipe, mealType: e.target.value as any})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-gold/50 outline-none"
-                        >
-                          {mealTypes.filter(t => t !== 'All').map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1 block">Day</label>
-                        <select 
-                          value={newRecipe.day}
-                          onChange={(e) => setNewRecipe({...newRecipe, day: e.target.value as any})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-gold/50 outline-none"
-                        >
-                          <option value="Any">Any</option>
-                          {days.filter(d => d !== 'All').map(day => (
-                            <option key={day} value={day}>{day}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1 block">Calories</label>
-                        <input 
-                          type="number" 
-                          value={newRecipe.calories}
-                          onChange={(e) => setNewRecipe({...newRecipe, calories: Number(e.target.value)})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white focus:border-gold/50 outline-none text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1 block">Protein (g)</label>
-                        <input 
-                          type="number" 
-                          value={newRecipe.protein}
-                          onChange={(e) => setNewRecipe({...newRecipe, protein: Number(e.target.value)})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white focus:border-gold/50 outline-none text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1 block">Carbs (g)</label>
-                        <input 
-                          type="number" 
-                          value={newRecipe.carbs}
-                          onChange={(e) => setNewRecipe({...newRecipe, carbs: Number(e.target.value)})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white focus:border-gold/50 outline-none text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1 block">Fat (g)</label>
-                        <input 
-                          type="number" 
-                          value={newRecipe.fat}
-                          onChange={(e) => setNewRecipe({...newRecipe, fat: Number(e.target.value)})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white focus:border-gold/50 outline-none text-center"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1 block">Ingredients (comma separated)</label>
-                      <textarea 
-                        value={newRecipe.ingredients}
-                        onChange={(e) => setNewRecipe({...newRecipe, ingredients: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-gold/50 outline-none min-h-[80px]"
-                        placeholder="Chicken breast, Olive oil, Salt..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1 block">Instructions</label>
-                      <textarea 
-                        value={newRecipe.instructions}
-                        onChange={(e) => setNewRecipe({...newRecipe, instructions: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-gold/50 outline-none min-h-[120px]"
-                        placeholder="1. Preheat oven..."
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleCreateRecipe}
-                      className="w-full btn-gold mt-4"
-                    >
-                      Save Recipe
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>,
-          document.body
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Search & Filter */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-zinc-900/80 border border-white/5 rounded-3xl p-6">
+              
               <div className="flex flex-col gap-4 mb-6">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                   <input 
                     type="text" 
-                    placeholder="Search recipes or ingredients..." 
+                    placeholder="Search recipes or ingredients..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-black/50 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all"
                   />
                 </div>
                 
-                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                  {days.map(day => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDay(day)}
-                      className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                        selectedDay === day 
-                          ? 'bg-gold text-black' 
-                          : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {days.map(day => (
+                      <button
+                        key={day}
+                        onClick={() => setSelectedDay(day)}
+                        className={`px-4 py-2 rounded-xl font-bold uppercase tracking-wider text-[10px] transition-all ${
+                          selectedDay === day 
+                            ? 'bg-gold text-black shadow-lg shadow-gold/20' 
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
 
-                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                  {mealTypes.map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setSelectedMealType(type)}
-                      className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                        selectedMealType === type 
-                          ? 'bg-white text-black' 
-                          : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    {mealTypes.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedMealType(type)}
+                        className={`px-4 py-2 rounded-xl font-bold uppercase tracking-wider text-[10px] transition-all ${
+                          selectedMealType === type 
+                            ? 'bg-white text-black shadow-lg' 
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -583,24 +611,24 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
                       }`}
                     >
                       <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-black/40 text-gold">
+                          <Utensils className="w-6 h-6" />
+                        </div>
                         <div className="px-3 py-1 rounded-full bg-gold/10 border border-gold/20 text-gold text-[10px] font-black uppercase tracking-widest">
                           {recipe.mealType}
                         </div>
-                        <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {recipe.day}
-                        </div>
                       </div>
                       
-                      <h3 className="text-xl font-black uppercase italic mb-2 group-hover:text-gold transition-colors line-clamp-2">{recipe.name}</h3>
+                      <h3 className="text-xl font-black uppercase italic mb-2 group-hover:text-gold transition-colors">{recipe.name}</h3>
                       
-                      <div className="flex items-center gap-4 text-xs font-mono text-white/60 mt-4">
+                      <div className="flex items-center gap-4 text-[10px] font-mono text-white/40">
                         <div className="flex items-center gap-1">
                           <Flame className="w-3 h-3 text-orange-500" />
                           <span>{recipe.calories} kcal</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Utensils className="w-3 h-3 text-blue-500" />
-                          <span>{recipe.protein}g Protein</span>
+                          <Calendar className="w-3 h-3" />
+                          <span>{recipe.day}</span>
                         </div>
                       </div>
                     </motion.div>
@@ -610,7 +638,7 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
             </div>
           </div>
 
-          {/* Recipe Details */}
+          {/* Details Panel */}
           <div className="lg:col-span-1">
             <AnimatePresence mode="wait">
               {selectedRecipe ? (
@@ -619,73 +647,71 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="bg-zinc-900/80 border border-white/5 rounded-3xl p-8 h-full sticky top-24 overflow-y-auto max-h-[calc(100vh-150px)] custom-scrollbar"
+                  className="bg-zinc-900/80 border border-white/5 rounded-3xl p-8 h-full sticky top-24"
                 >
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gold text-xs font-black uppercase tracking-widest">{selectedRecipe.day} • {selectedRecipe.mealType}</span>
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-black/40 text-gold">
+                        <ChefHat className="w-8 h-8" />
                       </div>
-                      <button
-                        onClick={() => handleAddToLog(selectedRecipe)}
-                        className={`p-2 rounded-full transition-all ${
-                          isAddedToLog 
-                            ? 'bg-green-500 text-black' 
-                            : 'bg-white/10 text-white hover:bg-gold hover:text-black'
-                        }`}
-                        title="Add to Daily Log"
-                      >
-                        {isAddedToLog ? <Sparkles className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <h2 className="text-3xl font-black uppercase italic leading-none mb-4">{selectedRecipe.name}</h2>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="px-3 py-1 bg-white/10 rounded-lg text-xs font-bold text-white/80">
-                        {selectedRecipe.portion}
-                      </div>
-                      <div className="px-3 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-xs font-bold">
-                        {selectedRecipe.calories} Calories
+                      <div>
+                        <h2 className="text-2xl font-black uppercase italic leading-none">{selectedRecipe.name}</h2>
+                        <p className="text-xs font-bold uppercase tracking-widest mt-1 text-gold">{selectedRecipe.mealType} • {selectedRecipe.day}</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mb-8">
-                    <div className="bg-black/40 p-3 rounded-xl border border-white/5 text-center">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Protein</div>
-                      <div className="text-xl font-black italic text-blue-400">{selectedRecipe.protein}g</div>
-                    </div>
-                    <div className="bg-black/40 p-3 rounded-xl border border-white/5 text-center">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Carbs</div>
-                      <div className="text-xl font-black italic text-green-400">{selectedRecipe.carbs}g</div>
-                    </div>
-                    <div className="bg-black/40 p-3 rounded-xl border border-white/5 text-center">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Fat</div>
-                      <div className="text-xl font-black italic text-yellow-400">{selectedRecipe.fat}g</div>
-                    </div>
+                    <button
+                      onClick={() => handleAddToLog(selectedRecipe)}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isAddedToLog 
+                          ? 'bg-green-500 text-black' 
+                          : 'bg-white/5 text-white hover:bg-gold hover:text-black'
+                      }`}
+                    >
+                      {isAddedToLog ? <Sparkles className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
                   </div>
 
                   <div className="space-y-8">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-3 bg-black/40 rounded-xl border border-white/5 text-center">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Protein</div>
+                        <div className="text-lg font-black italic text-blue-400">{selectedRecipe.protein}g</div>
+                      </div>
+                      <div className="p-3 bg-black/40 rounded-xl border border-white/5 text-center">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Carbs</div>
+                        <div className="text-lg font-black italic text-green-400">{selectedRecipe.carbs}g</div>
+                      </div>
+                      <div className="p-3 bg-black/40 rounded-xl border border-white/5 text-center">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Fat</div>
+                        <div className="text-lg font-black italic text-yellow-400">{selectedRecipe.fat}g</div>
+                      </div>
+                    </div>
+
                     <div>
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3 flex items-center gap-2">
                         <Utensils className="w-3 h-3" /> Ingredients
                       </h4>
-                      <ul className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
                         {selectedRecipe.ingredients.split(', ').map((ingredient, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-white/80">
-                            <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 shrink-0" />
+                          <span key={i} className="px-3 py-1.5 bg-white/10 rounded-lg text-xs font-medium hover:bg-white/20 transition-colors cursor-default">
                             {ingredient}
-                          </li>
+                          </span>
                         ))}
-                      </ul>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3 flex items-center gap-2">
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2 flex items-center gap-2">
                         <ChefHat className="w-3 h-3" /> Instructions
                       </h4>
-                      <p className="text-sm leading-relaxed text-white/80 bg-white/5 p-4 rounded-xl border border-white/5">
+                      <p className="text-sm text-white/70 leading-relaxed italic">
                         {selectedRecipe.instructions}
                       </p>
+                    </div>
+
+                    <div className="p-4 bg-black/40 rounded-2xl border border-white/5">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-1">Portion Size</h4>
+                      <p className="text-sm font-mono text-gold">{selectedRecipe.portion}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -695,7 +721,7 @@ export default function RecipeLibrary({ userId = 'guest', onBack }: Props) {
                   animate={{ opacity: 1 }}
                   className="bg-zinc-900/40 border border-white/5 rounded-3xl p-8 h-full flex flex-col items-center justify-center text-center space-y-4"
                 >
-                  <ChefHat className="w-16 h-16 text-white/10" />
+                  <Info className="w-16 h-16 text-white/10" />
                   <p className="text-white/40 font-bold uppercase tracking-widest text-sm">Select a recipe to view details</p>
                 </motion.div>
               )}

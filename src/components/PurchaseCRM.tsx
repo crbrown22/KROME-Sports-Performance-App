@@ -10,7 +10,7 @@ export default function PurchaseCRM() {
   useEffect(() => {
     const fetchPurchases = async () => {
       try {
-        const response = await fetch('/api/purchases');
+        const response = await fetch('/api/admin/purchases');
         if (response.ok) {
           const data = await response.json();
           setPurchases(data);

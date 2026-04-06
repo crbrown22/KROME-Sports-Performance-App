@@ -1,12 +1,13 @@
 import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { ChevronLeft, LogOut, Apple, Calendar, ChevronRight, Flame, Beef, Wheat, Droplets } from 'lucide-react';
-import { getCurrentDate } from '../utils/date';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, LogOut, Apple, Calendar, ChevronRight, Flame, Beef, Wheat, Droplets, PieChart, Utensils, LayoutDashboard } from 'lucide-react';
+import { getCurrentDate, addDays } from '../utils/date';
 import { LoggedFood } from '../data/nutritionData';
 import { calculateNutritionRecommendations } from '../utils/nutrition';
 import { BodyMetricsData, INITIAL_DATA } from '../types';
 import SupplementsAndVitamins from './SupplementsAndVitamins';
+import PerformanceMacroNutrients from './PerformanceMacroNutrients';
 import { getSupplementRecommendation, generateDefaultSupplements } from '../utils/supplements';
 import { getNutritionLogs } from '../services/firebaseService';
 import { handleFirestoreError, OperationType } from '../utils/firebaseError';
@@ -15,37 +16,53 @@ interface NutritionDashboardProps {
   user: any;
   onBack: () => void;
   onLogout: () => void;
+  isOwnProfile?: boolean;
 }
 
-export default function NutritionDashboard({ user, onBack, onLogout }: NutritionDashboardProps) {
+type NutritionView = 'tracker';
+
+export default function NutritionDashboard({ user, onBack, onLogout, isOwnProfile = true, initialView = 'tracker', isStandalone = true }: NutritionDashboardProps & { initialView?: NutritionView, isStandalone?: boolean }) {
+  const [activeView, setActiveView] = useState<NutritionView>(initialView);
   const [nutritionLogs, setNutritionLogs] = useState<LoggedFood[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => getCurrentDate());
   const [bodyMetricsData, setBodyMetricsData] = useState<BodyMetricsData>(INITIAL_DATA);
+  
+  const userId = user?.id || user?.uid;
 
   useEffect(() => {
+    if (initialView && initialView !== 'dashboard' as any) {
+      setActiveView(initialView);
+    }
+  }, [initialView]);
+  
+  useEffect(() => {
     const loadMetrics = async () => {
-      if (!user || !user.id || user.id === 'guest') return;
+      if (!userId || userId === 'guest') return;
       try {
-        const response = await fetch(`/api/user_metrics/${user.id}`);
+        const response = await fetch(`/api/metrics/${userId}`);
         if (response.ok) {
           const data = await response.json();
-          setBodyMetricsData(data);
+          if (data) {
+            setBodyMetricsData(data);
+          }
         }
       } catch (err) {
         console.error("Failed to load metrics", err);
       }
     };
     loadMetrics();
-  }, [user?.id]);
+  }, [userId]);
 
   useEffect(() => {
     const fetchNutritionLogs = async () => {
-      if (!user || !user.id || user.id === 'guest') return;
+      if (!userId || userId === 'guest') return;
       try {
-        const data = await getNutritionLogs(user.id);
+        const res = await fetch(`/api/nutrition/${userId}`);
+        if (!res.ok) throw new Error("Failed to fetch nutrition logs");
+        const data = await res.json();
         const formattedLogs: LoggedFood[] = data.map((item: any) => ({
           id: item.food_id,
-          logId: item.id,
+          logId: item.log_id || item.id,
           name: item.name,
           category: item.category,
           meal: item.meal,
@@ -62,16 +79,17 @@ export default function NutritionDashboard({ user, onBack, onLogout }: Nutrition
         }));
         setNutritionLogs(formattedLogs);
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'nutrition_logs');
+        console.error("Failed to fetch nutrition logs", err);
       }
     };
     fetchNutritionLogs();
-  }, [user?.id]);
+    
+    window.addEventListener('nutrition-updated', fetchNutritionLogs);
+    return () => window.removeEventListener('nutrition-updated', fetchNutritionLogs);
+  }, [userId]);
 
   const changeDate = (days: number) => {
-    const date = new Date(selectedDate);
-    date.setDate(date.getDate() + days);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(prev => addDays(prev, days));
   };
 
   const displayDate = () => {
@@ -134,143 +152,38 @@ export default function NutritionDashboard({ user, onBack, onLogout }: Nutrition
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-32 pb-24 bg-black px-6"
+      className={`${isStandalone ? 'min-h-screen pt-4 pb-24' : ''} bg-transparent px-6 relative`}
     >
-      <div className="max-w-4xl mx-auto">
-        <div className="space-y-8">
-          <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-              <h3 className="font-bold uppercase italic flex items-center gap-2">
-                <Apple className="w-4 h-4 text-gold" />
-                Nutrition Logs
-              </h3>
-              
-              <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-1">
-                <button 
-                  onClick={() => changeDate(-1)} 
-                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <div className="flex items-center gap-2 px-2">
-                  <Calendar className="w-4 h-4 text-gold" />
-                  <span className="font-bold uppercase tracking-widest text-[10px]">
-                    {displayDate()}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => changeDate(1)} 
-                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              {/* Calories */}
-              <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.calories, targets.calories)}`}>
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Flame className="w-16 h-16" />
-                </div>
+      <div className="max-w-4xl mx-auto relative z-20">
+        <div className="space-y-4">
+          <AnimatePresence mode="wait">
+            {activeView === 'tracker' && (
+              <motion.div
+                key="tracker"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-black/90 border border-krome/40 rounded-[40px] p-8 backdrop-blur-xl relative overflow-hidden"
+              >
+                <img 
+                  src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=2000&auto=format&fit=crop" 
+                  alt="Nutrition Background" 
+                  className="absolute inset-0 w-full h-full object-cover opacity-10"
+                  referrerPolicy="no-referrer"
+                />
                 <div className="relative z-10">
-                  <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Calories</div>
-                  <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.calories)}</div>
-                  <div className="text-[10px] text-white/60 mb-3">/ {targets.calories} kcal</div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((nutritionTotals.calories / targets.calories) * 100, 100)}%` }}
-                      className={`h-full ${getBarColor(nutritionTotals.calories, targets.calories, 'bg-gold')}`}
-                    />
-                  </div>
+                  <PerformanceMacroNutrients 
+                    userId={userId?.toString() || 'guest'}
+                    onBack={onBack}
+                    isOwnProfile={isOwnProfile}
+                  />
                 </div>
-              </div>
-
-              {/* Protein */}
-              <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.protein, targets.protein)}`}>
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Beef className="w-16 h-16" />
-                </div>
-                <div className="relative z-10">
-                  <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Protein</div>
-                  <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.protein)}g</div>
-                  <div className="text-[10px] text-white/60 mb-3">/ {targets.protein}g</div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((nutritionTotals.protein / targets.protein) * 100, 100)}%` }}
-                      className={`h-full ${getBarColor(nutritionTotals.protein, targets.protein, 'bg-blue-500')}`}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Carbs */}
-              <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.carbs, targets.carbs)}`}>
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Wheat className="w-16 h-16" />
-                </div>
-                <div className="relative z-10">
-                  <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Carbs</div>
-                  <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.carbs)}g</div>
-                  <div className="text-[10px] text-white/60 mb-3">/ {targets.carbs}g</div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((nutritionTotals.carbs / targets.carbs) * 100, 100)}%` }}
-                      className={`h-full ${getBarColor(nutritionTotals.carbs, targets.carbs, 'bg-green-500')}`}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Fat */}
-              <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.fat, targets.fat)}`}>
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Droplets className="w-16 h-16" />
-                </div>
-                <div className="relative z-10">
-                  <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Fat</div>
-                  <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.fat)}g</div>
-                  <div className="text-[10px] text-white/60 mb-3">/ {targets.fat}g</div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((nutritionTotals.fat / targets.fat) * 100, 100)}%` }}
-                      className={`h-full ${getBarColor(nutritionTotals.fat, targets.fat, 'bg-yellow-500')}`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <h4 className="text-xs font-black uppercase tracking-widest text-white/60 mb-4">Meals for {displayDate()}</h4>
-            <div className="space-y-2">
-              {selectedDateLogs.length === 0 ? (
-                <p className="text-center text-white/20 py-8 text-xs font-bold uppercase tracking-widest">No meals logged for this date</p>
-              ) : (
-                selectedDateLogs.map((log) => (
-                  <div key={log.logId} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
-                    <div>
-                      <div className="font-bold text-sm">{log.name}</div>
-                      <div className="text-[10px] text-white/40 uppercase tracking-wider">{log.meal} • {log.servings}x</div>
-                    </div>
-                    <div className="text-xs font-mono text-gold">{Math.round(log.serving.calories * log.servings)} kcal</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          <SupplementsAndVitamins 
-            data={bodyMetricsData} 
-            setData={setBodyMetricsData} 
-            isEditing={false} 
-            getSupplementRecommendation={(name) => getSupplementRecommendation(name, bodyMetricsData)}
-            generateDefaultSupplements={() => generateDefaultSupplements(bodyMetricsData, setBodyMetricsData)}
-          />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>
   );
 }
+

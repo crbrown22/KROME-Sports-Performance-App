@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-export default function VideoAnalyzer({ userId }: { userId: string }) {
+export default function VideoAnalyzer({ userId, isOwnProfile = true }: { userId: string, isOwnProfile?: boolean }) {
   const [video, setVideo] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -87,23 +87,27 @@ export default function VideoAnalyzer({ userId }: { userId: string }) {
         <Video className="w-5 h-5 text-gold" /> Form & Technique Analysis
       </h2>
       
+      {isOwnProfile && (
+        <div className="space-y-4">
+          <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" id="video-upload" />
+          <label htmlFor="video-upload" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-gold transition-colors">
+            <Upload className="w-6 h-6 text-gold" />
+            <span className="text-sm font-bold uppercase">{video ? video.name : 'Upload Workout Video'}</span>
+          </label>
+          
+          {video && (
+            <button 
+              onClick={analyzeVideo} 
+              disabled={loading}
+              className="w-full btn-gold flex items-center justify-center gap-2 py-3"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Analyze Technique'}
+            </button>
+          )}
+        </div>
+      )}
+      
       <div className="space-y-4">
-        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" id="video-upload" />
-        <label htmlFor="video-upload" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-gold transition-colors">
-          <Upload className="w-6 h-6 text-gold" />
-          <span className="text-sm font-bold uppercase">{video ? video.name : 'Upload Workout Video'}</span>
-        </label>
-        
-        {video && (
-          <button 
-            onClick={analyzeVideo} 
-            disabled={loading}
-            className="w-full btn-gold flex items-center justify-center gap-2 py-3"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Analyze Technique'}
-          </button>
-        )}
-        
         {error && (
           <div className="flex items-center gap-2 text-red-500 text-sm p-4 bg-red-500/10 rounded-xl">
             <AlertCircle className="w-4 h-4" /> {error}

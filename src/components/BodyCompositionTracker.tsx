@@ -8,9 +8,10 @@ interface BodyCompositionTrackerProps {
   userId: string;
   onBack: () => void;
   isAdminView?: boolean;
+  isOwnProfile?: boolean;
 }
 
-export default function BodyCompositionTracker({ userId, onBack, isAdminView = false }: BodyCompositionTrackerProps) {
+export default function BodyCompositionTracker({ userId, onBack, isAdminView = false, isOwnProfile = true }: BodyCompositionTrackerProps) {
   const [image, setImage] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('image/jpeg');
   const [analysis, setAnalysis] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export default function BodyCompositionTracker({ userId, onBack, isAdminView = f
           Body <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent">Composition</span>
         </h1>
 
-        {!isAdminView && (
+        {!isAdminView && isOwnProfile && (
           <div className="flex flex-col gap-8 mb-16">
             <div className="bg-zinc-900 p-8 rounded-3xl border border-white/10 w-full">
               <h2 className="text-xl font-bold uppercase italic mb-6">Upload Image</h2>
@@ -197,12 +198,14 @@ export default function BodyCompositionTracker({ userId, onBack, isAdminView = f
               className="bg-zinc-900 p-4 rounded-xl border border-white/10 cursor-pointer hover:border-gold transition-colors relative group"
               onClick={() => setSelectedLog(log)}
             >
-              <button 
-                onClick={(e) => deleteLog(e, log.id)}
-                className="absolute top-2 right-2 p-1 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-500/20"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {isOwnProfile && (
+                <button 
+                  onClick={(e) => deleteLog(e, log.id)}
+                  className="absolute top-2 right-2 p-1 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-500/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
               <img src={log.image_url} alt="Progress" className="w-full rounded-lg mb-2" />
               <p className="text-xs text-white/40">{new Date(log.created_at).toLocaleDateString()}</p>
             </div>

@@ -4,9 +4,17 @@ export interface ExerciseTemplate {
   exerciseId: string;
   sets: string;
   reps: string;
+  weight?: string;
   tempo?: string;
   rest?: string;
   notes?: string;
+  setsLog?: {
+    weight: string;
+    reps: string;
+    tempo: string;
+    rest: string;
+    notes: string;
+  }[];
   nameOverride?: string;
   videoLinkOverride?: string;
   canGenerateVideo?: boolean;
@@ -16,7 +24,12 @@ export interface WorkoutTemplate {
   id: string;
   title: string;
   day: number;
-  exercises: ExerciseTemplate[];
+  warmUp?: ExerciseTemplate[];
+  quickness?: ExerciseTemplate[];
+  lift?: ExerciseTemplate[];
+  metabolic?: ExerciseTemplate[];
+  coolDown?: ExerciseTemplate[];
+  exercises: ExerciseTemplate[]; // Keep for compatibility
 }
 
 export interface WeekTemplate {
@@ -36,6 +49,7 @@ export interface FullProgramTemplate {
   sport?: string;
   goal?: string;
   trainer?: string;
+  category?: string;
   phases: PhaseTemplate[];
 }
 
@@ -56,46 +70,110 @@ export const SOCCER_52_WEEK: FullProgramTemplate = {
             id: `soccer-w${i+1}-d1`,
             title: 'Strength + Power (Lower)',
             day: 1,
-            exercises: [
-              { id: '1', exerciseId: 'trap-bar-deadlift', sets: '3', reps: '6-8', rest: '90-120s', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
-              { id: '2', exerciseId: 'bulgarian-split-squat', sets: '3', reps: '8 ea', rest: '60-90s', videoLinkOverride: 'https://www.youtube.com/watch?v=2C-uEi5t0gI', canGenerateVideo: true },
+            warmUp: [
+              { id: 'w1-1', exerciseId: 'foam-roll', nameOverride: 'Soft Tissue Foam Roll', sets: '1', reps: '5 min', notes: 'Focus on quads, glutes, and calves' },
+              { id: 'w1-2', exerciseId: 'dynamic-warmup', nameOverride: 'Movement Prep / Dynamic Warm Up', sets: '1', reps: '10 min', notes: 'KROME Standard Dynamic Flow' }
+            ],
+            quickness: [
               { id: '3', exerciseId: 'box-jumps', sets: '4', reps: '4', rest: '2-3 min', videoLinkOverride: 'https://www.youtube.com/watch?v=5k9e6y2-F-Q', canGenerateVideo: true },
-              { id: '4', exerciseId: 'mb-rotational-throw', sets: '3', reps: '6 ea', rest: '90s', videoLinkOverride: 'https://www.youtube.com/watch?v=R9K4tO8_6-w', canGenerateVideo: true },
-              { id: '5', exerciseId: 'nordic-curl', sets: '3', reps: '6', videoLinkOverride: 'https://www.youtube.com/watch?v=d_Z991-Ww-o', canGenerateVideo: true }
-            ]
+              { id: '4', exerciseId: 'mb-rotational-throw', sets: '3', reps: '6 ea', rest: '90s', videoLinkOverride: 'https://www.youtube.com/watch?v=R9K4tO8_6-w', canGenerateVideo: true }
+            ],
+            lift: [
+              { id: '1', exerciseId: 'trap-bar-deadlift', sets: '3', reps: '6-8', rest: '90-120s', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+              { id: '2', exerciseId: 'bulgarian-split-squat', sets: '3', reps: '8 ea', rest: '60-90s', videoLinkOverride: 'https://www.youtube.com/watch?v=2C-uEi5t0gI', canGenerateVideo: true }
+            ],
+            metabolic: [
+              { id: '5', exerciseId: 'nordic-curl', sets: '3', reps: '6', videoLinkOverride: 'https://www.youtube.com/watch?v=d_Z991-Ww-o', canGenerateVideo: true },
+              { id: 'm1-1', exerciseId: 'plank', nameOverride: 'Core: Plank Variations', sets: '3', reps: '45s', rest: '30s' }
+            ],
+            coolDown: [
+              { id: 'c1-1', exerciseId: 'static-stretch', nameOverride: 'Mobility: Static Stretching', sets: '1', reps: '5 min', notes: 'Focus on lower body' }
+            ],
+            exercises: [] // Keep empty for structured workouts
           },
           {
             id: `soccer-w${i+1}-d2`,
             title: 'Speed / COD + Repeated Sprint',
             day: 2,
-            exercises: [
+            warmUp: [
+              { id: 'w2-1', exerciseId: 'foam-roll', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '6', exerciseId: '30yd-sprints', sets: '6', reps: '30 yd', rest: '2.5-3.5 min' },
-              { id: '7', exerciseId: 'pro-agility', sets: '4', reps: 'trials', rest: '2-3 min' },
-              { id: '8', exerciseId: 'lateral-bound', sets: '3', reps: '5 ea', rest: '90s' },
+              { id: '7', exerciseId: 'pro-agility', sets: '4', reps: 'trials', rest: '2-3 min' }
+            ],
+            lift: [
+              { id: '8', exerciseId: 'lateral-bound', sets: '3', reps: '5 ea', rest: '90s' }
+            ],
+            metabolic: [
               { id: '9', exerciseId: 'rsa', sets: '6', reps: '20m', rest: '20-30s' }
-            ]
+            ],
+            coolDown: [
+              { id: 'c2-1', exerciseId: 'mobility-flow', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
+          },
+          {
+            id: `soccer-w${i+1}-d3`,
+            title: 'Recovery & Mobility',
+            day: 3,
+            warmUp: [
+              { id: `w3-1-${i}`, exerciseId: 'foam-roll', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '15 min' }
+            ],
+            quickness: [],
+            lift: [
+              { id: `l3-1-${i}`, exerciseId: 'mobility-flow', nameOverride: 'Active Recovery Flow', sets: '2', reps: '10 min' }
+            ],
+            metabolic: [],
+            coolDown: [
+              { id: `c3-1-${i}`, exerciseId: 'static-stretch', nameOverride: 'Static Stretching', sets: '1', reps: '10 min' }
+            ],
+            exercises: []
           },
           {
             id: `soccer-w${i+1}-d4`,
             title: 'Strength + Power (Upper + Unilateral)',
             day: 4,
-            exercises: [
+            warmUp: [
+              { id: 'w3-1', exerciseId: 'upper-body-prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
+              { id: '103', exerciseId: 'mb-chest-pass', sets: '4', reps: '6' }
+            ],
+            lift: [
               { id: '100', exerciseId: 'push-press', sets: '4', reps: '6-8 ea', rest: '90s' },
               { id: '101', exerciseId: 'row', sets: '4', reps: '8 ea' },
-              { id: '102', exerciseId: 'step-up', sets: '3', reps: '6-8 ea' },
-              { id: '103', exerciseId: 'mb-chest-pass', sets: '4', reps: '6' }
-            ]
+              { id: '102', exerciseId: 'step-up', sets: '3', reps: '6-8 ea' }
+            ],
+            metabolic: [
+              { id: 'm3-1', exerciseId: 'core-circuit', nameOverride: 'ESD / Core', sets: '3', reps: '10 min' }
+            ],
+            coolDown: [
+              { id: 'c3-1', exerciseId: 'upper-mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
           },
           {
             id: `soccer-w${i+1}-d6`,
             title: 'Agility + Conditioning',
             day: 6,
-            exercises: [
+            warmUp: [
+              { id: 'w4-1', exerciseId: 'field-warmup', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '15 min' }
+            ],
+            quickness: [
               { id: '104', exerciseId: 'cod-ladder', sets: '1', reps: '6 min' },
-              { id: '105', exerciseId: 'progressive-sprints', sets: '3', reps: 'rounds', rest: '2-3 min' },
-              { id: '106', exerciseId: 'shuttle-set', sets: '6', reps: '25m' },
               { id: '107', exerciseId: 'reactive-drill', sets: '1', reps: '6-8 reps' }
-            ]
+            ],
+            lift: [
+              { id: '105', exerciseId: 'progressive-sprints', sets: '3', reps: 'rounds', rest: '2-3 min' }
+            ],
+            metabolic: [
+              { id: '106', exerciseId: 'shuttle-set', sets: '6', reps: '25m' }
+            ],
+            coolDown: [
+              { id: 'c4-1', exerciseId: 'post-field-mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '10 min' }
+            ],
+            exercises: []
           }
         ]
       }))
@@ -302,46 +380,86 @@ export const SOFTBALL_WINTER: FullProgramTemplate = {
             id: `softball-w${i+1}-d1`,
             title: 'Acceleration & Rhythm',
             day: 1,
-            exercises: [
-              { id: '153', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'sw1-w1', exerciseId: 'soft-tissue', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '154', exerciseId: '10yd-accel', sets: '3', reps: '3x10 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '155', exerciseId: '30yd-sprints', sets: '1', reps: '3x20 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '156', exerciseId: 'lateral-shuffle-sprint', sets: '4', reps: '10 yd ea', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            lift: [],
+            metabolic: [],
+            coolDown: [
+              { id: '153', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            exercises: []
           },
           {
             id: `softball-w${i+1}-d2`,
             title: 'Lower Body Power + Core',
             day: 2,
-            exercises: [
+            warmUp: [
+              { id: 'sw1-w2', exerciseId: 'dynamic-warmup', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '157', exerciseId: 'box-jumps', sets: '4', reps: '4', videoLinkOverride: 'https://www.youtube.com/watch?v=5k9e6y2-F-Q', canGenerateVideo: true },
-              { id: '158', exerciseId: 'hang-cleans', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+              { id: '158', exerciseId: 'hang-cleans', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            lift: [
               { id: '159', exerciseId: 'goblet-squats', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '160', exerciseId: 'rdls', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '161', exerciseId: 'walking-lunges', sets: '3', reps: '10 ea', videoLinkOverride: 'https://www.youtube.com/watch?v=D7KaRcUTQeE', canGenerateVideo: true }
-            ]
+            ],
+            metabolic: [
+              { id: 'sw1-m2', exerciseId: 'core-work', nameOverride: 'ESD / Core', sets: '3', reps: '10 min' }
+            ],
+            coolDown: [
+              { id: 'sw1-c2', exerciseId: 'mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
           },
           {
             id: `softball-w${i+1}-d4`,
             title: 'Change of Direction',
             day: 4,
-            exercises: [
-              { id: '162', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'sw1-w3', exerciseId: 'warmup', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '163', exerciseId: 'pro-shuttle', sets: '5', reps: 'reps', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '164', exerciseId: 'lateral-linear-sprints', sets: '3', reps: '20 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '165', exerciseId: '20yd-flyins', sets: '2', reps: '2x20 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            lift: [],
+            metabolic: [],
+            coolDown: [
+              { id: '162', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            exercises: []
           },
           {
             id: `softball-w${i+1}-d5`,
             title: 'Upper Body + Core',
             day: 5,
-            exercises: [
-              { id: '166', exerciseId: 'mb-chest-pass', sets: '4', reps: '6', videoLinkOverride: 'https://www.youtube.com/watch?v=R9K4tO8_6-w', canGenerateVideo: true },
+            warmUp: [
+              { id: 'sw1-w4', exerciseId: 'upper-prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
+              { id: '166', exerciseId: 'mb-chest-pass', sets: '4', reps: '6', videoLinkOverride: 'https://www.youtube.com/watch?v=R9K4tO8_6-w', canGenerateVideo: true }
+            ],
+            lift: [
               { id: '167', exerciseId: 'push-press', sets: '3', reps: '8', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '168', exerciseId: 'db-rows', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '169', exerciseId: 'pull-ups-lat', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            metabolic: [
+              { id: 'sw1-m4', exerciseId: 'core', nameOverride: 'ESD / Core', sets: '3', reps: '10 min' }
+            ],
+            coolDown: [
+              { id: 'sw1-c4', exerciseId: 'mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
           }
         ]
       }))
@@ -366,45 +484,85 @@ export const BASEBALL_WINTER: FullProgramTemplate = {
             id: `baseball-w${i+1}-d1`,
             title: 'Conditioning & Speed',
             day: 1,
-            exercises: [
-              { id: '170', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'bw1-w1', exerciseId: 'prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '171', exerciseId: '10yd-accel', sets: '3', reps: '3x10 yd', notes: 'Lead off position', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '172', exerciseId: '30yd-sprints', sets: '1', reps: '3x30 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            lift: [],
+            metabolic: [],
+            coolDown: [
+              { id: '170', exerciseId: '60yd-buildups', sets: '2', reps: '60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            exercises: []
           },
           {
             id: `baseball-w${i+1}-d2`,
             title: 'Strength Training',
             day: 2,
-            exercises: [
-              { id: '173', exerciseId: 'hang-cleans', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'bw1-w2', exerciseId: 'prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
+              { id: '173', exerciseId: 'hang-cleans', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            lift: [
               { id: '174', exerciseId: 'back-squat', sets: '4', reps: '8', notes: '75%', videoLinkOverride: 'https://www.youtube.com/watch?v=ultWZbUMPL8', canGenerateVideo: true },
               { id: '175', exerciseId: 'incline-chest-press', sets: '3', reps: '8', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '176', exerciseId: 'rdls', sets: '3', reps: '10/10/8', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '177', exerciseId: 'pull-up', sets: '3', reps: 'Burnout', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            metabolic: [
+              { id: 'bw1-m2', exerciseId: 'core', nameOverride: 'ESD / Core', sets: '3', reps: '10 min' }
+            ],
+            coolDown: [
+              { id: 'bw1-c2', exerciseId: 'mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
           },
           {
             id: `baseball-w${i+1}-d4`,
             title: 'Conditioning & Agility',
             day: 4,
-            exercises: [
-              { id: '178', exerciseId: '60yd-buildups', sets: '1', reps: '2x60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
-              { id: '179', exerciseId: '60yd-buildups', sets: '2', reps: '2x60 yd', notes: 'Delay Steal Start', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'bw1-w3', exerciseId: 'prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
               { id: '180', exerciseId: '20yd-flyins', sets: '1', reps: '2x20 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            lift: [],
+            metabolic: [],
+            coolDown: [
+              { id: '178', exerciseId: '60yd-buildups', sets: '1', reps: '2x60 yd', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+              { id: '179', exerciseId: '60yd-buildups', sets: '2', reps: '2x60 yd', notes: 'Delay Steal Start', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            exercises: []
           },
           {
             id: `baseball-w${i+1}-d5`,
             title: 'Strength Training (Upper)',
             day: 5,
-            exercises: [
-              { id: '181', exerciseId: 'high-pulls', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
+            warmUp: [
+              { id: 'bw1-w4', exerciseId: 'prep', nameOverride: 'Soft Tissue / Movement Prep', sets: '1', reps: '10 min' }
+            ],
+            quickness: [
+              { id: '181', exerciseId: 'high-pulls', sets: '4', reps: '5/5/4/4', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
+            ],
+            lift: [
               { id: '182', exerciseId: 'db-rows', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '183', exerciseId: 'walking-lunges', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '184', exerciseId: 'lat-pulldown', sets: '3', reps: '10', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true },
               { id: '185', exerciseId: 'step-up', sets: '3', reps: '5 ea', videoLinkOverride: 'https://www.youtube.com/watch?v=1n0L2W1-h6g', canGenerateVideo: true }
-            ]
+            ],
+            metabolic: [
+              { id: 'bw1-m4', exerciseId: 'core', nameOverride: 'ESD / Core', sets: '3', reps: '10 min' }
+            ],
+            coolDown: [
+              { id: 'bw1-c4', exerciseId: 'mobility', nameOverride: 'Conditioning / Mobility', sets: '1', reps: '5 min' }
+            ],
+            exercises: []
           }
         ]
       }))

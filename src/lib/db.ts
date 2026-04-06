@@ -110,6 +110,19 @@ try {
     UNIQUE(user_id, workout_id, exercise_id, date)
   );
 
+  CREATE TABLE IF NOT EXISTS custom_foods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT,
+    calories REAL,
+    protein REAL,
+    carbs REAL,
+    fat REAL,
+    portion TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS program_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -119,6 +132,7 @@ try {
     day INTEGER,
     completed INTEGER DEFAULT 0,
     date TEXT,
+    scheduled_time TEXT,
     firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -226,6 +240,28 @@ try {
     firestore_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS program_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    description TEXT,
+    price REAL DEFAULT 0,
+    data TEXT,
+    firestore_id TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS program_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    program_id TEXT,
+    assigned_by INTEGER,
+    firestore_id TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE(user_id, program_id)
   );
 
   CREATE INDEX IF NOT EXISTS idx_progress_user_id ON progress(user_id);
@@ -388,6 +424,22 @@ for (const table of tablesToMigrate) {
       console.error(`Failed to migrate ${table}:`, alterErr);
     }
   }
+}
+
+// Migration: Add scheduled_time column to program_progress table if it doesn't exist
+try {
+  db.prepare('SELECT scheduled_time FROM program_progress LIMIT 1').get();
+} catch (err) {
+  console.log('Adding scheduled_time column to program_progress table...');
+  db.exec('ALTER TABLE program_progress ADD COLUMN scheduled_time TEXT');
+}
+
+// Migration: Add workout_id column to program_progress table if it doesn't exist
+try {
+  db.prepare('SELECT workout_id FROM program_progress LIMIT 1').get();
+} catch (err) {
+  console.log('Adding workout_id column to program_progress table...');
+  db.exec('ALTER TABLE program_progress ADD COLUMN workout_id TEXT');
 }
 
 // Migration: Add username column to user_activity_logs if it doesn't exist

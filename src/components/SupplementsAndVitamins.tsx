@@ -7,23 +7,24 @@ interface SupplementsAndVitaminsProps {
   data: BodyMetricsData;
   setData: React.Dispatch<React.SetStateAction<BodyMetricsData>>;
   isEditing: boolean;
-  getSupplementRecommendation: (name: string) => string;
-  generateDefaultSupplements: () => void;
+  getSupplementRecommendation: (name: string, data: BodyMetricsData) => string;
+  generateDefaultSupplements: (data: BodyMetricsData, setData: React.Dispatch<React.SetStateAction<BodyMetricsData>>) => void;
 }
 
 export default function SupplementsAndVitamins({ data, setData, isEditing, getSupplementRecommendation, generateDefaultSupplements }: SupplementsAndVitaminsProps) {
   return (
     <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl space-y-8">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
-          <Pill className="w-5 h-5" />
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+            <Pill className="w-5 h-5" />
+          </div>
+          <h3 className="text-lg font-bold uppercase italic text-white">Supplements and Vitamins</h3>
         </div>
-        <h3 className="text-lg font-bold uppercase italic">Supplements and Vitamins</h3>
       </div>
-
       <div className="flex justify-end">
         <button 
-          onClick={generateDefaultSupplements}
+          onClick={() => generateDefaultSupplements(data, setData)}
           className="text-xs font-bold uppercase tracking-widest text-gold hover:text-white transition-colors"
         >
           Auto-fill Supplements
@@ -68,7 +69,7 @@ export default function SupplementsAndVitamins({ data, setData, isEditing, getSu
                         {item}
                         {isEditing && (
                           <div className="text-[10px] text-gold italic mt-1">
-                            {getSupplementRecommendation(item)}
+                            {getSupplementRecommendation(item, data)}
                           </div>
                         )}
                       </li>
@@ -107,7 +108,7 @@ export default function SupplementsAndVitamins({ data, setData, isEditing, getSu
                         {item}
                         {isEditing && (
                           <div className="text-[10px] text-gold italic mt-1">
-                            {getSupplementRecommendation(item)}
+                            {getSupplementRecommendation(item, data)}
                           </div>
                         )}
                       </li>

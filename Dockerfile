@@ -31,4 +31,4 @@ EXPOSE 8080
 ENV NODE_ENV=production
 
 # Run the web service on container startup.
-CMD [ "node", "dist/server.cjs" ]
+CMD [ "npx", "tsx", "server.ts" ]

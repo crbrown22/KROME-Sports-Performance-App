@@ -41,6 +41,90 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["user_id", "workout_id", "exercise_id"]
+    },
+    "Exercise": {
+      "title": "Exercise",
+      "description": "Exercise library item.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "equipment": { "type": "array", "items": { "type": "string" } },
+        "videoUrl": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category"]
+    },
+    "ProgramTemplate": {
+      "title": "ProgramTemplate",
+      "description": "Global workout program template.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "weeks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "weekNumber": { "type": "integer" },
+                    "workouts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "title": { "type": "string" },
+                          "day": { "type": "integer" },
+                          "exercises": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": { "type": "string" },
+                                "exerciseId": { "type": "string" },
+                                "sets": { "type": "string" },
+                                "reps": { "type": "string" },
+                                "tempo": { "type": "string" },
+                                "rest": { "type": "string" },
+                                "notes": { "type": "string" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phases"]
+    },
+    "AssignedProgram": {
+      "title": "AssignedProgram",
+      "description": "Program assigned to a user by an admin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "programId": { "type": "string" },
+        "assignedBy": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "programId", "assignedBy"]
     }
   },
   "firestore": {
@@ -55,6 +139,18 @@
     "/workout_logs/{logId}": {
       "schema": { "$ref": "WorkoutLog" },
       "description": "Workout logs collection."
+    },
+    "/exercises/{exerciseId}": {
+      "schema": { "$ref": "Exercise" },
+      "description": "Exercise library collection."
+    },
+    "/program_templates/{templateId}": {
+      "schema": { "$ref": "ProgramTemplate" },
+      "description": "Global program templates collection."
+    },
+    "/assigned_programs/{assignmentId}": {
+      "schema": { "$ref": "AssignedProgram" },
+      "description": "Programs assigned to users by admins."
     }
   }
 }

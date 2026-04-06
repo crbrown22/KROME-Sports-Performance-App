@@ -10,11 +10,11 @@ interface AthleteSettingsProps {
 export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: user.firstName || "",
-    lastName: user.lastName || "",
-    email: user.email || "",
-    username: user.username || "",
-    fitness_goal: user.fitness_goal || ""
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    username: user?.username || "",
+    fitness_goal: user?.fitness_goal || ""
   });
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
 
@@ -59,7 +59,7 @@ export default function AthleteSettings({ user, onUpdate }: AthleteSettingsProps
           </div>
           <div className="flex gap-4">
             <div className="px-4 py-2 bg-gold/10 border border-gold/20 rounded-full text-gold text-[10px] font-black uppercase tracking-widest">
-              {user.role === 'admin' ? 'Administrator' : 'Athlete'}
+              {user.role === 'admin' ? 'Administrator' : user.role === 'coach' ? 'Coach' : 'Athlete'}
             </div>
             <button 
               onClick={() => isEditing ? handleSave() : setIsEditing(true)}

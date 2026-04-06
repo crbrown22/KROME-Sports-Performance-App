@@ -44,15 +44,19 @@ const initialLeads: Lead[] = [
 
 const stages = ['New Lead', 'Contacted', 'Consultation', 'Proposal', 'Closed Won', 'Closed Lost'];
 
-export const calculateKPIs = (users: any[], purchases: any[], leads: Lead[]) => {
-  const totalRevenue = purchases.reduce((sum, p) => sum + (p.price || 0), 0);
+export const calculateKPIs = (users: any[] = [], purchases: any[] = [], leads: Lead[] = []) => {
+  const safeUsers = Array.isArray(users) ? users : [];
+  const safePurchases = Array.isArray(purchases) ? purchases : [];
+  const safeLeads = Array.isArray(leads) ? leads : [];
+  
+  const totalRevenue = safePurchases.reduce((sum, p) => sum + (p.price || 0), 0);
   const mrr = totalRevenue > 0 ? totalRevenue / Math.max(1, new Date().getMonth() + 1) : 12450;
-  const ltv = users.length > 0 ? totalRevenue / users.length : 850;
+  const ltv = safeUsers.length > 0 ? totalRevenue / safeUsers.length : 850;
   
   const websiteVisitors = 12500;
-  const leadsGenerated = Math.max(850, leads.length);
-  const consultations = Math.max(120, leads.filter(l => ['Consultation', 'Proposal', 'Closed Won'].includes(l.status)).length);
-  const closedWon = Math.max(45, leads.filter(l => l.status === 'Closed Won').length);
+  const leadsGenerated = Math.max(850, safeLeads.length);
+  const consultations = Math.max(120, safeLeads.filter(l => l && ['Consultation', 'Proposal', 'Closed Won'].includes(l.status)).length);
+  const closedWon = Math.max(45, safeLeads.filter(l => l && l.status === 'Closed Won').length);
 
   const leadsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
   const consultationsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
@@ -62,7 +66,7 @@ export const calculateKPIs = (users: any[], purchases: any[], leads: Lead[]) => 
     totalRevenue,
     mrr,
     ltv,
-    activeUsers: users.length,
+    activeUsers: safeUsers.length,
     websiteVisitors,
     leadsGenerated,
     consultations,
@@ -98,7 +102,7 @@ export default function SalesAndGrowthCRM() {
         const [leadsRes, usersRes, purchasesRes, growthRes] = await Promise.all([
           fetch('/api/leads'),
           fetch('/api/users'),
-          fetch('/api/purchases'),
+          fetch('/api/admin/purchases'),
           fetch('/api/admin/growth-kpis')
         ]);
         

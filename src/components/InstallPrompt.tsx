@@ -35,7 +35,7 @@ export const InstallPrompt: React.FC = () => {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-24 md:bottom-6 left-4 right-4 z-[110] p-4 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex items-center justify-between">
+    <div className="fixed bottom-6 left-4 right-4 z-[110] p-4 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center">
           <Download className="w-6 h-6 text-gold" />

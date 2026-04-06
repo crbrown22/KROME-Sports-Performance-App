@@ -2,6 +2,7 @@ import { safeStorage } from '../utils/storage';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { getEmbedUrl } from '../utils/video';
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface VideoModalProps {
 
 export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoModalProps) {
   if (!isOpen) return null;
+
+  const embedUrl = getEmbedUrl(videoUrl);
 
   return (
     <AnimatePresence>
@@ -39,13 +42,19 @@ export default function VideoModal({ isOpen, onClose, videoUrl, title }: VideoMo
             </button>
           </div>
           <div className="relative pt-[56.25%] bg-black">
-            <iframe
-              className="absolute inset-0 w-full h-full"
-              src={videoUrl}
-              title={title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            ></iframe>
+            {embedUrl ? (
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={embedUrl}
+                title={title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-white/40">
+                Invalid video URL
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

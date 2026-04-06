@@ -1,7 +1,7 @@
 import { haptics } from '../utils/nativeBridge';
 import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Activity, 
   Calendar as CalendarIcon, 
@@ -13,6 +13,8 @@ import {
   BarChart3,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
+  ChevronDown,
   Zap,
   Dumbbell,
   StretchHorizontal,
@@ -21,7 +23,8 @@ import {
   Trash2,
   List as ListIcon
 } from 'lucide-react';
-import { formatDate, getCurrentDate } from '../utils/date';
+import { ALL_PROGRAMS } from '../data/workoutTemplates';
+import { formatDate, getCurrentDate, parseISODate } from '../utils/date';
 import WorkoutFeedback from './WorkoutFeedback';
 import { 
   LineChart, 
@@ -43,7 +46,16 @@ import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
 import VideoModal from './VideoModal';
 import ConfirmModal from './ConfirmModal';
 import { PlayCircle } from 'lucide-react';
-import { getWorkoutLogs, addWorkoutLog, deleteWorkoutLog, getProgramProgress, getWorkoutFeedback, updateWorkoutLog } from '../services/firebaseService';
+import { 
+  getWorkoutLogs, 
+  addWorkoutLog, 
+  deleteWorkoutLog, 
+  getProgramProgress, 
+  getWorkoutFeedback, 
+  updateWorkoutLog,
+  subscribeToWorkoutLogs,
+  subscribeToProgramProgress
+} from '../services/firebaseService';
 import { handleFirestoreError, OperationType } from '../utils/firebaseError';
 
 interface WorkoutLog {
@@ -81,24 +93,55 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [videoModal, setVideoModal] = useState<{isOpen: boolean, url: string, title: string}>({isOpen: false, url: '', title: ''});
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; log: WorkoutLog | null }>({
     isOpen: false,
     log: null
   });
 
+  const showSaveConfirmation = (message: string) => {
+    setSaveMessage(message);
+    setTimeout(() => setSaveMessage(null), 3000);
+  };
+
   const fetchLogs = async () => {
     try {
-      const logs = await getWorkoutLogs(userId);
-      setWorkoutLogs(logs.map((l: any) => ({
-        id: l.id,
-        workoutId: l.workout_id,
-        exerciseId: l.exercise_id,
-        completed: l.completed === 1 || l.completed === true,
-        date: l.date || new Date().toISOString(),
-        editedData: l.edited_data ? JSON.parse(l.edited_data) : {},
-        workoutStartTime: l.workout_start_time,
-        workoutEndTime: l.workout_end_time
-      })));
+      const res = await fetch(`/api/workout-logs/${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch workout logs");
+      const logs = await res.json();
+      const localEditedDataRaw = safeStorage.getItem(`editedExercises_${userId}`);
+      const localEditedData = localEditedDataRaw ? JSON.parse(localEditedDataRaw) : {};
+      
+      const localCompletedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+      const localCompleted = localCompletedRaw ? JSON.parse(localCompletedRaw) : {};
+
+      setWorkoutLogs(logs.map((l: any) => {
+        const key = `${l.workout_id}-${l.exercise_id}`;
+        const apiEditedData = (() => {
+          if (!l.edited_data) return {};
+          if (typeof l.edited_data === 'object') return l.edited_data;
+          try {
+            return JSON.parse(l.edited_data);
+          } catch (e) {
+            console.error("Error parsing edited_data in WorkoutTracker:", e, l.edited_data);
+            return {};
+          }
+        })();
+
+        const isCompleted = localCompleted[key] !== undefined ? localCompleted[key] : (l.completed === 1 || l.completed === true);
+
+        return {
+          id: l.id,
+          workoutId: l.workout_id,
+          exerciseId: l.exercise_id,
+          completed: isCompleted,
+          date: l.date || getCurrentDate(),
+          editedData: localEditedData[key] || apiEditedData,
+          workoutStartTime: l.workout_start_time,
+          workoutEndTime: l.workout_end_time
+        };
+      }));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'workout_logs');
     }
@@ -106,28 +149,70 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
 
   const fetchFeedback = async () => {
     try {
-      const data = await getWorkoutFeedback(userId);
+      const res = await fetch(`/api/workout-feedback/${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch feedback");
+      const data = await res.json();
       setFeedback(data);
     } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'workout_feedback');
+      console.error("Error fetching feedback:", err);
     }
   };
 
   useEffect(() => {
+    let unsubscribeLogs: () => void;
+    let unsubscribeProgress: () => void;
+
     const fetchData = async () => {
       try {
-        await Promise.all([
-          fetchLogs(),
-          fetchFeedback(),
-          (async () => {
-            const progress = await getProgramProgress(userId);
-            setProgramProgress(progress.map((p: any) => ({
-              ...p,
-              programId: p.program_id,
-              completed: p.completed === 1 || p.completed === true
-            })));
-          })()
-        ]);
+        // First, sync any local data that might not be in the database
+        await syncLocalData();
+        
+        await fetchFeedback();
+
+        // Real-time listeners
+        unsubscribeLogs = subscribeToWorkoutLogs(userId, (logs) => {
+          const localEditedDataRaw = safeStorage.getItem(`editedExercises_${userId}`);
+          const localEditedData = localEditedDataRaw ? JSON.parse(localEditedDataRaw) : {};
+          
+          const localCompletedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+          const localCompleted = localCompletedRaw ? JSON.parse(localCompletedRaw) : {};
+
+          setWorkoutLogs(logs.map((l: any) => {
+            const key = `${l.workout_id}-${l.exercise_id}`;
+            const apiEditedData = (() => {
+              if (!l.edited_data) return {};
+              if (typeof l.edited_data === 'object') return l.edited_data;
+              try {
+                return JSON.parse(l.edited_data);
+              } catch (e) {
+                console.error("Error parsing edited_data in WorkoutTracker:", e, l.edited_data);
+                return {};
+              }
+            })();
+
+            const isCompleted = localCompleted[key] !== undefined ? localCompleted[key] : (l.completed === 1 || l.completed === true);
+
+            return {
+              id: l.id,
+              workoutId: l.workout_id,
+              exerciseId: l.exercise_id,
+              completed: isCompleted,
+              date: l.date || getCurrentDate(),
+              editedData: localEditedData[key] || apiEditedData,
+              workoutStartTime: l.workout_start_time,
+              workoutEndTime: l.workout_end_time
+            };
+          }));
+        });
+
+        unsubscribeProgress = subscribeToProgramProgress(userId, (progress) => {
+          setProgramProgress(progress.map((p: any) => ({
+            ...p,
+            programId: p.program_id,
+            completed: p.completed === 1 || p.completed === true
+          })));
+        });
+
       } catch (err) {
         console.error("Failed to fetch workout data", err);
       } finally {
@@ -136,28 +221,164 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
     };
 
     fetchData();
+
+    return () => {
+      if (unsubscribeLogs) unsubscribeLogs();
+      if (unsubscribeProgress) unsubscribeProgress();
+    };
   }, [userId]);
+
+  const syncLocalData = async () => {
+    if (userId === 'guest') return;
+    
+    try {
+      const completedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+      const editedRaw = safeStorage.getItem(`editedExercises_${userId}`);
+      
+      const completedLocal = completedRaw ? JSON.parse(completedRaw) : {};
+      const editedLocal = editedRaw ? JSON.parse(editedRaw) : {};
+      
+      if (Object.keys(completedLocal).length === 0 && Object.keys(editedLocal).length === 0) return;
+
+      // Fetch existing logs to avoid duplicates
+      const existingLogs = await getWorkoutLogs(userId);
+      const existingKeys = new Set(existingLogs.map((l: any) => `${l.workout_id}-${l.exercise_id}`));
+      
+      const logsToSync = [];
+      
+      // Sync completed exercises
+      for (const key of Object.keys(completedLocal)) {
+        if (!existingKeys.has(key)) {
+          const [workoutId, exerciseId] = key.split('-');
+          if (workoutId && exerciseId) {
+            logsToSync.push({
+              workoutId,
+              exerciseId,
+              completed: completedLocal[key],
+              date: getCurrentDate(),
+              editedData: editedLocal[key] || {}
+            });
+            existingKeys.add(key); // Prevent adding same key twice if it's also in editedLocal
+          }
+        }
+      }
+      
+      // Sync edited exercises that weren't in completedLocal
+      for (const key of Object.keys(editedLocal)) {
+        if (!existingKeys.has(key)) {
+          const [workoutId, exerciseId] = key.split('-');
+          if (workoutId && exerciseId) {
+            logsToSync.push({
+              workoutId,
+              exerciseId,
+              completed: false, // It's edited but not completed
+              date: getCurrentDate(),
+              editedData: editedLocal[key]
+            });
+            existingKeys.add(key);
+          }
+        }
+      }
+      
+      if (logsToSync.length > 0) {
+        await fetch(`/api/workout-logs/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logs: logsToSync })
+        });
+      }
+    } catch (err) {
+      console.error("Failed to sync local data", err);
+    }
+  };
 
   const handleAddLog = async (log: WorkoutLog) => {
     try {
-      await addWorkoutLog({
-        user_id: userId,
-        workout_id: log.workoutId,
-        exercise_id: log.exerciseId,
-        completed: log.completed ? 1 : 0,
-        date: log.date,
-        edited_data: JSON.stringify(log.editedData || {}),
-        workout_start_time: log.workoutStartTime,
-        workout_end_time: log.workoutEndTime
+      const res = await fetch(`/api/workout-logs/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          logs: [{
+            workoutId: log.workoutId,
+            exerciseId: log.exerciseId,
+            completed: log.completed,
+            date: log.date,
+            editedData: log.editedData || {},
+            workoutStartTime: log.workoutStartTime,
+            workoutEndTime: log.workoutEndTime
+          }]
+        })
       });
+      if (!res.ok) throw new Error("Failed to add log");
       await fetchLogs();
+      checkAndMarkWorkoutComplete(log.workoutId, log.date);
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'workout_logs');
+      console.error("Error adding log:", err);
+    }
+  };
+
+  const checkAndMarkWorkoutComplete = async (workoutId: string, date: string) => {
+    // Find the workout in ALL_PROGRAMS to get its structure
+    let workout = null;
+    let programId = '';
+    let phaseName = '';
+    let weekNum = 0;
+    let dayNum = 0;
+
+    for (const prog of ALL_PROGRAMS) {
+      for (const phase of prog.phases) {
+        for (const week of phase.weeks) {
+          const found = week.workouts.find(w => w.id === workoutId);
+          if (found) {
+            workout = found;
+            programId = prog.id;
+            phaseName = phase.name;
+            weekNum = week.week;
+            dayNum = found.day;
+            break;
+          }
+        }
+        if (workout) break;
+      }
+      if (workout) break;
+    }
+
+    if (!workout) return;
+
+    // Check if all exercises for this workout on this date are completed in workoutLogs
+    const workoutExercises = workout.exercises;
+    const logsForWorkout = workoutLogs.filter(l => l.workoutId === workoutId && l.date === date);
+    
+    const allCompleted = workoutExercises.every(ex => {
+      const log = logsForWorkout.find(l => l.exerciseId === ex.id);
+      return log && log.completed;
+    });
+
+    if (allCompleted) {
+      // Mark as complete in program_progress
+      try {
+        await fetch(`/api/program-progress/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            progress: [{
+              programId,
+              phase: phaseName,
+              week: weekNum,
+              day: dayNum,
+              completed: true,
+              date
+            }]
+          })
+        });
+        window.dispatchEvent(new Event('workout-completed'));
+      } catch (err) {
+        console.error("Failed to mark workout as complete:", err);
+      }
     }
   };
 
   const handleUpdateLog = async (log: WorkoutLog) => {
-    if (!log.id) return;
     const isCompleted = !log.completed;
     if (isCompleted) {
       haptics.success();
@@ -165,12 +386,36 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
       haptics.light();
     }
     try {
-      await updateWorkoutLog(log.id, {
-        completed: isCompleted ? 1 : 0
+      const res = await fetch(`/api/workout-logs/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          logs: [{
+            workoutId: log.workoutId,
+            exerciseId: log.exerciseId,
+            completed: isCompleted,
+            date: log.date,
+            editedData: log.editedData || {},
+            workoutStartTime: log.workoutStartTime,
+            workoutEndTime: log.workoutEndTime
+          }]
+        })
       });
+      if (!res.ok) throw new Error("Failed to update log");
+      
+      // Sync to local storage
+      const key = `${log.workoutId}-${log.exerciseId}`;
+      const completedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+      const completedLocal = completedRaw ? JSON.parse(completedRaw) : {};
+      completedLocal[key] = isCompleted;
+      safeStorage.setItem(`completedExercises_${userId}`, JSON.stringify(completedLocal));
+      
       await fetchLogs();
+      checkAndMarkWorkoutComplete(log.workoutId, log.date);
+      showSaveConfirmation(isCompleted ? "Exercise Completed" : "Exercise Marked Incomplete");
+      window.dispatchEvent(new Event('workout-completed'));
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'workout_logs');
+      console.error("Error updating log:", err);
     }
   };
 
@@ -182,37 +427,55 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
     if (!deleteConfirm.log) return;
     const log = deleteConfirm.log;
     
-    await fetch(`/api/workout-logs/${userId}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
-      body: JSON.stringify({ workout_id: log.workoutId, exercise_id: log.exerciseId, date: log.date })
-    });
-    setDeleteConfirm({ isOpen: false, log: null });
-    await fetchLogs();
+    try {
+      const res = await fetch(`/api/workout-logs/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workout_id: log.workoutId,
+          exercise_id: log.exerciseId,
+          date: log.date
+        })
+      });
+      if (!res.ok) throw new Error("Failed to delete log");
+      
+      // Sync to local storage
+      const key = `${log.workoutId}-${log.exerciseId}`;
+      const completedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+      const completedLocal = completedRaw ? JSON.parse(completedRaw) : {};
+      delete completedLocal[key];
+      safeStorage.setItem(`completedExercises_${userId}`, JSON.stringify(completedLocal));
+      
+      const editedRaw = safeStorage.getItem(`editedExercises_${userId}`);
+      const editedLocal = editedRaw ? JSON.parse(editedRaw) : {};
+      delete editedLocal[key];
+      safeStorage.setItem(`editedExercises_${userId}`, JSON.stringify(editedLocal));
+      
+      await fetchLogs();
+      showSaveConfirmation("Exercise Deleted");
+      window.dispatchEvent(new Event('workout-completed'));
+    } catch (err) {
+      console.error("Error deleting log:", err);
+    } finally {
+      setDeleteConfirm({ isOpen: false, log: null });
+    }
   };
 
   const calculateCompletion = (period: 'week' | 'month' | 'year') => {
-    // Use getCurrentDate to get timezone-aware date string, then convert to Date object
     const nowStr = getCurrentDate();
-    const [y, m, d] = nowStr.split('-').map(Number);
-    const now = new Date(y, m - 1, d);
-    let startDate = new Date(y, m - 1, d);
+    const now = parseISODate(nowStr);
+    let startDate = parseISODate(nowStr);
 
     if (period === 'week') startDate.setDate(now.getDate() - 7);
     else if (period === 'month') startDate.setMonth(now.getMonth() - 1);
     else if (period === 'year') startDate.setFullYear(now.getFullYear() - 1);
 
-    // Get all unique exercises for the workouts in the period
-    // Since we don't have the full template data here, we'll assume 
-    // a standard of 20 exercises per day for this calculation
-    const periodLogs = workoutLogs.filter(log => new Date(log.date) >= startDate);
-    const completed = periodLogs.filter(log => log.completed).length;
-    
-    // Estimate total exercises: 5 days * 20 exercises = 100 per week
-    const daysInPeriod = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const totalExercises = daysInPeriod * 20;
+    const periodProgress = programProgress.filter(p => parseISODate(p.date) >= startDate);
+    const totalWorkouts = periodProgress.length;
+    const completedWorkouts = periodProgress.filter(p => p.completed).length;
 
-    return totalExercises === 0 ? 0 : Math.min(100, Math.round((completed / totalExercises) * 100));
+    if (totalWorkouts === 0) return 0;
+    return Math.round((completedWorkouts / totalWorkouts) * 100);
   };
 
   const getPhaseData = () => {
@@ -332,11 +595,34 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
       return;
     }
     try {
+      const completedRaw = safeStorage.getItem(`completedExercises_${userId}`);
+      const completedLocal = completedRaw ? JSON.parse(completedRaw) : {};
+      const editedRaw = safeStorage.getItem(`editedExercises_${userId}`);
+      const editedLocal = editedRaw ? JSON.parse(editedRaw) : {};
+      
+      let localChanged = false;
+
       for (const log of session.logs) {
         if (log.id) {
           await deleteWorkoutLog(log.id);
+          
+          const key = `${log.workoutId}-${log.exerciseId}`;
+          if (key in completedLocal) {
+            delete completedLocal[key];
+            localChanged = true;
+          }
+          if (key in editedLocal) {
+            delete editedLocal[key];
+            localChanged = true;
+          }
         }
       }
+      
+      if (localChanged) {
+        safeStorage.setItem(`completedExercises_${userId}`, JSON.stringify(completedLocal));
+        safeStorage.setItem(`editedExercises_${userId}`, JSON.stringify(editedLocal));
+      }
+
       await fetchLogs();
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'workout_logs');
@@ -379,16 +665,16 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
             onChange={(value) => setSelectedDate(value as Date)} 
             value={selectedDate}
             tileContent={({ date }) => {
-              const hasWorkout = workoutLogs.some(log => isSameDay(new Date(log.date), date));
+              const hasWorkout = workoutLogs.some(log => isSameDay(parseISODate(log.date), date));
               return hasWorkout ? <div className="w-2 h-2 bg-gold rounded-full mx-auto mt-1" /> : null;
             }}
             className="w-full bg-transparent border-none text-white"
           />
           <div className="mt-8">
             <h4 className="text-lg font-black uppercase italic mb-4">Workouts on {format(selectedDate, 'PPP')}</h4>
-            {workoutLogs.filter(log => isSameDay(new Date(log.date), selectedDate)).length > 0 ? (
+            {workoutLogs.filter(log => isSameDay(parseISODate(log.date), selectedDate)).length > 0 ? (
               <div className="space-y-2">
-                {workoutLogs.filter(log => isSameDay(new Date(log.date), selectedDate)).map(log => {
+                {workoutLogs.filter(log => isSameDay(parseISODate(log.date), selectedDate)).map(log => {
                   const exerciseDetails = EXERCISE_LIBRARY.find(e => e.id === log.exerciseId);
                   const videoUrl = exerciseDetails?.videoUrl;
                   const name = exerciseDetails?.name || log.exerciseId;
@@ -398,6 +684,13 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
                       <div>
                         <p className="font-bold text-gold">{log.workoutId.replace(/-/g, ' ')}</p>
                         <p className="text-xs text-white/60">Exercise: {name}</p>
+                        {(log.editedData?.sets || log.editedData?.reps || log.editedData?.weight) && (
+                          <div className="flex gap-3 mt-2 text-[10px] font-mono text-white/40">
+                            {log.editedData?.sets && <span>Sets: {log.editedData.sets}</span>}
+                            {log.editedData?.reps && <span>Reps: {log.editedData.reps}</span>}
+                            {log.editedData?.weight && <span>Weight: {log.editedData.weight}</span>}
+                          </div>
+                        )}
                         {videoUrl && (
                           <button 
                             onClick={() => setVideoModal({ isOpen: true, url: videoUrl, title: name })}
@@ -565,42 +858,99 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
               </button>
             </div>
             <div className="grid grid-cols-1 gap-4">
-              {getRecentSessions().map((session, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-white/10 transition-colors cursor-default gap-8">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${session.completedCount === session.totalCount ? 'bg-emerald-500' : 'bg-gold'}`} />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold uppercase tracking-widest text-white/70 whitespace-nowrap overflow-hidden text-ellipsis" title={session.workoutId.replace(/-/g, ' ')}>
-                        {session.workoutId.replace(/-/g, ' ')}
+              {getRecentSessions().map((session, idx) => {
+                const sessionId = `${session.workoutId}-${session.date}`;
+                const isExpanded = expandedSession === sessionId;
+                
+                return (
+                <div key={idx} className="flex flex-col bg-black/20 rounded-2xl border border-white/5 hover:border-white/10 transition-colors overflow-hidden">
+                  <div 
+                    onClick={() => setExpandedSession(isExpanded ? null : sessionId)}
+                    className="flex items-center justify-between p-4 cursor-pointer gap-8"
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${session.completedCount === session.totalCount ? 'bg-emerald-500' : 'bg-gold'}`} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold uppercase tracking-widest text-white/70 whitespace-nowrap overflow-hidden text-ellipsis" title={session.workoutId.replace(/-/g, ' ')}>
+                          {session.workoutId.replace(/-/g, ' ')}
+                        </span>
+                        <span className="text-xs text-white/30">
+                          {session.completedCount}/{session.totalCount} Exercises
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-6 shrink-0">
+                      {session.startTime && session.endTime && (
+                        <div className="flex items-center gap-2 text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/10">
+                          <Clock className="w-4 h-4" />
+                          <span className="text-sm font-mono font-bold whitespace-nowrap">
+                            {calculateDuration(session.startTime, session.endTime)} min
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-sm text-white/30 font-medium whitespace-nowrap">
+                        {formatDate(session.date)}
                       </span>
-                      <span className="text-xs text-white/30">
-                        {session.completedCount}/{session.totalCount} Exercises
-                      </span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(session); }}
+                        className="text-white/40 hover:text-red-500 transition-colors"
+                        aria-label="Delete workout session"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6 shrink-0">
-                    {session.startTime && session.endTime && (
-                      <div className="flex items-center gap-2 text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/10">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm font-mono font-bold whitespace-nowrap">
-                          {calculateDuration(session.startTime, session.endTime)} min
-                        </span>
-                      </div>
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-white/5 bg-black/40"
+                      >
+                        <div className="p-4 space-y-2">
+                          {workoutLogs
+                            .filter(log => log.workoutId === session.workoutId && log.date === session.date)
+                            .map(log => {
+                              const exerciseDetails = EXERCISE_LIBRARY.find(e => e.id === log.exerciseId);
+                              const videoUrl = exerciseDetails?.videoUrl;
+                              const name = exerciseDetails?.name || log.exerciseId;
+
+                              return (
+                                <div key={`${log.workoutId}-${log.exerciseId}`} className="p-3 bg-white/5 rounded-xl flex justify-between items-center">
+                                  <div>
+                                    <p className="text-sm font-bold text-white/80">{name}</p>
+                                    {(log.editedData?.sets || log.editedData?.reps || log.editedData?.weight) && (
+                                      <div className="flex gap-3 mt-1 text-[10px] font-mono text-white/40">
+                                        {log.editedData?.sets && <span>Sets: {log.editedData.sets}</span>}
+                                        {log.editedData?.reps && <span>Reps: {log.editedData.reps}</span>}
+                                        {log.editedData?.weight && <span>Weight: {log.editedData.weight}</span>}
+                                      </div>
+                                    )}
+                                    {videoUrl && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setVideoModal({ isOpen: true, url: videoUrl, title: name }); }}
+                                        className="text-[10px] text-gold hover:underline mt-1 flex items-center gap-1 !outline-none"
+                                      >
+                                        <PlayCircle className="w-3 h-3" /> Watch Demo
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${log.completed ? 'bg-emerald-500/20 text-emerald-500' : 'bg-gold/20 text-gold'}`}>
+                                    {log.completed ? 'Completed' : 'Pending'}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </motion.div>
                     )}
-                    <span className="text-sm text-white/30 font-medium whitespace-nowrap">
-                      {formatDate(session.date)}
-                    </span>
-                    <button 
-                      onClick={() => handleDeleteSession(session)}
-                      className="text-white/40 hover:text-red-500 transition-colors"
-                      aria-label="Delete workout session"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  </AnimatePresence>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 
@@ -642,6 +992,20 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
         onConfirm={confirmDeleteLog}
         onCancel={() => setDeleteConfirm({ isOpen: false, log: null })}
       />
+
+      <AnimatePresence>
+        {saveMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-black px-6 py-3 rounded-full font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {saveMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

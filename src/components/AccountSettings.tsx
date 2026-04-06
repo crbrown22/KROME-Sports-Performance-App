@@ -46,45 +46,40 @@ export default function AccountSettings({ user, onUpdate, onDelete, onBack, onLo
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be smaller than 5MB");
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be smaller than 2MB");
       return;
     }
 
     setUploading(true);
     try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Image = reader.result as string;
+        
+        // Update local state
+        const updatedFormData = { ...formData, avatar_url: base64Image };
+        setFormData(updatedFormData);
 
-      const uploadRes = await fetch('/api/files/upload', {
-        method: 'POST',
-        body: formDataUpload
-      });
+        // Update server (both SQLite and Firestore)
+        const response = await fetch(`/api/users/${user.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatar_url: base64Image })
+        });
 
-      if (!uploadRes.ok) throw new Error('Upload failed');
-
-      const { filename } = await uploadRes.json();
-      const avatarUrl = `/api/files/${filename}`;
-
-      const updatedFormData = { ...formData, avatarUrl: avatarUrl };
-      setFormData(updatedFormData);
-
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatarUrl: avatarUrl })
-      });
-
-      if (response.ok) {
-        onUpdate({ ...user, avatarUrl: avatarUrl });
-        setSuccess("Profile picture updated!");
-        setTimeout(() => setSuccess(""), 3000);
-      } else {
-        throw new Error('Failed to update profile');
-      }
+        if (response.ok) {
+          onUpdate({ ...user, avatar_url: base64Image });
+          setSuccess("Profile picture updated!");
+          setTimeout(() => setSuccess(""), 3000);
+        } else {
+          throw new Error('Failed to update profile');
+        }
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
-      console.error("Avatar upload failed", err);
-      setError("Failed to upload avatar. Please try again.");
+      console.error("Avatar update failed", err);
+      setError("Failed to update avatar. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -171,9 +166,16 @@ export default function AccountSettings({ user, onUpdate, onDelete, onBack, onLo
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-32 pb-24 bg-black px-6"
+      className="min-h-screen pb-24 bg-black px-6"
+      style={{ paddingTop: 'calc(100px + var(--safe-area-top))' }}
     >
       <div className="max-w-4xl mx-auto">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest hover:gap-4 transition-all mb-8 !outline-none"
+        >
+          <ChevronLeft className="w-4 h-4" /> Back
+        </button>
         <div className="profile-gradient border border-white/10 rounded-3xl p-8 md:p-10 backdrop-blur-xl shadow-2xl">
           {success && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-400 text-sm">

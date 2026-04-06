@@ -32,6 +32,11 @@ interface PARQData {
   q5: boolean | null;
   q6: boolean | null;
   q7: boolean | null;
+  kneeInjury: boolean | null;
+  backInjury: boolean | null;
+  ankleInjury: boolean | null;
+  jointProblems: boolean | null;
+  injuryDetails: string;
   restingHeartRate: string;
   recoveryHeartRate: string;
   bodyFatPercentage: string;
@@ -50,6 +55,7 @@ const INITIAL_PARQ: PARQData = {
   preferredTimes: [], preferredDays: [], positions: [],
   bats: '', throws: '', shirtSize: '',
   q1: null, q2: null, q3: null, q4: null, q5: null, q6: null, q7: null,
+  kneeInjury: null, backInjury: null, ankleInjury: null, jointProblems: null, injuryDetails: '',
   restingHeartRate: '', recoveryHeartRate: '', bodyFatPercentage: '',
   bloodPressure: '', waistMeasurement: '', hipMeasurement: '',
   rThighMeasurement: '', waistToHipRatio: ''
@@ -63,9 +69,13 @@ const questions = [
   { id: 'q5', text: 'Do you have a bone or joint problem (for example, back, knee or hip) that could be made worse by a change in your physical activity?' },
   { id: 'q6', text: 'Is your doctor currently prescribing drugs (for example, water pills) for your blood pressure or heart condition?' },
   { id: 'q7', text: 'Do you know of any other reason why you should not do physical activity?' },
+  { id: 'kneeInjury', text: 'Have you ever had a significant knee injury?' },
+  { id: 'backInjury', text: 'Have you ever had a significant back injury?' },
+  { id: 'ankleInjury', text: 'Have you ever had a significant ankle injury?' },
+  { id: 'jointProblems', text: 'Do you have any existing joint problems?' },
 ];
 
-export default function PARQ({ userId, onComplete, initialReadOnly = false }: { userId: string, onComplete?: () => void, initialReadOnly?: boolean }) {
+export default function PARQ({ userId, onComplete, onUpdate, initialReadOnly = false }: { userId: string, onComplete?: () => void, onUpdate?: (userData: any) => void, initialReadOnly?: boolean }) {
   const [data, setData] = useState<PARQData>(INITIAL_PARQ);
   const [isEditing, setIsEditing] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(initialReadOnly);
@@ -93,43 +103,44 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
     loadData();
   }, [userId]);
 
-  useEffect(() => {
-    if (isEditing) {
-      const priceMap: Record<string, number> = {
-        'Personal Training Session': 60,
-        '52 Week Program': 6000,
-        '16 Week Online Training Program': 3000,
-        '8 Week Online Training Program': 1500,
-        '52 Week Flexibility & Mobility Online Program': 5000,
-        '16 Week Flexibility & Mobility Online Program': 2500,
-        '8 Week Flexibility & Mobility Online Program': 1500,
-        '52 Week Nutrition Plan': 6000,
-        '16 Week Nutrition Plan': 2500,
-        '8 Week Nutrition Plan': 1200,
-        'Baseball / Softball Hitting Lessons': 50,
-        'Baseball / Softball Fielding Lessons': 50,
-        'Baseball / Softball Hitting Analysis': 50,
-        'Team Strength & Conditioning Clinic': 20,
-        'Baseball / Softball Team Hitting Clinic': 20,
-        'Baseball / Softball Team Defense Clinic': 20
-      };
+  const handleSave = async () => {
+    if (userId && userId !== 'guest') {
+      try {
+        // Update lead in CRM if applicable
+        const priceMap: Record<string, number> = {
+          'Personal Training Session': 60,
+          '52 Week Program': 6000,
+          '16 Week Online Training Program': 3000,
+          '8 Week Online Training Program': 1500,
+          '52 Week Flexibility & Mobility Online Program': 5000,
+          '16 Week Flexibility & Mobility Online Program': 2500,
+          '8 Week Flexibility & Mobility Online Program': 1500,
+          '52 Week Nutrition Plan': 6000,
+          '16 Week Nutrition Plan': 2500,
+          '8 Week Nutrition Plan': 1200,
+          'Baseball / Softball Hitting Lessons': 50,
+          'Baseball / Softball Fielding Lessons': 50,
+          'Baseball / Softball Hitting Analysis': 50,
+          'Team Strength & Conditioning Clinic': 20,
+          'Baseball / Softball Team Hitting Clinic': 20,
+          'Baseball / Softball Team Defense Clinic': 20
+        };
 
-      const calculateLeadValue = (sessionRequests: string[] = []) => {
-        let totalValue = 0;
-        sessionRequests.forEach(request => {
-          totalValue += priceMap[request] || 0;
-        });
-        return totalValue;
-      };
-      
-      const leadValue = calculateLeadValue(data.sessionRequests);
+        const calculateLeadValue = (sessionRequests: string[] = []) => {
+          let totalValue = 0;
+          sessionRequests.forEach(request => {
+            totalValue += priceMap[request] || 0;
+          });
+          return totalValue;
+        };
+        
+        const leadValue = calculateLeadValue(data.sessionRequests);
 
-      const updateLead = async () => {
         try {
           const leadsRes = await fetch('/api/leads');
           if (leadsRes.ok) {
             const leads = await leadsRes.json();
-            const userLead = leads.find((l: any) => l.user_id === parseInt(userId));
+            const userLead = leads.find((l: any) => l.user_id === Number(userId) || l.uid === userId);
             
             if (userLead) {
               await fetch(`/api/leads/${userLead.id}`, {
@@ -149,25 +160,29 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
         } catch (e) {
           console.error("Failed to update lead in CRM", e);
         }
-      };
-      
-      updateLead();
-    }
-  }, [data, isEditing, userId]);
 
-  const handleSave = async () => {
-    if (userId && userId !== 'guest') {
-      try {
-        await fetch(`/api/parq/${userId}`, {
+        const response = await fetch(`/api/parq/${userId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-        await fetch(`/api/users/${userId}/parq-complete`, {
+        
+        if (!response.ok) {
+          throw new Error('Failed to save PAR-Q');
+        }
+
+        const completeRes = await fetch(`/api/users/${userId}/parq-complete`, {
           method: 'PATCH'
         });
+
+        if (completeRes.ok) {
+          const updatedUser = await completeRes.json();
+          if (onUpdate) onUpdate(updatedUser);
+        }
       } catch (err) {
         console.error("Error saving PARQ:", err);
+        alert("Failed to save PAR-Q. Please try again.");
+        return; // Don't close editing if it failed
       }
     }
     
@@ -376,6 +391,22 @@ export default function PARQ({ userId, onComplete, initialReadOnly = false }: { 
               </div>
             </div>
           ))}
+          
+          {/* Injury Details */}
+          <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gold mb-2 block">If you answered Yes to any injury questions, please provide details:</label>
+            {isEditing ? (
+              <textarea 
+                disabled={isReadOnly}
+                value={data.injuryDetails}
+                onChange={(e) => setData({...data, injuryDetails: e.target.value})}
+                className="w-full bg-black/50 border border-white/10 rounded p-2 text-sm text-white"
+                rows={3}
+              />
+            ) : (
+              <div className="text-sm text-white">{data.injuryDetails || 'None'}</div>
+            )}
+          </div>
         </div>
 
         {/* Existing Health Metrics Section */}

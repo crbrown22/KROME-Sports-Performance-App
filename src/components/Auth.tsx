@@ -56,15 +56,27 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
           haptics.success();
           onLoginSuccess(userData);
         } else {
-          // If user exists in Firebase but not in our DB, create a basic entry
-          const userData = {
-            id: user.uid,
-            email: user.email,
-            username: user.displayName || user.email?.split('@')[0],
-            role: 'athlete'
-          };
-          haptics.success();
-          onLoginSuccess(userData);
+          // If user exists in Firebase but not in our DB, register them
+          const registerResponse = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              uid: user.uid,
+              username: user.displayName || user.email?.split('@')[0], 
+              email: user.email, 
+              firstName: user.displayName?.split(' ')[0] || '',
+              lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+              role: (user.email === 'swolecode@gmail.com' || user.email === 'kromefitness@gmail.com') ? 'admin' : 'athlete'
+            })
+          });
+          
+          if (registerResponse.ok) {
+            const userData = await registerResponse.json();
+            haptics.success();
+            onLoginSuccess(userData);
+          } else {
+            setError("Failed to sync user profile. Please try again.");
+          }
         }
       } else if (mode === 'register') {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -234,6 +246,11 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
                       Coach
                     </button>
                   </div>
+                  {role === 'coach' && (
+                    <p className="text-[10px] text-gold font-bold uppercase tracking-widest mt-2 ml-1">
+                      Coaches are automatically assigned as Admin
+                    </p>
+                  )}
                 </div>
               </>
             )}

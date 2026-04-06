@@ -16,9 +16,9 @@ interface UserRecord {
   id: string;
   username: string;
   email: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'coach' | 'athlete';
   status: 'active' | 'inactive' | 'pending';
-  avatarUrl?: string;
+  avatar_url?: string;
 }
 
 export default function AdminMessageDashboard({ adminId }: { adminId: string }) {
@@ -46,8 +46,8 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
   ];
 
   const filteredUsers = users.filter(user => 
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (user.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
         const response = await fetch('/api/messages/unread');
         if (response.ok) {
           const data = await response.json();
-          const ids = new Set<string>(data.map((m: any) => m.sender_id.toString()));
+          const ids = new Set<string>(data.map((m: any) => (m.sender_id?.toString() || '')));
           setUnreadUserIds(ids);
         }
       } catch (err) {
@@ -97,9 +97,9 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
       if (response.ok) {
         const data = await response.json();
         const formattedMessages = data.map((m: any) => ({
-          id: m.id.toString(),
-          senderId: m.sender_id.toString(),
-          receiverId: m.receiver_id.toString(),
+          id: m.id?.toString() || '',
+          senderId: m.sender_id?.toString() || '',
+          receiverId: m.receiver_id?.toString() || '',
           text: m.message,
           createdAt: m.created_at,
           read: !!m.is_read
@@ -233,7 +233,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
   };
 
   const filteredMessages = messages.filter(msg =>
-    msg.text.toLowerCase().includes(chatSearchTerm.toLowerCase())
+    (msg.text?.toLowerCase() || '').includes(chatSearchTerm.toLowerCase())
   );
 
   const groupedMessages = React.useMemo(() => groupMessagesByDate(filteredMessages), [filteredMessages, chatSearchTerm]);
@@ -268,8 +268,8 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
               className={`w-full p-6 flex items-center gap-4 hover:bg-white/5 transition-all relative group ${selectedUser?.id === user.id ? 'bg-white/10' : ''}`}
             >
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-black font-black italic relative shadow-lg overflow-hidden shrink-0 ${selectedUser?.id === user.id ? 'gold-gradient' : 'bg-zinc-800 text-white group-hover:bg-zinc-700'}`}>
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   user.username[0].toUpperCase()
                 )}
@@ -321,8 +321,8 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl gold-gradient flex items-center justify-center text-black font-black italic shadow-lg overflow-hidden">
-                  {selectedUser.avatarUrl ? (
-                    <img src={selectedUser.avatarUrl} alt={selectedUser.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  {selectedUser.avatar_url ? (
+                    <img src={selectedUser.avatar_url} alt={selectedUser.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     selectedUser.username[0].toUpperCase()
                   )}
@@ -363,8 +363,8 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
                     return (
                       <div key={msg.id} className={`flex gap-3 ${isAdmin ? 'flex-row-reverse' : ''}`}>
                         <div className={`w-8 h-8 rounded-lg overflow-hidden shrink-0 mt-auto mb-1 ${isAdmin ? 'hidden' : 'block'}`}>
-                          {selectedUser.avatarUrl ? (
-                            <img src={selectedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          {selectedUser.avatar_url ? (
+                            <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-white/40 uppercase">
                               {selectedUser.username[0]}

@@ -25,31 +25,31 @@ const WorkoutStatistics = ({ userId }: { userId: string }) => {
   }, [userId, period]);
 
   return (
-    <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
-      <div className="flex justify-between items-center mb-8">
-        <h3 className="font-bold uppercase italic flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-gold" />
-          Workout Statistics
+    <div className="bg-zinc-900/50 border border-white/5 rounded-[32px] md:rounded-[48px] p-6 md:p-12 shadow-2xl krome-outline">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
+        <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tight flex items-center gap-3">
+          <BarChart3 className="w-5 h-5 text-gold" />
+          Workout <span className="text-gold">Statistics</span>
         </h3>
         <select 
           value={period} 
           onChange={(e) => setPeriod(e.target.value as any)}
-          className="bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-gold"
+          className="bg-black/50 border border-white/5 rounded-full px-4 py-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest outline-none focus:border-gold transition-colors"
         >
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
         </select>
       </div>
-      <div className="h-72 w-full">
+      <div className="h-[300px] md:h-[400px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
-            <XAxis dataKey="category" stroke="#ffffff20" fontSize={10} />
-            <YAxis stroke="#ffffff20" fontSize={10} />
-            <Tooltip contentStyle={{ backgroundColor: '#18181b', border: 'none' }} />
-            <Legend />
-            <Bar dataKey="volume" fill="#D4AF37" name="Volume" />
-            <Bar dataKey="sets" fill="#008080" name="Sets" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+            <XAxis dataKey="category" stroke="#ffffff20" fontSize={9} fontWeight="bold" tickLine={false} axisLine={false} dy={10} />
+            <YAxis stroke="#ffffff20" fontSize={9} fontWeight="bold" tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }} />
+            <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
+            <Bar dataKey="volume" fill="#D4AF37" name="Volume" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="sets" fill="#008080" name="Sets" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -96,16 +96,16 @@ const MetricsGrid = ({ userId }: { userId: string }) => {
   const latestComp = history.length > 0 ? history[history.length - 1] : null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
       {[
         { label: 'Weight', value: latestComp ? `${latestComp.weight} lbs` : (metrics.initialWeight ? `${metrics.initialWeight} lbs` : 'N/A') },
         { label: 'Body Fat', value: latestComp ? `${latestComp.bodyFat}%` : 'N/A' },
         { label: 'VO2 Max', value: metrics.vo2Max ? `${metrics.vo2Max}` : 'N/A' },
         { label: 'Resting HR', value: metrics.restingHR ? `${metrics.restingHR} bpm` : 'N/A' },
       ].map((m, i) => (
-        <div key={i} className="bg-zinc-900/50 border border-white/10 p-4 rounded-2xl">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">{m.label}</p>
-          <p className="text-xl font-black italic text-gold">{m.value}</p>
+        <div key={i} className="bg-zinc-900/50 border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-3xl krome-outline">
+          <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white/40">{m.label}</p>
+          <p className="text-lg md:text-xl font-black italic text-gold mt-1">{m.value}</p>
         </div>
       ))}
     </div>
@@ -242,7 +242,14 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
   const compData = getComparativeData();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative min-h-screen">
+      <img 
+        src="https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=2000&auto=format&fit=crop" 
+        alt="Analytics Background" 
+        className="absolute inset-0 w-full h-full object-cover opacity-5"
+        referrerPolicy="no-referrer"
+      />
+      <div className="relative z-10 space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-black italic uppercase tracking-tighter">Athlete <span className="text-gold">Dashboard</span></h2>
       </div>
@@ -314,6 +321,7 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

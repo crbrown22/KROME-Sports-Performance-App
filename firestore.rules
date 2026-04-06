@@ -16,6 +16,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'coach' ||
          (request.auth.token.email == "swolecode@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -101,6 +102,10 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
       allow update, delete: if isAdmin();
+    }
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

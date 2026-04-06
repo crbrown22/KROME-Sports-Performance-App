@@ -81,15 +81,15 @@ const Shop = (props: ShopProps) => {
 
   const ShopSection = ({ title, items }: { title: string, items: any[] }) => (
     <div className="mb-12 md:mb-20">
-      <h2 className="text-xl md:text-2xl font-black tracking-widest uppercase text-zinc-400 mb-8 md:mb-12 text-center italic">{title}</h2>
+      <h2 className="text-xl md:text-2xl font-black tracking-widest uppercase text-[#b2d8d8] mb-8 md:mb-12 text-center italic">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
         {items.map((item, idx) => (
-          <div key={idx} className="bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800 flex flex-col hover:border-zinc-600 transition-colors krome-outline">
+          <div key={idx} className="bg-black/20 backdrop-blur-md rounded-3xl overflow-hidden border border-[#b2d8d8] flex flex-col hover:border-gold/50 transition-all krome-outline">
             <img src={item.img} alt={item.title} className="w-full h-48 md:h-56 object-cover opacity-90" referrerPolicy="no-referrer" />
             <div className="p-6 md:p-8 flex flex-col flex-1">
-              <h5 className="text-base md:text-lg font-bold text-zinc-100 mb-2 md:mb-3 flex-1 uppercase italic">{item.title}</h5>
-              <p className="text-zinc-400 font-bold text-xs md:text-sm mb-4 md:mb-6">{item.price}</p>
-              <button onClick={() => handlePurchaseClick(item)} className="btn-outline-accent !py-2 !text-xs w-full">Select</button>
+              <h5 className="text-base md:text-lg font-bold text-[#b2d8d8] mb-2 md:mb-3 flex-1 uppercase italic group-hover:text-gold transition-colors">{item.title}</h5>
+              <p className="text-[#b2d8d8]/60 font-bold text-xs md:text-sm mb-4 md:mb-6">{item.price}</p>
+              <button onClick={() => handlePurchaseClick(item)} className="border border-[#b2d8d8] text-[#b2d8d8] hover:text-gold hover:border-gold !py-2 !text-xs w-full transition-all rounded-xl">Select</button>
             </div>
           </div>
         ))}
@@ -104,7 +104,7 @@ const Shop = (props: ShopProps) => {
       exit={{ opacity: 0 }}
       className={`pt-24 md:pt-32 pb-24 min-h-screen bg-black text-white relative ${className}`}
     >
-      <div className="absolute inset-0 z-0 opacity-40">
+      <div className="absolute inset-0 z-0 opacity-20">
         <img 
           src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1920&auto=format&fit=crop" 
           className="w-full h-full object-cover"
@@ -115,8 +115,8 @@ const Shop = (props: ShopProps) => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
-        <button onClick={onBack} className="text-zinc-400 mb-8 md:mb-12 hover:text-zinc-100 transition-colors tracking-widest uppercase text-[10px] md:text-xs">← Back</button>
-        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-100 text-center mb-12 md:mb-20 italic">KROME <span className="text-accent">Shop</span></h1>
+        <button onClick={onBack} className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest mb-6 md:mb-8 hover:gap-4 transition-all !outline-none border border-[#b2d8d8] px-4 py-2 rounded-xl bg-black/20 backdrop-blur-md w-fit">← Back</button>
+        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[#b2d8d8] text-center mb-12 md:mb-20 italic">KROME <span className="text-accent">Shop</span></h1>
         
         {(category === 'all' || category === 'programs') && (
           <>
@@ -129,15 +129,15 @@ const Shop = (props: ShopProps) => {
         
         {(category === 'all' || category === 'apparel') && (
           <div className="text-center mt-24">
-            <h2 className="text-2xl font-light tracking-widest uppercase text-zinc-300 mb-12">KROME Fitness Products & Apparel</h2>
+            <h2 className="text-2xl font-light tracking-widest uppercase text-[#b2d8d8] mb-12">KROME Fitness Products & Apparel</h2>
             <h3 className="text-sm text-accent font-medium mb-12 tracking-widest uppercase">Coming Soon</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               {products.map((product, idx) => (
-                <div key={idx} className="bg-zinc-950/80 backdrop-blur-sm rounded-lg overflow-hidden border border-zinc-800 p-8">
+                <div key={idx} className="bg-black/20 backdrop-blur-md rounded-3xl overflow-hidden border border-[#b2d8d8] p-8">
                   <img src={product.img} alt={product.title} className="w-full h-56 object-cover mb-6 opacity-80" referrerPolicy="no-referrer" />
-                  <h5 className="text-lg font-medium text-zinc-100 mb-2">{product.title}</h5>
-                  <p className="text-zinc-500 font-light text-sm mb-6">{product.price}</p>
-                  <button className="border border-zinc-800 text-zinc-600 px-6 py-2 text-sm uppercase tracking-wider w-full" disabled>Coming Soon</button>
+                  <h5 className="text-lg font-medium text-[#b2d8d8] mb-2">{product.title}</h5>
+                  <p className="text-[#b2d8d8]/60 font-light text-sm mb-6">{product.price}</p>
+                  <button className="border border-[#b2d8d8] text-[#b2d8d8] px-6 py-2 text-sm uppercase tracking-wider w-full rounded-xl" disabled>Coming Soon</button>
                 </div>
               ))}
             </div>

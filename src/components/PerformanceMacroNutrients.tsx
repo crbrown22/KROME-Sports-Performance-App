@@ -1,9 +1,11 @@
 import { safeStorage } from '../utils/storage';
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from 'react-dom';
 import { getCurrentDate } from '../utils/date';
-import { ChevronLeft, Search, Plus, Trash2, PieChart, Activity, Flame, Droplets, Wheat, Beef, Calendar, ChevronRight, Sparkles, Loader2, X, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Search, Plus, Trash2, PieChart, Activity, Flame, Droplets, Wheat, Beef, Calendar, ChevronRight, Sparkles, Loader2, X, ShieldCheck, Apple } from "lucide-react";
 import { foodDatabase, FoodItem, LoggedFood } from "../data/nutritionData";
+import { getFoodImage } from "../utils/foodImages";
 import { recipes, Recipe } from "../data/recipeData";
 import { calculateNutritionRecommendations } from "../utils/nutrition";
 import { GoogleGenAI } from "@google/genai";
@@ -12,15 +14,62 @@ interface Props {
   key?: string;
   userId?: string;
   onBack: () => void;
+  isOwnProfile?: boolean;
 }
 
-export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: Props) {
+export default function PerformanceMacroNutrients({ userId = 'guest', onBack, isOwnProfile = true }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [allLogs, setAllLogs] = useState<LoggedFood[]>([]);
+  const [customFoods, setCustomFoods] = useState<FoodItem[]>([]);
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]); // State for user-saved recipes
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [showAddFoodModal, setShowAddFoodModal] = useState(false);
+  const [newFood, setNewFood] = useState({
+    name: "",
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    portion: ""
+  });
+  
+  const handleAddCustomFood = async () => {
+    if (!newFood.name || !newFood.calories) return;
+    try {
+      const res = await fetch(`/api/custom-food/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newFood)
+      });
+      if (res.ok) {
+        setShowAddFoodModal(false);
+        setNewFood({ name: "", calories: 0, protein: 0, carbs: 0, fat: 0, portion: "" });
+        // Refresh custom foods list
+        const customFoodResponse = await fetch(`/api/custom-food/${userId}`);
+        if (customFoodResponse.ok) {
+          const customFoodData = await customFoodResponse.json();
+          const formattedCustomFoods: FoodItem[] = customFoodData.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.name,
+            category: "Custom",
+            per100g: { calories: 0, carbs: 0, protein: 0, fat: 0 },
+            serving: {
+              size: item.portion || "1 serving",
+              calories: item.calories,
+              carbs: item.carbs,
+              protein: item.protein,
+              fat: item.fat
+            }
+          }));
+          setCustomFoods(formattedCustomFoods);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to add custom food", err);
+    }
+  };
   
   const [targets, setTargets] = useState({
     calories: 2500,
@@ -106,7 +155,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
             const data = await response.json();
             const formattedLogs: LoggedFood[] = data.map((item: any) => ({
               id: item.food_id,
-              logId: item.log_id,
+              logId: item.log_id || item.id,
               name: item.name,
               category: item.category,
               meal: item.meal,
@@ -122,6 +171,26 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
               per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 } // Dummy data for per100g
             }));
             setAllLogs(formattedLogs);
+          }
+
+          // Fetch custom foods
+          const customFoodResponse = await fetch(`/api/custom-food/${userId}`);
+          if (customFoodResponse.ok) {
+            const customFoodData = await customFoodResponse.json();
+            const formattedCustomFoods: FoodItem[] = customFoodData.map((item: any) => ({
+              id: item.id.toString(),
+              name: item.name,
+              category: "Custom",
+              per100g: { calories: 0, carbs: 0, protein: 0, fat: 0 },
+              serving: {
+                size: item.portion || "1 serving",
+                calories: item.calories,
+                carbs: item.carbs,
+                protein: item.protein,
+                fat: item.fat
+              }
+            }));
+            setCustomFoods(formattedCustomFoods);
           }
         } catch (error) {
           console.error("Failed to load nutrition logs:", error);
@@ -215,6 +284,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ logs: allLogs })
           });
+          window.dispatchEvent(new Event('nutrition-updated'));
         } catch (error) {
           console.error("Auto-save failed:", error);
         }
@@ -300,7 +370,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
     }
   }));
 
-  const allFoodItems = [...foodDatabase, ...recipeItems];
+  const allFoodItems = [...foodDatabase, ...recipeItems, ...customFoods];
 
   const filteredFoods = allFoodItems.filter(food => {
     const nameStr = food.name || '';
@@ -403,7 +473,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen bg-black text-white pt-24 pb-12 overflow-x-hidden"
+      className="min-h-screen bg-transparent text-white pt-4 pb-12 overflow-x-hidden"
     >
       {/* AI Analysis Modal */}
       <AnimatePresence>
@@ -413,49 +483,49 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-zinc-900 border border-gold/20 rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl mx-auto"
+              className="bg-black/90 backdrop-blur-xl border border-gold/30 rounded-[40px] p-8 md:p-10 max-w-lg w-full relative shadow-[0_0_50px_rgba(255,215,0,0.1)] mx-auto"
               onClick={(e) => e.stopPropagation()}
             >
                <button 
                 onClick={() => setShowAnalysisModal(false)}
-                className="absolute top-4 right-4 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors z-10"
+                className="absolute top-6 right-6 w-10 h-10 bg-white/5 hover:bg-gold/20 rounded-full flex items-center justify-center text-white/60 hover:text-gold transition-all z-10 krome-outline"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
 
-              <div className="flex flex-col items-center text-center gap-3 mb-6">
-                <div className="w-14 h-14 rounded-full bg-gold/10 flex items-center justify-center text-gold shadow-[0_0_15px_rgba(255,215,0,0.2)]">
-                  <Sparkles className="w-7 h-7" />
+              <div className="flex flex-col items-center text-center gap-4 mb-8">
+                <div className="w-20 h-20 rounded-full bg-gold/10 flex items-center justify-center text-gold shadow-[0_0_30px_rgba(255,215,0,0.2)] border border-gold/20">
+                  <Sparkles className="w-10 h-10" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black uppercase italic text-white">AI <span className="text-gold">Analysis</span></h3>
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest mt-1">Nutrition Insights</p>
+                  <h3 className="text-3xl font-black uppercase italic text-white tracking-tighter">AI <span className="text-gold">Nutrition</span> Analysis</h3>
+                  <p className="text-[10px] text-gold/60 uppercase tracking-[0.3em] font-bold mt-2">Elite Performance Insights</p>
                 </div>
               </div>
 
               {isAnalyzing ? (
-                <div className="flex flex-col items-center justify-center py-10 text-gold gap-4">
-                  <Loader2 className="w-10 h-10 animate-spin" />
-                  <p className="text-[10px] uppercase tracking-widest text-white/50 font-bold">Analyzing Data...</p>
+                <div className="flex flex-col items-center justify-center py-16 text-gold gap-6">
+                  <Loader2 className="w-12 h-12 animate-spin" />
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/70 font-black animate-pulse">Processing Biological Data...</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="prose prose-invert prose-sm max-h-[300px] overflow-y-auto custom-scrollbar pr-2 bg-black/20 p-4 rounded-2xl border border-white/5">
-                    <p className="text-white/80 leading-relaxed whitespace-pre-line text-sm">
+                <div className="space-y-6">
+                  <div className="prose prose-invert prose-sm max-h-[350px] overflow-y-auto custom-scrollbar pr-4 bg-black/40 p-6 rounded-3xl border border-white/5 shadow-inner">
+                    <p className="text-white/80 leading-relaxed whitespace-pre-line text-sm font-medium">
                       {analysisResult}
                     </p>
                   </div>
                   
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-4 pt-2">
                     <button
                       onClick={handleAnalyzeNutrition}
-                      className="flex-1 py-3 bg-gold hover:bg-yellow-400 text-black transition-colors rounded-xl font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                      className="flex-1 py-4 bg-gold hover:bg-yellow-400 text-black transition-all rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-gold/20 krome-outline"
                     >
-                      <Sparkles className="w-4 h-4" /> Refresh
+                      <Sparkles className="w-4 h-4" /> Refresh Analysis
                     </button>
                     <button
                       onClick={() => setShowAnalysisModal(false)}
-                      className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white transition-colors rounded-xl font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                      className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white transition-all rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 border border-white/10 krome-outline"
                     >
                       Close
                     </button>
@@ -471,43 +541,111 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img 
           src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=2000&auto=format&fit=crop" 
-          className="w-full h-full object-cover opacity-20 grayscale mix-blend-overlay"
+          className="w-full h-full object-cover opacity-40"
           alt="Nutrition Background"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-black/90 to-green-900/10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6">
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all"
-        >
-          <ChevronLeft className="w-4 h-4" /> Back to Nutrition
-        </button>
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
+        <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-[40px] p-8 md:p-12 min-h-screen shadow-2xl">
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all krome-outline"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back to Nutrition
+          </button>
 
-        <div className="flex flex-col md:flex-row gap-8 mb-8 items-end justify-between">
-          <div>
-            <h2 className="text-gold font-bold uppercase tracking-[0.2em] text-sm mb-2">Module 01</h2>
-            <h1 className="text-4xl md:text-6xl font-black uppercase italic leading-none tracking-tighter">
-              Performance <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold to-accent pr-2 pb-2">Macro-Nutrients</span>
-            </h1>
-          </div>
-          
-          <div className="flex flex-col items-end gap-4">
-            <button 
-              onClick={() => {
-                if (!isEditingTargets) setTempTargets(targets);
-                setIsEditingTargets(!isEditingTargets);
-              }}
-              className="btn-gold px-6 py-2 text-xs flex items-center gap-2"
-            >
-              <Activity className="w-4 h-4" /> {isEditingTargets ? 'Cancel Editing' : 'Adjust Macros'}
-            </button>
+          <div className="flex flex-col md:flex-row gap-8 mb-12 items-end justify-between">
+            <div className="relative">
+              <div className="absolute -left-4 top-0 w-1 h-full bg-gold/50 blur-sm" />
+              <h2 className="text-gold font-bold uppercase tracking-[0.2em] text-sm mb-2">Module 01</h2>
+              <h1 className="text-4xl md:text-6xl font-black uppercase italic leading-none tracking-tighter text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+                Performance <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-400 to-gold pr-2 pb-2">Macro-Nutrients</span>
+              </h1>
+            </div>
+            
+            <div className="flex flex-col items-end gap-4">
+              {isOwnProfile && (
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowAddFoodModal(true)}
+                    className="px-6 py-3 bg-black/40 backdrop-blur-md border border-gold/30 rounded-xl text-gold text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-gold/10 transition-all krome-outline"
+                  >
+                    <Plus className="w-4 h-4" /> Add Custom Food
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!isEditingTargets) setTempTargets(targets);
+                      setIsEditingTargets(!isEditingTargets);
+                    }}
+                    className="px-6 py-3 bg-gold text-black rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 transition-all krome-outline"
+                  >
+                    <Activity className="w-4 h-4" /> {isEditingTargets ? 'Cancel Editing' : 'Adjust Macros'}
+                  </button>
+                </div>
+              )}
 
-            {/* Date Selector */}
-            <div className="flex items-center gap-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-2">
+              {/* Date Selector */}
+              <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-2">
+              {/* Add Custom Food Modal */}
+              {createPortal(
+                <AnimatePresence>
+                  {showAddFoodModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="bg-black/80 backdrop-blur-xl border border-gold/30 rounded-[40px] p-10 max-w-lg w-full relative overflow-hidden shadow-[0_0_50px_rgba(255,215,0,0.1)]"
+                      >
+                        <button 
+                          onClick={() => setShowAddFoodModal(false)}
+                          className="absolute top-6 right-6 w-10 h-10 bg-white/5 hover:bg-gold/20 rounded-full flex items-center justify-center text-white/40 hover:text-gold transition-all krome-outline"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                        <h2 className="text-3xl font-black uppercase italic mb-8 text-white tracking-tighter">Add <span className="text-gold">Custom</span> Food</h2>
+                        <div className="space-y-6">
+                          <div>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Food Name</label>
+                            <input type="text" placeholder="e.g. Elite Whey Protein" value={newFood.name} onChange={(e) => setNewFood({...newFood, name: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
+                          </div>
+                          
+                          <div className="grid grid-cols-4 gap-4">
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-2 block text-center">Calories</label>
+                              <input type="number" value={newFood.calories} onChange={(e) => setNewFood({...newFood, calories: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2 block text-center">Protein</label>
+                              <input type="number" value={newFood.protein} onChange={(e) => setNewFood({...newFood, protein: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-green-400/70 mb-2 block text-center">Carbs</label>
+                              <input type="number" value={newFood.carbs} onChange={(e) => setNewFood({...newFood, carbs: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-yellow-400/70 mb-2 block text-center">Fat</label>
+                              <input type="number" value={newFood.fat} onChange={(e) => setNewFood({...newFood, fat: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Portion Size</label>
+                            <input type="text" placeholder="e.g. 1 Scoop (30g)" value={newFood.portion} onChange={(e) => setNewFood({...newFood, portion: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
+                          </div>
+                          
+                          <button onClick={handleAddCustomFood} className="w-full py-4 bg-gold text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 mt-4 krome-outline">Save Performance Food</button>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>,
+                document.body
+              )}
               <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -529,59 +667,59 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-6 bg-zinc-900/80 border border-gold/30 rounded-3xl"
+            className="mb-12 p-8 bg-black/40 backdrop-blur-xl border border-gold/30 rounded-[32px] shadow-2xl"
           >
-            <h3 className="text-lg font-black uppercase italic mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-gold" /> Adjust Daily Targets
+            <h3 className="text-xl font-black uppercase italic mb-8 flex items-center gap-3 text-white">
+              <Activity className="w-6 h-6 text-gold" /> Adjust Daily Performance Targets
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
               <div>
-                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Calories (kcal)</label>
+                <label className="block text-[10px] text-gold uppercase tracking-[0.2em] mb-2 font-bold">Calories (kcal)</label>
                 <input 
                   type="number" 
                   value={tempTargets.calories}
                   onChange={(e) => setTempTargets({...tempTargets, calories: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Protein (g)</label>
+                <label className="block text-[10px] text-blue-400 uppercase tracking-[0.2em] mb-2 font-bold">Protein (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.protein}
                   onChange={(e) => setTempTargets({...tempTargets, protein: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Carbs (g)</label>
+                <label className="block text-[10px] text-green-400 uppercase tracking-[0.2em] mb-2 font-bold">Carbs (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.carbs}
                   onChange={(e) => setTempTargets({...tempTargets, carbs: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-1">Fats (g)</label>
+                <label className="block text-[10px] text-yellow-500 uppercase tracking-[0.2em] mb-2 font-bold">Fats (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.fat}
                   onChange={(e) => setTempTargets({...tempTargets, fat: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:border-gold outline-none transition-colors"
+                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-4">
               <button 
                 onClick={() => setIsEditingTargets(false)}
-                className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+                className="px-8 py-3 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors krome-outline"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleUpdateTargets}
-                className="btn-gold px-8 py-2 text-xs flex items-center gap-2"
+                className="px-10 py-3 bg-gold text-black rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 krome-outline"
               >
                 <ShieldCheck className="w-4 h-4" /> Save Targets
               </button>
@@ -590,14 +728,14 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
         )}
 
         {/* Dashboard */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {/* Calories */}
-          <div className={`rounded-2xl p-5 relative overflow-hidden transition-all border ${getCardColor(totals.calories, targets.calories)}`}>
+          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.calories, targets.calories)}`}>
             <div className="relative z-10">
-              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Calories</div>
-              <div className="text-2xl font-black italic mb-0.5">{Math.round(totals.calories)}</div>
-              <div className="text-[10px] text-white/40 mb-3">/ {targets.calories} kcal</div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="text-[10px] font-black text-gold uppercase tracking-widest mb-2">Calories</div>
+              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.calories)}</div>
+              <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.calories} kcal</div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min((totals.calories / targets.calories) * 100, 100)}%` }}
@@ -608,12 +746,12 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           </div>
 
           {/* Protein */}
-          <div className={`rounded-2xl p-5 relative overflow-hidden transition-all border ${getCardColor(totals.protein, targets.protein)}`}>
+          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.protein, targets.protein)}`}>
             <div className="relative z-10">
-              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Protein</div>
-              <div className="text-2xl font-black italic mb-0.5">{Math.round(totals.protein)}g</div>
-              <div className="text-[10px] text-white/40 mb-3">/ {targets.protein}g</div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Protein</div>
+              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.protein)}g</div>
+              <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.protein}g</div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min((totals.protein / targets.protein) * 100, 100)}%` }}
@@ -624,12 +762,12 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           </div>
 
           {/* Carbs */}
-          <div className={`rounded-2xl p-5 relative overflow-hidden transition-all border ${getCardColor(totals.carbs, targets.carbs)}`}>
+          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.carbs, targets.carbs)}`}>
             <div className="relative z-10">
-              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Carbs</div>
-              <div className="text-2xl font-black italic mb-0.5">{Math.round(totals.carbs)}g</div>
-              <div className="text-[10px] text-white/40 mb-3">/ {targets.carbs}g</div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="text-[10px] font-black text-green-400 uppercase tracking-widest mb-2">Carbs</div>
+              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.carbs)}g</div>
+              <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.carbs}g</div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min((totals.carbs / targets.carbs) * 100, 100)}%` }}
@@ -640,12 +778,12 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           </div>
 
           {/* Fat */}
-          <div className={`rounded-2xl p-5 relative overflow-hidden transition-all border ${getCardColor(totals.fat, targets.fat)}`}>
+          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.fat, targets.fat)}`}>
             <div className="relative z-10">
-              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Fats</div>
-              <div className="text-2xl font-black italic mb-0.5">{Math.round(totals.fat)}g</div>
-              <div className="text-[10px] text-white/40 mb-3">/ {targets.fat}g</div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mb-2">Fats</div>
+              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.fat)}g</div>
+              <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.fat}g</div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min((totals.fat / targets.fat) * 100, 100)}%` }}
@@ -656,96 +794,116 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Search & Add */}
-          <div className="lg:col-span-2">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 h-full">
-              <div className="flex flex-col gap-4 mb-6">
-                {/* Meal Selector */}
-                <div className="flex gap-2">
-                  {meals.map(meal => (
+          {isOwnProfile ? (
+            <div className="lg:col-span-2">
+              <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-8 h-full krome-outline shadow-xl">
+                <div className="flex flex-col gap-6 mb-8">
+                  {/* Meal Selector */}
+                  <div className="flex gap-3">
+                    {meals.map(meal => (
+                      <button
+                        key={meal}
+                        onClick={() => setSelectedMeal(meal)}
+                        className={`px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all flex-1 krome-outline ${
+                          selectedMeal === meal 
+                            ? 'bg-gold text-black shadow-lg shadow-gold/20' 
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {meal}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gold" />
+                    <input 
+                      type="text" 
+                      placeholder={`Search high-performance foods...`} 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Filter */}
+                <div className="flex gap-3 mb-8 overflow-x-auto pb-2 hide-scrollbar">
+                  {categories.map(cat => (
                     <button
-                      key={meal}
-                      onClick={() => setSelectedMeal(meal)}
-                      className={`px-4 py-2 rounded-lg font-bold uppercase tracking-wider text-[10px] transition-all flex-1 ${
-                        selectedMeal === meal 
-                          ? 'bg-gold text-black shadow-lg shadow-gold/20' 
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all krome-outline ${
+                        selectedCategory === cat 
+                          ? 'bg-gold text-black' 
                           : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
                       }`}
                     >
-                      {meal}
+                      {cat}
                     </button>
                   ))}
                 </div>
 
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                  <input 
-                    type="text" 
-                    placeholder={`Search foods...`} 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all"
-                  />
+                <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                  {filteredFoods.map((food) => (
+                    <motion.div 
+                      key={food.id}
+                      layoutId={food.id}
+                      className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden flex items-center gap-4 hover:border-gold/30 transition-all group p-1"
+                    >
+                      <img src={getFoodImage(food.category, food.name)} alt={food.name} className="w-20 h-20 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                      <div className="flex-1 py-2">
+                        <div className="font-bold text-base text-white group-hover:text-gold transition-colors">{food.name}</div>
+                        <div className="text-[10px] text-white/50 uppercase tracking-widest font-bold mt-1">{food.serving.size} • {food.serving.calories} kcal</div>
+                        <div className="flex gap-3 mt-2">
+                          <span className="text-[10px] text-blue-400/80 font-bold uppercase tracking-tighter">{food.serving.protein}g P</span>
+                          <span className="text-[10px] text-green-400/80 font-bold uppercase tracking-tighter">{food.serving.carbs}g C</span>
+                          <span className="text-[10px] text-yellow-400/80 font-bold uppercase tracking-tighter">{food.serving.fat}g F</span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => addToLog(food)}
+                        className="w-10 h-10 mr-4 rounded-full bg-gold text-black flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-gold/20"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </motion.div>
+                  ))}
+                  {filteredFoods.length === 0 && (
+                    <div className="text-center py-20 text-white/30 italic text-sm uppercase tracking-widest font-bold">
+                      No performance foods found matching "{searchQuery}"
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Category Filter */}
-              <div className="flex gap-2 mb-6 overflow-x-auto pb-2 hide-scrollbar">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                      selectedCategory === cat 
-                        ? 'bg-gold text-black' 
-                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                {filteredFoods.map((food) => (
-                  <motion.div 
-                    key={food.id}
-                    layoutId={food.id}
-                    className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group"
-                  >
-                    <div>
-                      <div className="font-bold text-sm">{food.name}</div>
-                      <div className="text-[10px] text-white/50 uppercase tracking-wider">{food.serving.size} • {food.serving.calories} kcal</div>
-                    </div>
-                    <button 
-                      onClick={() => addToLog(food)}
-                      className="w-8 h-8 rounded-full bg-gold text-black flex items-center justify-center hover:scale-110 transition-transform"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </motion.div>
-                ))}
-                {filteredFoods.length === 0 && (
-                  <div className="text-center py-12 text-white/30 italic text-sm">
-                    No foods found matching "{searchQuery}"
-                  </div>
-                )}
+            </div>
+          ) : (
+            <div className="lg:col-span-2">
+              <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-12 h-full flex flex-col items-center justify-center text-center shadow-xl">
+                <div className="w-20 h-20 rounded-full bg-gold/10 flex items-center justify-center text-gold mb-6 shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                  <Apple className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-black uppercase italic mb-4 text-white">Nutrition Profile</h3>
+                <p className="text-white/40 text-sm max-w-sm uppercase tracking-widest font-bold leading-relaxed">
+                  Viewing athlete's daily nutrition log and performance metrics.
+                </p>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Daily Log */}
           <div className="lg:col-span-1">
-            <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 h-full flex flex-col">
-              <h3 className="text-sm font-black uppercase italic mb-4 flex items-center gap-2 text-gold">
-                <Activity className="w-4 h-4" /> Daily Log
+            <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-8 h-full flex flex-col shadow-xl">
+              <h3 className="text-base font-black uppercase italic mb-6 flex items-center gap-3 text-gold">
+                <Activity className="w-5 h-5" /> Daily Performance Log
               </h3>
 
-              <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 max-h-[500px]">
+              <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-2 max-h-[600px]">
                 {dailyLog.length === 0 ? (
-                  <div className="text-center py-12 text-white/30 italic text-sm">
-                    Log is empty.
+                  <div className="text-center py-20 text-white/30 italic text-sm uppercase tracking-widest font-bold">
+                    Log is currently empty.
                   </div>
                 ) : (
                   meals.map(meal => {
@@ -753,8 +911,8 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
                     if (mealLogs.length === 0) return null;
                     
                     return (
-                      <div key={meal} className="space-y-2">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40 border-b border-white/5 pb-1 mb-1">{meal}</h4>
+                      <div key={meal} className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gold/60 border-b border-gold/10 pb-2 mb-2">{meal}</h4>
                         <AnimatePresence mode="popLayout">
                           {mealLogs.map((item) => (
                             <motion.div 
@@ -762,25 +920,36 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -20 }}
-                              className="bg-black/40 border border-white/5 rounded-lg p-3 relative group"
+                              className="bg-black/40 border border-white/5 rounded-xl p-4 relative group hover:border-gold/20 transition-all"
                             >
-                              <div className="flex justify-between items-start mb-1">
-                                <div className="font-bold text-xs">{item.name}</div>
-                                <button 
-                                  onClick={() => removeFromLog(item.logId)}
-                                  className="text-white/20 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-bold text-sm text-white">{item.name}</div>
+                                {isOwnProfile && (
+                                  <button 
+                                    onClick={() => removeFromLog(item.logId)}
+                                    className="text-white/20 hover:text-red-500 transition-colors p-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                               
-                              <div className="flex items-center justify-between text-[10px] text-white/50">
-                                <span>{Math.round(item.serving.calories * item.servings)} kcal</span>
-                                <div className="flex items-center gap-1 bg-white/5 rounded-md px-1.5 py-0.5">
-                                  <button onClick={() => updateServings(item.logId, -0.5)} className="hover:text-white">-</button>
-                                  <span className="text-white font-mono w-6 text-center">{item.servings}</span>
-                                  <button onClick={() => updateServings(item.logId, 0.5)} className="hover:text-white">+</button>
-                                </div>
+                              <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/50 font-bold uppercase tracking-tighter">
+                                <span className="text-white/70">{Math.round(item.serving.calories * item.servings)} kcal</span>
+                                <span className="text-blue-400/80">{Math.round(item.serving.protein * item.servings)}g P</span>
+                                <span className="text-green-400/80">{Math.round(item.serving.carbs * item.servings)}g C</span>
+                                <span className="text-yellow-400/80">{Math.round(item.serving.fat * item.servings)}g F</span>
+                              </div>
+                              <div className="flex items-center justify-between mt-4">
+                                {isOwnProfile ? (
+                                  <div className="flex items-center gap-2 bg-white/5 rounded-lg px-2 py-1 border border-white/10">
+                                    <button onClick={() => updateServings(item.logId, -0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1">-</button>
+                                    <span className="text-gold font-mono text-xs w-8 text-center font-bold">{item.servings}</span>
+                                    <button onClick={() => updateServings(item.logId, 0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1">+</button>
+                                  </div>
+                                ) : (
+                                  <span className="text-white/40 font-mono text-[10px] uppercase tracking-widest">{item.servings} servings</span>
+                                )}
                               </div>
                             </motion.div>
                           ))}
@@ -792,31 +961,31 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
               </div>
               
               {dailyLog.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
                   <button
                     onClick={handleAnalyzeNutrition}
-                    className="w-full py-2 rounded-lg bg-zinc-800 border border-white/10 hover:border-gold/50 flex items-center justify-center gap-2 group transition-all"
+                    className="w-full py-4 rounded-xl bg-black/40 border border-gold/30 hover:bg-gold/10 flex items-center justify-center gap-3 group transition-all krome-outline"
                   >
-                    <Sparkles className="w-3 h-3 text-gold" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white group-hover:text-gold transition-colors">Analyze</span>
+                    <Sparkles className="w-4 h-4 text-gold" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white group-hover:text-gold transition-colors">AI Nutrition Analysis</span>
                   </button>
 
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-4">
                     <button 
                       onClick={() => setAllLogs(prev => prev.filter(item => item.date !== selectedDate))}
-                      className="text-[10px] text-red-400 hover:text-red-300 uppercase tracking-widest font-bold"
+                      className="text-[10px] text-red-400/60 hover:text-red-400 uppercase tracking-widest font-bold transition-colors"
                     >
-                      Clear Day
+                      Clear Log
                     </button>
                     <button 
                       onClick={handleSaveLog}
-                      className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all krome-outline ${
                         isSaved 
-                          ? 'bg-green-500 text-black' 
-                          : 'bg-gold text-black hover:bg-yellow-400'
+                          ? 'bg-green-500 text-black shadow-lg shadow-green-500/20' 
+                          : 'bg-gold text-black hover:bg-yellow-400 shadow-lg shadow-gold/20'
                       }`}
                     >
-                      {isSaved ? 'Saved!' : 'Save Log'}
+                      {isSaved ? 'Log Saved!' : 'Save Daily Log'}
                     </button>
                   </div>
                 </div>
@@ -825,6 +994,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack }: 
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
+  </motion.div>
   );
 }

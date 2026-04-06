@@ -34,7 +34,8 @@ export default function MobileAdminDashboard({ user, onLogout, onBack, onNavigat
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-32 pb-24 bg-black px-6"
+      className="min-h-screen pb-24 bg-black px-6"
+      style={{ paddingTop: 'calc(100px + var(--safe-area-top))' }}
     >
       <div className="max-w-md mx-auto">
         <div className="flex justify-between items-center mb-12">
@@ -79,7 +80,7 @@ export default function MobileAdminDashboard({ user, onLogout, onBack, onNavigat
                 'Name Not Set'}
             </p>
           </div>
-          <p className="text-gold font-bold uppercase tracking-widest text-[10px] mb-8 italic">KROME ADMIN</p>
+          <p className="text-gold font-bold uppercase tracking-widest text-[10px] mb-8 italic">{user.role === 'admin' ? 'KROME ADMIN' : 'KROME COACH'}</p>
 
           <div className="space-y-3" role="tablist" aria-label="Admin sections">
             <button onClick={() => onNavigate('fitnessOverview')} className="w-full py-3 rounded-full flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all bg-white/5 text-white/60 hover:bg-white/10 krome-outline">

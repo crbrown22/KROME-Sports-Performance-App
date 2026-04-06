@@ -309,7 +309,7 @@ Explain what to expect:
               width: isMinimized ? '300px' : '380px'
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className={`fixed bottom-6 right-6 z-50 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden transition-all duration-300`}
+            className={`fixed bottom-6 right-6 z-[1100] bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden transition-all duration-300`}
           >
             {/* Header */}
             <div className="p-4 bg-zinc-950 border-b border-white/5 flex items-center justify-between">

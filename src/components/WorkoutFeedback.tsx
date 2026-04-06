@@ -8,10 +8,13 @@ interface WorkoutFeedbackProps {
   userId: string;
   workoutId: string;
   programId: string;
+  phase?: string;
+  week?: number;
+  day?: number;
   onSuccess?: () => void;
 }
 
-export default function WorkoutFeedback({ userId, workoutId, programId, onSuccess }: WorkoutFeedbackProps) {
+export default function WorkoutFeedback({ userId, workoutId, programId, phase, week, day, onSuccess }: WorkoutFeedbackProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -24,18 +27,38 @@ export default function WorkoutFeedback({ userId, workoutId, programId, onSucces
 
     setSubmitting(true);
     try {
-      // First, finish the workout to set the end time
+      const today = getCurrentDate();
+
+      // 1. Finish the workout to set the end time
       await fetch(`/api/workout-logs/${userId}/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workout_id: workoutId,
-          date: getCurrentDate(),
+          date: today,
           end_time: new Date().toISOString()
         })
       });
 
-      // Then submit the feedback
+      // 2. Update program progress to mark as completed (if phase/week/day provided)
+      if (phase && week !== undefined && day !== undefined) {
+        await fetch(`/api/program-progress/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            progress: [{
+              programId,
+              phase,
+              week,
+              day,
+              completed: true,
+              date: today
+            }]
+          })
+        });
+      }
+
+      // 3. Submit the feedback
       const response = await fetch('/api/workout-feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -50,6 +73,7 @@ export default function WorkoutFeedback({ userId, workoutId, programId, onSucces
 
       if (response.ok) {
         setSubmitted(true);
+        window.dispatchEvent(new CustomEvent('workout-completed'));
         if (onSuccess) onSuccess();
       }
     } catch (err) {

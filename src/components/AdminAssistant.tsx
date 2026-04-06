@@ -30,7 +30,7 @@ export default function AdminAssistant({ kpiData, users, leads, purchases }: Adm
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: 'Admin access verified. I am your KROME Executive Assistant. I can help you analyze client data, build programs, plan marketing campaigns, and manage operations. How can I assist you today?' }
+    { role: 'model', text: 'Dashboard access verified. I am your KROME Executive Assistant. I can help you analyze client data, build programs, plan marketing campaigns, and manage operations. How can I assist you today?' }
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -176,7 +176,7 @@ export default function AdminAssistant({ kpiData, users, leads, purchases }: Adm
       const chat = ai.chats.create({
         model: model,
         config: {
-          systemInstruction: `You are a highly capable AI assistant exclusively for the admin of KROME Sports Performance. Your role is to help gather and track data, keep up with client information, help plan sales and marketing campaigns, build workout and nutrition programs, and communicate with athletes. You know the ins and outs of the company and how to ETL data quickly and efficiently to the admin. Your tone is professional, analytical, and highly efficient. You have access to all company data and can assist with any administrative, marketing, or coaching task. Provide actionable insights, structured data formats when requested, and strategic advice.
+          systemInstruction: `You are a highly capable AI assistant for the admin and coaching staff of KROME Sports Performance. Your role is to help gather and track data, keep up with client information, help plan sales and marketing campaigns, build workout and nutrition programs, and communicate with athletes. You know the ins and outs of the company and how to ETL data quickly and efficiently to the admin. Your tone is professional, analytical, and highly efficient. You have access to all company data and can assist with any administrative, marketing, or coaching task. Provide actionable insights, structured data formats when requested, and strategic advice.
           
 CRITICAL INSTRUCTIONS FOR TONE AND LENGTH:
 - Keep your responses concise, to the point, and highly actionable.
@@ -461,7 +461,7 @@ CRITICAL INSTRUCTIONS FOR TONE AND LENGTH:
           <LiveVoiceChat 
             onClose={() => setShowVoiceChat(false)} 
             agentName="Admin Assistant"
-            systemInstruction="You are a highly capable AI assistant exclusively for the admin of KROME Sports Performance. Your role is to help gather and track data, keep up with client information, help plan sales and marketing campaigns, build workout and nutrition programs, and communicate with athletes. You know the ins and outs of the company and how to ETL data quickly and efficiently to the admin. Your tone is professional, analytical, and highly efficient. Keep your responses concise, to the point, and highly actionable."
+            systemInstruction="You are a highly capable AI assistant for the admin and coaching staff of KROME Sports Performance. Your role is to help gather and track data, keep up with client information, help plan sales and marketing campaigns, build workout and nutrition programs, and communicate with athletes. You know the ins and outs of the company and how to ETL data quickly and efficiently to the admin. Your tone is professional, analytical, and highly efficient. Keep your responses concise, to the point, and highly actionable."
           />
         )}
       </AnimatePresence>

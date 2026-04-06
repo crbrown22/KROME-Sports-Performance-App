@@ -90,7 +90,7 @@ export default function SpecializedTrainingLanding({ onBack, onNavigate }: Props
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         <button 
           onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all !outline-none"
+          className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest mb-6 md:mb-8 hover:gap-4 transition-all !outline-none border border-[#b2d8d8] px-4 py-2 rounded-xl bg-black/20 backdrop-blur-md w-fit"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Home
         </button>
@@ -117,7 +117,7 @@ export default function SpecializedTrainingLanding({ onBack, onNavigate }: Props
               transition={{ delay: idx * 0.1 }}
               whileHover={{ y: -10 }}
               onClick={() => handleCardClick(category)}
-              className="group relative bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 cursor-pointer hover:border-gold/30 transition-all shadow-2xl hover:shadow-gold/10"
+              className="group relative bg-black/20 backdrop-blur-md rounded-3xl overflow-hidden border border-[#b2d8d8] cursor-pointer hover:border-gold/50 transition-all shadow-2xl hover:shadow-gold/10"
             >
               <div className="absolute inset-0 z-0">
                 <img 
@@ -131,14 +131,14 @@ export default function SpecializedTrainingLanding({ onBack, onNavigate }: Props
 
               <div className="relative z-10 p-6 h-full flex flex-col justify-end min-h-[300px]">
                 <div className="mb-auto">
-                  <div className="w-12 h-12 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-black/50 backdrop-blur-md border border-[#b2d8d8] flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform duration-300">
                     {category.icon}
                   </div>
                 </div>
                 
                 <div>
                   <h3 className="text-gold font-bold uppercase tracking-widest text-[10px] mb-1">{category.subtitle}</h3>
-                  <h2 className="text-2xl font-black uppercase italic mb-2 group-hover:text-white transition-colors">{category.title}</h2>
+                  <h2 className="text-2xl font-black uppercase italic mb-2 text-[#b2d8d8] group-hover:text-gold transition-colors">{category.title}</h2>
                   <p className="text-white/60 mb-4 line-clamp-2 text-sm group-hover:text-white/80 transition-colors">
                     {category.description}
                   </p>

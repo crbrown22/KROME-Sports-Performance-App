@@ -45,6 +45,7 @@ interface BodyMetricsProps {
   setData: React.Dispatch<React.SetStateAction<BodyMetricsData>>;
   onComplete?: () => void;
   initialEditing?: boolean;
+  isOwnProfile?: boolean;
 }
 
 const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }: { title: string, icon: any, id: string, expandedSection: string | null, toggleSection: (id: string) => void }) => (
@@ -60,7 +61,7 @@ const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }
         <Icon className="w-6 h-6" aria-hidden="true" />
       </div>
       <div className="text-left">
-        <h3 className="text-xl font-black uppercase italic tracking-tight">{title}</h3>
+        <h3 className="text-xl font-black uppercase italic tracking-tight text-[#b2d8d8]">{title}</h3>
         {expandedSection !== id && <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Click to expand</p>}
       </div>
     </div>
@@ -70,10 +71,31 @@ const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }
   </button>
 );
 
-export default function BodyMetrics({ userId, data, setData, onComplete, initialEditing = false }: BodyMetricsProps) {
+export default function BodyMetrics({ userId, data, setData, onComplete, initialEditing = false, isOwnProfile = true }: BodyMetricsProps) {
   const [bodyCompHistory, setBodyCompHistory] = useState<BodyCompEntry[]>([]);
+  const [parqData, setParqData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [expandedSection, setExpandedSection] = useState<string | null>('bodyComp');
+
+  // Load PAR-Q data
+  useEffect(() => {
+    const loadParqData = async () => {
+      if (userId && userId !== 'guest') {
+        try {
+          const response = await fetch(`/api/parq/${userId}`);
+          if (response.ok) {
+            const dbData = await response.json();
+            if (dbData) {
+              setParqData(dbData);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading PARQ in BodyMetrics:", err);
+        }
+      }
+    };
+    loadParqData();
+  }, [userId]);
 
   function calculateRMR() {
     // Mifflin-St. Jeor Equation
@@ -341,6 +363,13 @@ Goal: ${data.primaryGoal}
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
+    // Scroll to section after a short delay to allow animation to start
+    setTimeout(() => {
+      const element = document.getElementById(`section-content-${section}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   return (
@@ -348,20 +377,22 @@ Goal: ${data.primaryGoal}
       {/* Header Actions */}
       <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-black/20 sticky top-0 z-20">
         <div>
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter">Body <span className="text-gold">Metrics</span></h2>
+          <h2 className="text-3xl font-black uppercase italic tracking-tighter">Body <span className="text-[#b2d8d8]">Metrics</span></h2>
           <p className="text-xs font-bold uppercase tracking-widest text-white/40">Track your physical evolution</p>
         </div>
         <div className="flex gap-3">
-          {isEditing ? (
-            <button onClick={handleSave} className="btn-gold flex items-center gap-2 px-6 py-3 text-xs shadow-lg shadow-gold/20" aria-label="Save changes to body metrics">
+          {isEditing && isOwnProfile ? (
+            <button onClick={handleSave} className="bg-[#b2d8d8] text-zinc-950 flex items-center gap-2 px-6 py-3 text-xs shadow-lg shadow-[#b2d8d8]/20 border border-[#b2d8d8] rounded-xl hover:bg-[#b2d8d8]/90 transition-all font-black uppercase tracking-widest" aria-label="Save changes to body metrics">
               <Save className="w-4 h-4" aria-hidden="true" /> Save Changes
             </button>
           ) : (
             <>
-              <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all krome-outline" aria-label="Edit body metrics">
-                <Edit2 className="w-4 h-4" aria-hidden="true" /> Edit
-              </button>
-              <button onClick={handleShare} className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all krome-outline" aria-label="Share body metrics summary">
+              {isOwnProfile && (
+                <button onClick={() => setIsEditing(true)} className="px-6 py-3 rounded-xl border border-[#b2d8d8] text-[#b2d8d8] hover:bg-[#b2d8d8]/10 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all" aria-label="Edit body metrics">
+                  <Edit2 className="w-4 h-4" aria-hidden="true" /> Edit
+                </button>
+              )}
+              <button onClick={handleShare} className="px-6 py-3 rounded-xl border border-[#b2d8d8] text-[#b2d8d8] hover:bg-[#b2d8d8]/10 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-all" aria-label="Share body metrics summary">
                 <Share2 className="w-4 h-4" aria-hidden="true" /> Share
               </button>
             </>
@@ -387,14 +418,14 @@ Goal: ${data.primaryGoal}
                     { label: 'Current Weight', key: 'initialWeight', unit: 'lbs' },
                     { label: 'Height', key: 'height', unit: 'in' },
                     { label: 'BMI', key: 'bmi', unit: '' },
-                    { label: 'Goal', key: 'primaryGoal', unit: '', className: 'col-span-2 md:col-span-2' }
+                    { label: 'Primary Outcome Goal', key: 'primaryGoal', unit: '', className: 'col-span-2 md:col-span-2' }
                   ].map((field) => (
-                    <div key={field.key} className={`bg-black/20 border border-white/5 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group hover:border-white/10 transition-colors ${field.className || ''}`}>
+                    <div key={field.key} className={`bg-black/20 border border-[#b2d8d8]/40 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group hover:border-[#b2d8d8]/60 transition-colors ${field.className || ''}`}>
                       <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Activity className="w-8 h-8" />
                       </div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">{field.label}</label>
-                      {isEditing && field.key !== 'bmi' && field.key !== 'primaryGoal' ? (
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#b2d8d8] mb-2">{field.label}</label>
+                      {isEditing && field.key !== 'bmi' ? (
                           field.key === 'height' ? (
                             <div className="flex gap-2">
                               <input 
@@ -407,7 +438,7 @@ Goal: ${data.primaryGoal}
                                   const inches = (data.height || 0) % 12;
                                   setData(prev => ({ ...prev, height: (ft * 12) + inches }));
                                 }}
-                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
+                                className="bg-white/5 border border-[#b2d8d8] rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-[#b2d8d8]"
                               />
                               <input 
                                 type="number"
@@ -420,16 +451,28 @@ Goal: ${data.primaryGoal}
                                   const ft = Math.floor((data.height || 0) / 12);
                                   setData(prev => ({ ...prev, height: (ft * 12) + inches }));
                                 }}
-                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
+                                className="bg-white/5 border border-[#b2d8d8] rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-[#b2d8d8]"
                               />
                             </div>
+                          ) : field.key === 'primaryGoal' ? (
+                            <select 
+                                value={data.primaryGoal}
+                                onChange={(e) => updatePrimaryGoal(e.target.value)}
+                                className="w-full bg-white/5 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
+                            >
+                                <option value="Weight/Fat Loss">Weight/Fat Loss</option>
+                                <option value="Muscle Gain">Muscle Gain</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Overall Health">Overall Health</option>
+                                <option value="Performance">Performance</option>
+                            </select>
                           ) : (
                             <input 
-                              type={field.key === 'primaryGoal' ? 'text' : 'number'}
-                              min={field.key === 'primaryGoal' ? undefined : "0"}
+                              type='number'
+                              min="0"
                               value={(data as any)[field.key]}
                               onChange={(e) => {
-                                const val = field.key === 'primaryGoal' ? e.target.value : Math.max(0, parseFloat(e.target.value) || 0);
+                                const val = Math.max(0, parseFloat(e.target.value) || 0);
                                 setData(prev => ({ ...prev, [field.key]: val }));
                                 
                                 // Auto-populate Week 1 weight if initialWeight is changed
@@ -455,7 +498,7 @@ Goal: ${data.primaryGoal}
                                   });
                                 }
                               }}
-                              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-gold/50"
+                              className="bg-white/5 border border-[#b2d8d8] rounded-xl px-3 py-2 text-white font-black italic text-lg w-full focus:border-[#b2d8d8]"
                             />
                           )
                       ) : (
@@ -585,7 +628,48 @@ Goal: ${data.primaryGoal}
         </AnimatePresence>
       </div>
 
-      {/* 2. Metabolic Profile */}
+      {/* 2. PAR-Q & Injury History */}
+      <div>
+        <SectionHeader title="PAR-Q & Injury History" icon={FileText} id="parq" expandedSection={expandedSection} toggleSection={toggleSection} />
+        <AnimatePresence>
+          {expandedSection === 'parq' && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="p-8 space-y-4">
+                {parqData ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { label: 'Knee Injury', key: 'kneeInjury' },
+                      { label: 'Back Injury', key: 'backInjury' },
+                      { label: 'Ankle Injury', key: 'ankleInjury' },
+                      { label: 'Joint Problems', key: 'jointProblems' },
+                    ].map((field) => (
+                      <div key={field.key} className="p-4 bg-black/20 border border-[#b2d8d8] rounded-xl">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-[#b2d8d8] mb-2 block">{field.label}</label>
+                        <div className="text-sm text-white">
+                          {parqData[field.key] === true ? 'Yes' : parqData[field.key] === false ? 'No' : 'Not Answered'}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="col-span-1 md:col-span-2 p-4 bg-black/20 border border-[#b2d8d8] rounded-xl">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#b2d8d8] mb-2 block">Injury Details</label>
+                      <div className="text-sm text-white">{parqData.injuryDetails || 'None'}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-white/40 italic">No PAR-Q data found.</div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 3. Metabolic Profile */}
       <div>
         <SectionHeader title="Metabolic Profile" icon={Calculator} id="metabolic" expandedSection={expandedSection} toggleSection={toggleSection} />
         <AnimatePresence>
@@ -609,29 +693,29 @@ Goal: ${data.primaryGoal}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Gender</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Gender</label>
                       <select 
                         disabled={!isEditing}
                         value={data.gender}
                         onChange={(e) => setData({...data, gender: e.target.value as any})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       >
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Age (yrs)</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Age (yrs)</label>
                       <input 
                         disabled={!isEditing}
                         type="number"
                         value={data.age}
                         onChange={(e) => setData({...data, age: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Height</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Height</label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <input 
@@ -644,7 +728,7 @@ Goal: ${data.primaryGoal}
                               const inches = (data.height || 0) % 12;
                               setData({...data, height: (ft * 12) + inches});
                             }}
-                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                            className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">ft</span>
                         </div>
@@ -660,30 +744,30 @@ Goal: ${data.primaryGoal}
                               const ft = Math.floor((data.height || 0) / 12);
                               setData({...data, height: (ft * 12) + inches});
                             }}
-                            className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                            className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">in</span>
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Initial Wt (lbs)</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Initial Wt (lbs)</label>
                       <input 
                         disabled={!isEditing}
                         type="number"
                         value={data.initialWeight}
                         onChange={(e) => setData({...data, initialWeight: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Activity Level</label>
+                    <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Activity Level</label>
                     <select 
                       disabled={!isEditing}
                       value={data.activityLevel}
                       onChange={(e) => setData({...data, activityLevel: e.target.value as any})}
-                      className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
+                      className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                     >
                       <option value="sedentary">Sedentary (Little or no exercise)</option>
                       <option value="light">Light Activity (1-3 days/week)</option>
@@ -702,7 +786,7 @@ Goal: ${data.primaryGoal}
                         value={data.vo2Max || ''}
                         onChange={(e) => setData({...data, vo2Max: Number(e.target.value)})}
                         placeholder="e.g. 45"
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
                       />
                     </div>
                     <div>
@@ -713,7 +797,7 @@ Goal: ${data.primaryGoal}
                         value={data.restingHR || ''}
                         onChange={(e) => setData({...data, restingHR: Number(e.target.value)})}
                         placeholder="e.g. 60"
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-gold/50 krome-outline"
                       />
                     </div>
                   </div>
@@ -759,40 +843,40 @@ Goal: ${data.primaryGoal}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Actual RMR</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Actual RMR</label>
                       <input 
                         disabled={!isEditing}
                         type="number"
                         value={data.actualRMR}
                         onChange={(e) => setData({...data, actualRMR: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Fat Burn %</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Fat Burn %</label>
                       <input 
                         disabled={!isEditing}
                         type="number"
                         value={data.fatBurnPercent}
                         onChange={(e) => setData({...data, fatBurnPercent: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Carb Burn %</label>
+                      <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Carb Burn %</label>
                       <input 
                         disabled={!isEditing}
                         type="number"
                         value={data.carbBurnPercent}
                         onChange={(e) => setData({...data, carbBurnPercent: e.target.value === '' ? 0 : parseInt(e.target.value)})}
-                        className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-sm focus:border-gold/50 krome-outline"
+                        className="w-full bg-black/20 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
                       />
                     </div>
                   </div>
 
                   <div className="mt-8 space-y-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <h4 className="text-xs font-black uppercase tracking-widest text-gold">Metabolic Priorities</h4>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-[#b2d8d8]">Metabolic Priorities</h4>
                       <div className="group relative">
                         <Info className="w-4 h-4 text-white/40 cursor-help" />
                         <div className="absolute bottom-full left-0 md:left-auto md:right-0 mb-2 w-56 p-2 bg-zinc-800 text-[10px] text-white rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
@@ -801,13 +885,13 @@ Goal: ${data.primaryGoal}
                       </div>
                     </div>
                     {Object.entries(data.metabolicPriority).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center p-4 bg-black/20 rounded-xl border border-white/5">
-                        <span className="text-xs font-bold uppercase text-white/60">{key}</span>
+                      <div key={key} className="flex justify-between items-center p-4 bg-black/20 rounded-xl border border-[#b2d8d8]">
+                        <span className="text-xs font-bold uppercase text-[#b2d8d8]">{key}</span>
                         {isEditing ? (
                           <select 
                             value={value as string}
                             onChange={(e) => setData({...data, metabolicPriority: {...data.metabolicPriority, [key]: e.target.value}})}
-                            className="bg-black/50 border border-white/10 rounded-lg text-xs p-2 text-white focus:border-gold/50"
+                            className="bg-black/50 border border-[#b2d8d8] rounded-lg text-xs p-2 text-white focus:border-[#b2d8d8]"
                           >
                             <option value="High concern (7+ symptoms)">High</option>
                             <option value="Moderate concern (5-7 symptoms)">Moderate</option>
@@ -870,32 +954,41 @@ Goal: ${data.primaryGoal}
                     )}
                   </div>
 
-                  {[
-                    { label: '3-Month SMART Goal', key: 'smartGoal' },
-                    { label: 'Long-Term Goal', key: 'longTermGoal' }
-                  ].map((field) => (
-                    <div key={field.key} className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                      <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block">{field.label}</label>
-                      {isEditing ? (
-                        <input 
-                          type="text"
-                          value={(data as any)[field.key]}
-                          onChange={(e) => setData({...data, [field.key]: e.target.value})}
-                          className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50"
-                        />
-                      ) : (
-                        <div className="text-sm font-medium text-white">{(data as any)[field.key] || '-'}</div>
-                      )}
-                    </div>
-                  ))}
+                  <div className="bg-black/20 p-5 rounded-2xl border border-[#b2d8d8]">
+                    <label className="text-[10px] font-bold text-[#b2d8d8] uppercase tracking-widest mb-2 block">3-Month SMART Goal</label>
+                    {isEditing ? (
+                      <input 
+                        type="text"
+                        value={data.smartGoal}
+                        onChange={(e) => setData({...data, smartGoal: e.target.value})}
+                        className="w-full bg-black/50 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-white">{data.smartGoal || '-'}</div>
+                    )}
+                  </div>
 
-                  <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block">Notes</label>
+                  <div className="bg-black/20 p-5 rounded-2xl border border-[#b2d8d8]">
+                    <label className="text-[10px] font-bold text-[#b2d8d8] uppercase tracking-widest mb-2 block">Long-Term Goal</label>
+                    {isEditing ? (
+                      <input 
+                        type="text"
+                        value={data.longTermGoal}
+                        onChange={(e) => setData({...data, longTermGoal: e.target.value})}
+                        className="w-full bg-black/50 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]"
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-white">{data.longTermGoal || '-'}</div>
+                    )}
+                  </div>
+
+                  <div className="bg-black/20 p-5 rounded-2xl border border-[#b2d8d8]">
+                    <label className="text-[10px] font-bold text-[#b2d8d8] uppercase tracking-widest mb-2 block">Notes</label>
                     {isEditing ? (
                       <textarea 
                         value={data.notes}
                         onChange={(e) => setData({...data, notes: e.target.value})}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm focus:border-gold/50  h-24"
+                        className="w-full bg-black/50 border border-[#b2d8d8] rounded-xl p-3 text-sm text-white focus:border-[#b2d8d8]  h-24"
                       />
                     ) : (
                       <div className="text-sm font-medium text-white/60">{data.notes || '-'}</div>
@@ -965,15 +1058,15 @@ Goal: ${data.primaryGoal}
             >
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-gold mb-4">Metabolic Assessments</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[#b2d8d8] mb-4">Metabolic Assessments</h4>
                   {['activeMetabolic', 'restingMetabolic', 'symptomQuestionnaire'].map((key) => {
                     const assessment = data.assessments?.[key as keyof typeof data.assessments] as { date: string; retestDate: string } | undefined;
                     return (
-                      <div key={key} className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                        <div className="text-xs font-bold uppercase mb-4 text-white/60">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                      <div key={key} className="bg-black/20 p-5 rounded-2xl border border-[#b2d8d8]">
+                        <div className="text-xs font-bold uppercase mb-4 text-[#b2d8d8]">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Date</label>
+                            <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Date</label>
                             {isEditing ? (
                               <input 
                                 type="date"
@@ -985,14 +1078,14 @@ Goal: ${data.primaryGoal}
                                     [key]: { ...assessment, date: e.target.value }
                                   }
                                 })}
-                                className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50"
+                                className="w-full bg-black/50 border border-[#b2d8d8] rounded-xl p-2 text-xs focus:border-[#b2d8d8]"
                               />
                             ) : (
                               <div className="text-sm font-mono">{assessment?.date || '-'}</div>
                             )}
                           </div>
                           <div>
-                            <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-2">Re-Test</label>
+                            <label className="text-[10px] text-[#b2d8d8] uppercase tracking-wider block mb-2">Re-Test</label>
                             {isEditing ? (
                               <input 
                                 type="date"
@@ -1004,7 +1097,7 @@ Goal: ${data.primaryGoal}
                                     [key]: { ...assessment, retestDate: e.target.value }
                                   }
                                 })}
-                                className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-xs focus:border-gold/50"
+                                className="w-full bg-black/50 border border-[#b2d8d8] rounded-xl p-2 text-xs focus:border-[#b2d8d8]"
                               />
                             ) : (
                               <div className="text-sm font-mono">{assessment?.retestDate || '-'}</div>
@@ -1017,10 +1110,10 @@ Goal: ${data.primaryGoal}
                 </div>
                 
                 <div className="space-y-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-gold mb-4">Lab Testing</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[#b2d8d8] mb-4">Lab Testing</h4>
                   {['initial', 'retest1', 'retest2', 'retest3'].map((key) => (
-                    <div key={key} className="flex justify-between items-center p-4 bg-black/20 rounded-2xl border border-white/5">
-                      <span className="text-xs font-bold uppercase text-white/60">{key.replace(/([A-Z0-9])/g, ' $1').trim()}</span>
+                    <div key={key} className="flex justify-between items-center p-4 bg-black/20 rounded-2xl border border-[#b2d8d8]">
+                      <span className="text-xs font-bold uppercase text-[#b2d8d8]">{key.replace(/([A-Z0-9])/g, ' $1').trim()}</span>
                       {isEditing ? (
                         <input 
                           type="date"
@@ -1032,7 +1125,7 @@ Goal: ${data.primaryGoal}
                               labTesting: { ...data.assessments?.labTesting, [key]: e.target.value }
                             }
                           })}
-                          className="bg-black/50 border border-white/10 rounded-xl p-2 text-xs w-32 focus:border-gold/50"
+                          className="bg-black/50 border border-[#b2d8d8] rounded-xl p-2 text-xs text-white w-32 focus:border-[#b2d8d8]"
                         />
                       ) : (
                         <span className="text-sm font-mono text-white/80">{data.assessments?.labTesting?.[key as keyof typeof data.assessments.labTesting] || '-'}</span>
@@ -1058,10 +1151,10 @@ Goal: ${data.primaryGoal}
               className="overflow-hidden"
             >
               <div className="p-8 space-y-8">
-                 <div className="text-xs text-white/60 bg-gold/5 p-5 rounded-2xl border border-gold/10 flex items-start gap-3">
-                   <Info className="w-5 h-5 text-gold shrink-0 mt-0.5" />
+                 <div className="text-xs text-[#b2d8d8] bg-[#b2d8d8]/5 p-5 rounded-2xl border border-[#b2d8d8]/10 flex items-start gap-3">
+                   <Info className="w-5 h-5 text-[#b2d8d8] shrink-0 mt-0.5" />
                    <div className="leading-relaxed">
-                     <span className="font-bold text-gold block mb-1 text-sm uppercase tracking-wide">Calculation Logic</span>
+                     <span className="font-bold text-[#b2d8d8] block mb-1 text-sm uppercase tracking-wide">Calculation Logic</span>
                      Total calories are based on your Predicted AMR ({calculateAMR()} kcal) 
                      {data.primaryGoal === 'Muscle Gain' || data.primaryGoal === 'Weight Gain' ? ' + 500 kcal for Weight Gain' : 
                       data.primaryGoal === 'Weight/Fat Loss' || data.primaryGoal === 'Weight Loss' ? ' - 500 kcal for Weight Loss' : 
@@ -1075,10 +1168,10 @@ Goal: ${data.primaryGoal}
                       { label: 'Carbs (g)', key: 'carbsGrams' },
                       { label: 'Total Calories', key: 'totalCalories' }
                     ].map((item) => (
-                      <div key={item.key} className="bg-black/40 p-6 rounded-2xl border border-white/5 text-center group hover:border-gold/30 transition-colors relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 relative z-10">{item.label}</div>
-                        <div className="text-3xl font-black italic text-gold group-hover:scale-110 transition-transform relative z-10">{(data.recommendations as any)[item.key]}</div>
+                      <div key={item.key} className="bg-black/40 p-6 rounded-2xl border border-[#b2d8d8] text-center group hover:border-[#b2d8d8] transition-colors relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[#b2d8d8]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="text-[10px] font-bold text-[#b2d8d8] uppercase tracking-widest mb-2 relative z-10">{item.label}</div>
+                        <div className="text-3xl font-black italic text-[#b2d8d8] group-hover:scale-110 transition-transform relative z-10">{(data.recommendations as any)[item.key]}</div>
                       </div>
                     ))}
                  </div>
