@@ -8,7 +8,7 @@ on:
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   SERVICE_NAME: krome-sports-performance
-  REGION: us-central1 # Update to your region
+  REGION: us-east4 # Update to your region
 
 jobs:
   deploy:
