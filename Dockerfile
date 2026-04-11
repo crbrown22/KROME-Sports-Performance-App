@@ -24,7 +24,7 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Expose the port the app runs on
+# Expose the port the app runs on (Cloud Run default)
 EXPOSE 8080
 
 # Set production environment

@@ -196,9 +196,23 @@ async function rehydrateDatabase() {
     isRehydrated = true;
     return;
   }
-  console.log("[Rehydrate] Starting database re-hydration from Firestore...");
   
-  const collections = [
+  setTimeout(async () => {
+    // Check if rehydration is needed (e.g., if users table is empty)
+    try {
+      const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+      if (userCount.count > 0) {
+        console.log("[Rehydrate] Users already exist in SQLite. Skipping background rehydration.");
+        isRehydrated = true;
+        return;
+      }
+    } catch (err) {
+      console.warn("[Rehydrate] Could not check user count, proceeding with rehydration:", err);
+    }
+
+    console.log("[Rehydrate] Starting database re-hydration from Firestore...");
+    
+    const collections = [
     { name: 'users', handler: async (snapshot: any) => {
       console.log(`[Rehydrate] Found ${snapshot.size} users in Firestore.`);
       for (const doc of snapshot.docs) {
@@ -272,6 +286,7 @@ async function rehydrateDatabase() {
         );
       }
     }},
+    /*
     { name: 'user_metrics', handler: async (snapshot: any) => {
       console.log(`[Rehydrate] Found ${snapshot.size} user metrics in Firestore.`);
       for (const doc of snapshot.docs) {
@@ -697,10 +712,14 @@ async function rehydrateDatabase() {
         }
       }
     }}
+    */
   ];
 
   for (const col of collections) {
     try {
+      // Add a small delay between collections to avoid hitting rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       console.log(`[Rehydrate] Fetching collection: ${col.name} from Firestore...`);
       const snapshot = await adminDb.collection(col.name).get();
       console.log(`[Rehydrate] Successfully fetched ${snapshot.size} documents from collection: ${col.name}`);
@@ -714,8 +733,9 @@ async function rehydrateDatabase() {
     }
   }
 
-  console.log("[Rehydrate] Database re-hydration process finished.");
-  isRehydrated = true;
+    console.log("[Rehydrate] Database re-hydration process finished.");
+    isRehydrated = true;
+  }, 5000);
 }
 
 async function ensureAdminsExist() {
@@ -748,8 +768,7 @@ async function startServer() {
   console.log("startServer() called");
   
   console.log("Initializing express app...");
-  await rehydrateDatabase();
-  await ensureAdminsExist();
+  // Initialization moved to background after listen to prevent startup timeout
   // Log environment variable presence (without values)
 console.log('Environment Check:', {
   VAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
@@ -762,7 +781,9 @@ console.log('Environment Check:', {
 });
 
 const app = express();
-  const PORT = Number(process.env.PORT) || 8080;
+  // In AI Studio preview, we MUST use port 3000. 
+  // In Cloud Run deployment, we MUST use process.env.PORT.
+  const PORT = process.env.NODE_ENV === 'production' ? (Number(process.env.PORT) || 8080) : 3000;
 
   // Trust proxy for correct protocol/IP detection behind nginx
   app.set('trust proxy', true);
@@ -3152,6 +3173,7 @@ app.post('/api/webhook', async (req, res) => {
   app.get("/api/messages/unread", async (req, res) => {
     const { userId } = req.query;
     try {
+      /*
       let query = adminDb.collection('messages').where('is_read', '==', false);
       if (userId) {
         query = query.where('receiver_id', '==', userId);
@@ -3170,10 +3192,10 @@ app.post('/api/webhook', async (req, res) => {
       
       const result = messages.map(m => ({ ...m, sender_username: usersMap.get(m.sender_id) }));
       res.json(result);
-    } catch (err) {
-      console.error("Error fetching unread messages from Firestore, falling back to SQLite:", err);
-      try {
-        let messages: any[];
+      */
+      
+      // Fallback to SQLite
+      let messages: any[];
         if (userId) {
           const sqliteId = resolveUserId(userId as string);
           messages = db.prepare(`
@@ -3206,7 +3228,6 @@ app.post('/api/webhook', async (req, res) => {
         console.error("Error fetching unread messages from SQLite:", sqliteErr);
         res.status(500).json({ error: "Database error" });
       }
-    }
   });
 
   // Messages: Get conversation
@@ -3489,11 +3510,10 @@ app.post('/api/webhook', async (req, res) => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Local access: http://localhost:${PORT}`);
     
-    // Start rehydration in background after server is listening
-    console.log("[Server] Starting background rehydration...");
-    rehydrateDatabase().catch(err => {
-      console.error("[Server] Background rehydration failed:", err);
-    });
+    // Start rehydration and admin check in background after server is listening
+    console.log("[Server] Starting background rehydration and admin check...");
+    rehydrateDatabase();
+    ensureAdminsExist().catch(err => console.error("[Server] Admin check failed:", err));
   });
   
   server.on('error', (err) => {
