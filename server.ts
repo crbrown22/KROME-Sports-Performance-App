@@ -783,7 +783,7 @@ console.log('Environment Check:', {
 const app = express();
   // In AI Studio preview, we MUST use port 3000. 
   // In Cloud Run deployment, we MUST use process.env.PORT.
-  const PORT = process.env.NODE_ENV === 'production' ? (Number(process.env.PORT) || 8080) : 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Trust proxy for correct protocol/IP detection behind nginx
   app.set('trust proxy', true);
@@ -3444,9 +3444,17 @@ app.post('/api/webhook', async (req, res) => {
   if (isProduction) {
     console.log("[Server] Serving static files from dist...");
     
+    if (!fs.existsSync(distPath)) {
+      console.error(`[Server] CRITICAL: dist directory not found at ${distPath}`);
+    } else if (!fs.existsSync(indexPath)) {
+      console.error(`[Server] CRITICAL: index.html not found at ${indexPath}`);
+    } else {
+      console.log(`[Server] Found index.html at ${indexPath}`);
+    }
+
     // Serve static files from dist
     app.use(express.static(distPath, { 
-      index: 'index.html', // Let express-static handle the root index.html if it exists
+      index: false, // We handle index.html manually to inject env vars
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.json')) {
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -3468,12 +3476,30 @@ app.post('/api/webhook', async (req, res) => {
       }
       
       console.log(`[Server] SPA Fallback for: ${req.url}`);
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          console.error(`[Server] Error sending index.html: ${err}`);
+      
+      try {
+        if (fs.existsSync(indexPath)) {
+          let html = fs.readFileSync(indexPath, 'utf8');
+          
+          // Inject environment variables into the HTML
+          const envVars = Object.keys(process.env)
+            .filter(key => key.startsWith('VITE_'))
+            .reduce((acc, key) => {
+              acc[key] = process.env[key];
+              return acc;
+            }, {} as Record<string, any>);
+          
+          const injection = `<script>window._ENV_ = ${JSON.stringify(envVars)};</script>`;
+          html = html.replace('<head>', `<head>${injection}`);
+          
+          res.send(html);
+        } else {
           res.status(500).send("Server Error: index.html not found. Please ensure the app is built.");
         }
-      });
+      } catch (err) {
+        console.error(`[Server] Error processing index.html: ${err}`);
+        res.status(500).send("Server Error processing index.html");
+      }
     });
   } else {
     // Development mode: Use Vite
@@ -3515,6 +3541,17 @@ app.post('/api/webhook', async (req, res) => {
     rehydrateDatabase();
     ensureAdminsExist().catch(err => console.error("[Server] Admin check failed:", err));
   });
+
+  // Also listen on port 3000 if PORT is different, to satisfy potential probes
+  if (PORT !== 3000) {
+    try {
+      app.listen(3000, "0.0.0.0", () => {
+        console.log(`[Server] Also listening on http://0.0.0.0:3000 for probes`);
+      });
+    } catch (e) {
+      console.log("[Server] Could not start secondary listener on port 3000 (likely already in use)");
+    }
+  }
   
   server.on('error', (err) => {
     console.error('Server listen error:', err);
