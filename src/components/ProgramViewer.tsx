@@ -9,6 +9,7 @@ import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProgramCalendar from './ProgramCalendar';
+import { getProgramImage } from '../utils/imageUtils';
 import { 
   ChevronLeft, 
   CheckCircle2, 
@@ -1385,12 +1386,11 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                 >
                   <div className="h-48 relative overflow-hidden">
                     <img 
-                      src={`https://picsum.photos/seed/${program.name}/800/600`} 
+                      src={getProgramImage(program.name, program.sport)} 
                       alt={program.name} 
-                      className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover opacity-100 group-hover:scale-110 transition-all duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                     
                     <div className="absolute top-4 right-4 flex gap-2">
                       {isCustom && (

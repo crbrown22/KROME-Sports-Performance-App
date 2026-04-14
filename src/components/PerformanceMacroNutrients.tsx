@@ -548,31 +548,31 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-[40px] p-8 md:p-12 min-h-screen shadow-2xl">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-24">
+        <div className="bg-zinc-900/30 backdrop-blur-xl border border-white/10 rounded-[30px] md:rounded-[40px] p-4 sm:p-8 md:p-12 min-h-screen shadow-2xl">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-gold font-bold uppercase text-xs tracking-widest mb-8 hover:gap-4 transition-all krome-outline"
+            className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] tracking-widest mb-6 md:mb-8 hover:gap-4 transition-all krome-outline"
           >
             <ChevronLeft className="w-4 h-4" /> Back to Nutrition
           </button>
 
-          <div className="flex flex-col md:flex-row gap-8 mb-12 items-end justify-between">
-            <div className="relative">
-              <div className="absolute -left-4 top-0 w-1 h-full bg-gold/50 blur-sm" />
-              <h2 className="text-gold font-bold uppercase tracking-[0.2em] text-sm mb-2">Module 01</h2>
-              <h1 className="text-4xl md:text-6xl font-black uppercase italic leading-none tracking-tighter text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8 mb-8 md:mb-12 items-start md:items-end justify-between">
+            <div className="relative w-full md:w-auto">
+              <div className="hidden md:block absolute -left-4 top-0 w-1 h-full bg-gold/50 blur-sm" />
+              <h2 className="text-gold font-bold uppercase tracking-[0.2em] text-[10px] md:text-sm mb-2">Module 01</h2>
+              <h1 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase italic leading-tight tracking-tighter text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                 Performance <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-400 to-gold pr-2 pb-2">Macro-Nutrients</span>
               </h1>
             </div>
             
-            <div className="flex flex-col items-end gap-4">
+            <div className="flex flex-col w-full md:w-auto items-stretch md:items-end gap-4">
               {isOwnProfile && (
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button 
                     onClick={() => setShowAddFoodModal(true)}
-                    className="px-6 py-3 bg-black/40 backdrop-blur-md border border-gold/30 rounded-xl text-gold text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-gold/10 transition-all krome-outline"
+                    className="px-6 py-3 bg-white/5 backdrop-blur-md border border-gold/30 rounded-xl text-gold text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gold/10 transition-all krome-outline"
                   >
                     <Plus className="w-4 h-4" /> Add Custom Food
                   </button>
@@ -581,64 +581,64 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                       if (!isEditingTargets) setTempTargets(targets);
                       setIsEditingTargets(!isEditingTargets);
                     }}
-                    className="px-6 py-3 bg-gold text-black rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 transition-all krome-outline"
+                    className="px-6 py-3 bg-gold text-black rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 transition-all krome-outline"
                   >
-                    <Activity className="w-4 h-4" /> {isEditingTargets ? 'Cancel Editing' : 'Adjust Macros'}
+                    <Activity className="w-4 h-4" /> {isEditingTargets ? 'Cancel' : 'Adjust Macros'}
                   </button>
                 </div>
               )}
 
               {/* Date Selector */}
-              <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-2">
+              <div className="flex items-center justify-between sm:justify-end gap-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-2">
               {/* Add Custom Food Modal */}
               {createPortal(
                 <AnimatePresence>
                   {showAddFoodModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="bg-black/80 backdrop-blur-xl border border-gold/30 rounded-[40px] p-10 max-w-lg w-full relative overflow-hidden shadow-[0_0_50px_rgba(255,215,0,0.1)]"
+                        className="bg-zinc-900/90 backdrop-blur-xl border border-gold/30 rounded-[30px] md:rounded-[40px] p-6 sm:p-10 max-w-lg w-full relative overflow-hidden shadow-[0_0_50px_rgba(255,215,0,0.1)]"
                       >
                         <button 
                           onClick={() => setShowAddFoodModal(false)}
-                          className="absolute top-6 right-6 w-10 h-10 bg-white/5 hover:bg-gold/20 rounded-full flex items-center justify-center text-white/40 hover:text-gold transition-all krome-outline"
+                          className="absolute top-4 right-4 sm:top-6 sm:right-6 w-8 h-8 sm:w-10 sm:h-10 bg-white/5 hover:bg-gold/20 rounded-full flex items-center justify-center text-white/40 hover:text-gold transition-all krome-outline"
                         >
-                          <X className="w-6 h-6" />
+                          <X className="w-5 h-5 sm:w-6 sm:h-6" />
                         </button>
-                        <h2 className="text-3xl font-black uppercase italic mb-8 text-white tracking-tighter">Add <span className="text-gold">Custom</span> Food</h2>
-                        <div className="space-y-6">
+                        <h2 className="text-2xl sm:text-3xl font-black uppercase italic mb-6 sm:mb-8 text-white tracking-tighter">Add <span className="text-gold">Custom</span> Food</h2>
+                        <div className="space-y-4 sm:space-y-6">
                           <div>
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Food Name</label>
-                            <input type="text" placeholder="e.g. Elite Whey Protein" value={newFood.name} onChange={(e) => setNewFood({...newFood, name: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
+                            <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Food Name</label>
+                            <input type="text" placeholder="e.g. Elite Whey Protein" value={newFood.name} onChange={(e) => setNewFood({...newFood, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-3.5 sm:p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
                           </div>
                           
-                          <div className="grid grid-cols-4 gap-4">
+                          <div className="grid grid-cols-4 gap-2 sm:gap-4">
                             <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-2 block text-center">Calories</label>
-                              <input type="number" value={newFood.calories} onChange={(e) => setNewFood({...newFood, calories: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                              <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-white/50 mb-2 block text-center">Calories</label>
+                              <input type="number" value={newFood.calories} onChange={(e) => setNewFood({...newFood, calories: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-2.5 sm:p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-xs sm:text-sm" />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2 block text-center">Protein</label>
-                              <input type="number" value={newFood.protein} onChange={(e) => setNewFood({...newFood, protein: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                              <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2 block text-center">Protein</label>
+                              <input type="number" value={newFood.protein} onChange={(e) => setNewFood({...newFood, protein: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-2.5 sm:p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-xs sm:text-sm" />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-green-400/70 mb-2 block text-center">Carbs</label>
-                              <input type="number" value={newFood.carbs} onChange={(e) => setNewFood({...newFood, carbs: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                              <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-green-400/70 mb-2 block text-center">Carbs</label>
+                              <input type="number" value={newFood.carbs} onChange={(e) => setNewFood({...newFood, carbs: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-2.5 sm:p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-xs sm:text-sm" />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-yellow-400/70 mb-2 block text-center">Fat</label>
-                              <input type="number" value={newFood.fat} onChange={(e) => setNewFood({...newFood, fat: Number(e.target.value)})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-sm" />
+                              <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-yellow-400/70 mb-2 block text-center">Fat</label>
+                              <input type="number" value={newFood.fat} onChange={(e) => setNewFood({...newFood, fat: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-2.5 sm:p-3 text-white focus:border-gold/50 outline-none text-center font-mono text-xs sm:text-sm" />
                             </div>
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Portion Size</label>
-                            <input type="text" placeholder="e.g. 1 Scoop (30g)" value={newFood.portion} onChange={(e) => setNewFood({...newFood, portion: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
+                            <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-gold mb-2 block">Portion Size</label>
+                            <input type="text" placeholder="e.g. 1 Scoop (30g)" value={newFood.portion} onChange={(e) => setNewFood({...newFood, portion: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-3.5 sm:p-4 text-white focus:border-gold/50 outline-none transition-all shadow-inner" />
                           </div>
                           
-                          <button onClick={handleAddCustomFood} className="w-full py-4 bg-gold text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 mt-4 krome-outline">Save Performance Food</button>
+                          <button onClick={handleAddCustomFood} className="w-full py-3.5 sm:py-4 bg-gold text-black rounded-2xl font-black uppercase text-[10px] sm:text-xs tracking-widest hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 mt-2 sm:mt-4 krome-outline">Save Performance Food</button>
                         </div>
                       </motion.div>
                     </div>
@@ -667,59 +667,59 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12 p-8 bg-black/40 backdrop-blur-xl border border-gold/30 rounded-[32px] shadow-2xl"
+            className="mb-8 md:mb-12 p-6 md:p-8 bg-white/5 backdrop-blur-xl border border-gold/30 rounded-[32px] shadow-2xl"
           >
-            <h3 className="text-xl font-black uppercase italic mb-8 flex items-center gap-3 text-white">
+            <h3 className="text-lg md:text-xl font-black uppercase italic mb-6 md:mb-8 flex items-center gap-3 text-white">
               <Activity className="w-6 h-6 text-gold" /> Adjust Daily Performance Targets
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
               <div>
-                <label className="block text-[10px] text-gold uppercase tracking-[0.2em] mb-2 font-bold">Calories (kcal)</label>
+                <label className="block text-[9px] md:text-[10px] text-gold uppercase tracking-[0.2em] mb-2 font-bold">Calories (kcal)</label>
                 <input 
                   type="number" 
                   value={tempTargets.calories}
                   onChange={(e) => setTempTargets({...tempTargets, calories: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-blue-400 uppercase tracking-[0.2em] mb-2 font-bold">Protein (g)</label>
+                <label className="block text-[9px] md:text-[10px] text-blue-400 uppercase tracking-[0.2em] mb-2 font-bold">Protein (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.protein}
                   onChange={(e) => setTempTargets({...tempTargets, protein: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-green-400 uppercase tracking-[0.2em] mb-2 font-bold">Carbs (g)</label>
+                <label className="block text-[9px] md:text-[10px] text-green-400 uppercase tracking-[0.2em] mb-2 font-bold">Carbs (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.carbs}
                   onChange={(e) => setTempTargets({...tempTargets, carbs: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-yellow-500 uppercase tracking-[0.2em] mb-2 font-bold">Fats (g)</label>
+                <label className="block text-[9px] md:text-[10px] text-yellow-500 uppercase tracking-[0.2em] mb-2 font-bold">Fats (g)</label>
                 <input 
                   type="number" 
                   value={tempTargets.fat}
                   onChange={(e) => setTempTargets({...tempTargets, fat: parseInt(e.target.value) || 0})}
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-5 py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-white focus:border-gold outline-none transition-all font-mono text-sm shadow-inner"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-3 md:gap-4">
               <button 
                 onClick={() => setIsEditingTargets(false)}
-                className="px-8 py-3 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors krome-outline"
+                className="px-6 md:px-8 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors krome-outline"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleUpdateTargets}
-                className="px-10 py-3 bg-gold text-black rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 krome-outline"
+                className="px-8 md:px-10 py-2.5 md:py-3 bg-gold text-black rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest flex items-center gap-2 hover:bg-yellow-400 transition-all shadow-lg shadow-gold/20 krome-outline"
               >
                 <ShieldCheck className="w-4 h-4" /> Save Targets
               </button>
@@ -728,12 +728,12 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
         )}
 
         {/* Dashboard */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
           {/* Calories */}
-          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.calories, targets.calories)}`}>
+          <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.calories, targets.calories)}`}>
             <div className="relative z-10">
               <div className="text-[10px] font-black text-gold uppercase tracking-widest mb-2">Calories</div>
-              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.calories)}</div>
+              <div className="text-2xl md:text-3xl font-black italic mb-1 text-white">{Math.round(totals.calories)}</div>
               <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.calories} kcal</div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
@@ -746,10 +746,10 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
           </div>
 
           {/* Protein */}
-          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.protein, targets.protein)}`}>
+          <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.protein, targets.protein)}`}>
             <div className="relative z-10">
               <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Protein</div>
-              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.protein)}g</div>
+              <div className="text-2xl md:text-3xl font-black italic mb-1 text-white">{Math.round(totals.protein)}g</div>
               <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.protein}g</div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
@@ -762,10 +762,10 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
           </div>
 
           {/* Carbs */}
-          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.carbs, targets.carbs)}`}>
+          <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.carbs, targets.carbs)}`}>
             <div className="relative z-10">
               <div className="text-[10px] font-black text-green-400 uppercase tracking-widest mb-2">Carbs</div>
-              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.carbs)}g</div>
+              <div className="text-2xl md:text-3xl font-black italic mb-1 text-white">{Math.round(totals.carbs)}g</div>
               <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.carbs}g</div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
@@ -778,10 +778,10 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
           </div>
 
           {/* Fat */}
-          <div className={`bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.fat, targets.fat)}`}>
+          <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 relative overflow-hidden transition-all krome-outline ${getCardColor(totals.fat, targets.fat)}`}>
             <div className="relative z-10">
               <div className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mb-2">Fats</div>
-              <div className="text-3xl font-black italic mb-1 text-white">{Math.round(totals.fat)}g</div>
+              <div className="text-2xl md:text-3xl font-black italic mb-1 text-white">{Math.round(totals.fat)}g</div>
               <div className="text-[10px] text-white/50 mb-4 uppercase tracking-widest">/ {targets.fat}g</div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
@@ -798,15 +798,15 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
           {/* Search & Add */}
           {isOwnProfile ? (
             <div className="lg:col-span-2">
-              <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-8 h-full krome-outline shadow-xl">
-                <div className="flex flex-col gap-6 mb-8">
+              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-4 sm:p-8 h-full krome-outline shadow-xl">
+                <div className="flex flex-col gap-4 md:gap-6 mb-8">
                   {/* Meal Selector */}
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
                     {meals.map(meal => (
                       <button
                         key={meal}
                         onClick={() => setSelectedMeal(meal)}
-                        className={`px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all flex-1 krome-outline ${
+                        className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] sm:text-[10px] transition-all flex-1 min-w-[80px] krome-outline ${
                           selectedMeal === meal 
                             ? 'bg-gold text-black shadow-lg shadow-gold/20' 
                             : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
@@ -824,18 +824,18 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                       placeholder={`Search high-performance foods...`} 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-black/60 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all shadow-inner"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl py-3.5 sm:py-4 pl-12 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 transition-all shadow-inner"
                     />
                   </div>
                 </div>
 
                 {/* Category Filter */}
-                <div className="flex gap-3 mb-8 overflow-x-auto pb-2 hide-scrollbar">
+                <div className="flex gap-2 sm:gap-3 mb-6 md:mb-8 overflow-x-auto pb-2 hide-scrollbar">
                   {categories.map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all krome-outline ${
+                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all krome-outline ${
                         selectedCategory === cat 
                           ? 'bg-gold text-black' 
                           : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
@@ -846,33 +846,33 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                   ))}
                 </div>
 
-                <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="space-y-3 max-h-[400px] md:max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                   {filteredFoods.map((food) => (
                     <motion.div 
                       key={food.id}
                       layoutId={food.id}
-                      className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden flex items-center gap-4 hover:border-gold/30 transition-all group p-1"
+                      className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden flex items-center gap-3 sm:gap-4 hover:border-gold/30 transition-all group p-1"
                     >
-                      <img src={getFoodImage(food.category, food.name)} alt={food.name} className="w-20 h-20 object-cover rounded-xl" referrerPolicy="no-referrer" />
-                      <div className="flex-1 py-2">
-                        <div className="font-bold text-base text-white group-hover:text-gold transition-colors">{food.name}</div>
-                        <div className="text-[10px] text-white/50 uppercase tracking-widest font-bold mt-1">{food.serving.size} • {food.serving.calories} kcal</div>
-                        <div className="flex gap-3 mt-2">
-                          <span className="text-[10px] text-blue-400/80 font-bold uppercase tracking-tighter">{food.serving.protein}g P</span>
-                          <span className="text-[10px] text-green-400/80 font-bold uppercase tracking-tighter">{food.serving.carbs}g C</span>
-                          <span className="text-[10px] text-yellow-400/80 font-bold uppercase tracking-tighter">{food.serving.fat}g F</span>
+                      <img src={getFoodImage(food.category, food.name)} alt={food.name} className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                      <div className="flex-1 py-1 sm:py-2">
+                        <div className="font-bold text-sm sm:text-base text-white group-hover:text-gold transition-colors line-clamp-1">{food.name}</div>
+                        <div className="text-[9px] sm:text-[10px] text-white/50 uppercase tracking-widest font-bold mt-0.5 sm:mt-1">{food.serving.size} • {food.serving.calories} kcal</div>
+                        <div className="flex gap-2 sm:gap-3 mt-1.5 sm:mt-2">
+                          <span className="text-[9px] sm:text-[10px] text-blue-400/80 font-bold uppercase tracking-tighter">{food.serving.protein}g P</span>
+                          <span className="text-[9px] sm:text-[10px] text-green-400/80 font-bold uppercase tracking-tighter">{food.serving.carbs}g C</span>
+                          <span className="text-[9px] sm:text-[10px] text-yellow-400/80 font-bold uppercase tracking-tighter">{food.serving.fat}g F</span>
                         </div>
                       </div>
                       <button 
                         onClick={() => addToLog(food)}
-                        className="w-10 h-10 mr-4 rounded-full bg-gold text-black flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-gold/20"
+                        className="w-8 h-8 sm:w-10 sm:h-10 mr-2 sm:mr-4 rounded-full bg-gold text-black flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-gold/20 flex-shrink-0"
                       >
-                        <Plus className="w-5 h-5" />
+                        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </motion.div>
                   ))}
                   {filteredFoods.length === 0 && (
-                    <div className="text-center py-20 text-white/30 italic text-sm uppercase tracking-widest font-bold">
+                    <div className="text-center py-16 md:py-20 text-white/30 italic text-[10px] sm:text-sm uppercase tracking-widest font-bold">
                       No performance foods found matching "{searchQuery}"
                     </div>
                   )}
@@ -881,12 +881,12 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
             </div>
           ) : (
             <div className="lg:col-span-2">
-              <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-12 h-full flex flex-col items-center justify-center text-center shadow-xl">
-                <div className="w-20 h-20 rounded-full bg-gold/10 flex items-center justify-center text-gold mb-6 shadow-[0_0_30px_rgba(255,215,0,0.1)]">
-                  <Apple className="w-10 h-10" />
+              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-12 h-full flex flex-col items-center justify-center text-center shadow-xl">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gold/10 flex items-center justify-center text-gold mb-6 shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                  <Apple className="w-8 h-8 md:w-10 md:h-10" />
                 </div>
-                <h3 className="text-2xl font-black uppercase italic mb-4 text-white">Nutrition Profile</h3>
-                <p className="text-white/40 text-sm max-w-sm uppercase tracking-widest font-bold leading-relaxed">
+                <h3 className="text-xl md:text-2xl font-black uppercase italic mb-4 text-white">Nutrition Profile</h3>
+                <p className="text-white/40 text-[10px] md:text-sm max-w-sm uppercase tracking-widest font-bold leading-relaxed">
                   Viewing athlete's daily nutrition log and performance metrics.
                 </p>
               </div>
@@ -895,14 +895,14 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
 
           {/* Daily Log */}
           <div className="lg:col-span-1">
-            <div className="bg-black/40 backdrop-blur-xl border border-krome/20 rounded-3xl p-8 h-full flex flex-col shadow-xl">
-              <h3 className="text-base font-black uppercase italic mb-6 flex items-center gap-3 text-gold">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 h-full flex flex-col shadow-xl">
+              <h3 className="text-sm sm:text-base font-black uppercase italic mb-6 flex items-center gap-3 text-gold">
                 <Activity className="w-5 h-5" /> Daily Performance Log
               </h3>
 
-              <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-2 max-h-[600px]">
+              <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-2 max-h-[500px] md:max-h-[600px]">
                 {dailyLog.length === 0 ? (
-                  <div className="text-center py-20 text-white/30 italic text-sm uppercase tracking-widest font-bold">
+                  <div className="text-center py-16 md:py-20 text-white/30 italic text-[10px] sm:text-sm uppercase tracking-widest font-bold">
                     Log is currently empty.
                   </div>
                 ) : (
@@ -912,7 +912,7 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                     
                     return (
                       <div key={meal} className="space-y-3">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gold/60 border-b border-gold/10 pb-2 mb-2">{meal}</h4>
+                        <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-gold/60 border-b border-gold/10 pb-2 mb-2">{meal}</h4>
                         <AnimatePresence mode="popLayout">
                           {mealLogs.map((item) => (
                             <motion.div 
@@ -920,35 +920,35 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -20 }}
-                              className="bg-black/40 border border-white/5 rounded-xl p-4 relative group hover:border-gold/20 transition-all"
+                              className="bg-white/5 border border-white/5 rounded-xl p-3 sm:p-4 relative group hover:border-gold/20 transition-all"
                             >
                               <div className="flex justify-between items-start mb-2">
-                                <div className="font-bold text-sm text-white">{item.name}</div>
+                                <div className="font-bold text-xs sm:text-sm text-white line-clamp-1 pr-6">{item.name}</div>
                                 {isOwnProfile && (
                                   <button 
                                     onClick={() => removeFromLog(item.logId)}
-                                    className="text-white/20 hover:text-red-500 transition-colors p-1"
+                                    className="text-white/20 hover:text-red-500 transition-colors p-1 absolute top-2 right-2"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 h-4" />
                                   </button>
                                 )}
                               </div>
                               
-                              <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/50 font-bold uppercase tracking-tighter">
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[9px] sm:text-[10px] text-white/50 font-bold uppercase tracking-tighter">
                                 <span className="text-white/70">{Math.round(item.serving.calories * item.servings)} kcal</span>
                                 <span className="text-blue-400/80">{Math.round(item.serving.protein * item.servings)}g P</span>
                                 <span className="text-green-400/80">{Math.round(item.serving.carbs * item.servings)}g C</span>
                                 <span className="text-yellow-400/80">{Math.round(item.serving.fat * item.servings)}g F</span>
                               </div>
-                              <div className="flex items-center justify-between mt-4">
+                              <div className="flex items-center justify-between mt-3 sm:mt-4">
                                 {isOwnProfile ? (
-                                  <div className="flex items-center gap-2 bg-white/5 rounded-lg px-2 py-1 border border-white/10">
-                                    <button onClick={() => updateServings(item.logId, -0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1">-</button>
-                                    <span className="text-gold font-mono text-xs w-8 text-center font-bold">{item.servings}</span>
-                                    <button onClick={() => updateServings(item.logId, 0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1">+</button>
+                                  <div className="flex items-center gap-2 bg-white/5 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 border border-white/10">
+                                    <button onClick={() => updateServings(item.logId, -0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1 text-xs">-</button>
+                                    <span className="text-gold font-mono text-[10px] sm:text-xs w-6 sm:w-8 text-center font-bold">{item.servings}</span>
+                                    <button onClick={() => updateServings(item.logId, 0.5)} className="text-white/40 hover:text-gold transition-colors font-bold px-1 text-xs">+</button>
                                   </div>
                                 ) : (
-                                  <span className="text-white/40 font-mono text-[10px] uppercase tracking-widest">{item.servings} servings</span>
+                                  <span className="text-white/40 font-mono text-[9px] sm:text-[10px] uppercase tracking-widest">{item.servings} servings</span>
                                 )}
                               </div>
                             </motion.div>
@@ -961,25 +961,25 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
               </div>
               
               {dailyLog.length > 0 && (
-                <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
+                <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10 space-y-3 sm:space-y-4">
                   <button
                     onClick={handleAnalyzeNutrition}
-                    className="w-full py-4 rounded-xl bg-black/40 border border-gold/30 hover:bg-gold/10 flex items-center justify-center gap-3 group transition-all krome-outline"
+                    className="w-full py-3.5 sm:py-4 rounded-xl bg-white/5 border border-gold/30 hover:bg-gold/10 flex items-center justify-center gap-2 sm:gap-3 group transition-all krome-outline"
                   >
-                    <Sparkles className="w-4 h-4 text-gold" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white group-hover:text-gold transition-colors">AI Nutrition Analysis</span>
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 h-4 text-gold" />
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white group-hover:text-gold transition-colors">AI Nutrition Analysis</span>
                   </button>
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center justify-between gap-3 sm:gap-4">
                     <button 
                       onClick={() => setAllLogs(prev => prev.filter(item => item.date !== selectedDate))}
-                      className="text-[10px] text-red-400/60 hover:text-red-400 uppercase tracking-widest font-bold transition-colors"
+                      className="text-[9px] sm:text-[10px] text-red-400/60 hover:text-red-400 uppercase tracking-widest font-bold transition-colors whitespace-nowrap"
                     >
                       Clear Log
                     </button>
                     <button 
                       onClick={handleSaveLog}
-                      className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all krome-outline ${
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all krome-outline ${
                         isSaved 
                           ? 'bg-green-500 text-black shadow-lg shadow-green-500/20' 
                           : 'bg-gold text-black hover:bg-yellow-400 shadow-lg shadow-gold/20'

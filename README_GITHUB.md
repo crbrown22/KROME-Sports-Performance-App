@@ -8,13 +8,29 @@ This guide explains how to set up Continuous Deployment (CD) for this applicatio
 3. Follow the prompts to connect your account and create a new repository.
 
 ## 2. Google Cloud Setup
-You need a Service Account with permissions to deploy to Cloud Run.
+You need a Service Account with permissions to deploy to Cloud Run and push to Artifact Registry.
 
-1. Go to the [IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) page in GCP.
+### A. Enable APIs
+Enable the following APIs in your GCP project:
+- Cloud Run API
+- Artifact Registry API
+- Cloud Build API
+
+### B. Create Artifact Registry
+The GitHub Action expects a Docker repository named `cloud-run-source-deploy`.
+1. Go to [Artifact Registry](https://console.cloud.google.com/artifacts).
+2. Click **Create Repository**.
+3. Name: `cloud-run-source-deploy`
+4. Format: **Docker**
+5. Location Type: **Region** (e.g., `us-central1` - must match the `REGION` in your `.yml` file).
+6. Click **Create**.
+
+### C. Create Service Account
+1. Go to the [IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) page.
 2. Create a new Service Account (e.g., `github-deployer`).
 3. Grant it the following roles:
    - **Cloud Run Admin**
-   - **Storage Admin** (to push images to GCR)
+   - **Artifact Registry Writer** (This fixes the "uploadArtifacts denied" error)
    - **Service Account User**
 4. Create a **JSON Key** for this service account and download it.
 

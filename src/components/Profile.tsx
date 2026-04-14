@@ -5,6 +5,7 @@ import { getCurrentDate } from '../utils/date';
 import { getWorkoutExercises, calculateWorkoutProgress } from '../lib/workoutUtils';
 import AthleteDashboard from "./AthleteDashboard";
 import { TopNavigation } from "./TopNavigation";
+import { getProgramImage } from '../utils/imageUtils';
 import { 
   User, 
   Mail, 
@@ -142,7 +143,8 @@ export default function Profile({
       ...user,
       firstName: user.firstName || user.first_name || "",
       lastName: user.lastName || user.last_name || "",
-      username: user.username || ""
+      username: user.username || "",
+      avatar_url: user.avatar_url || user.avatarUrl || ""
     });
   }, [user]);
   const [isEditing, setIsEditing] = useState(false);
@@ -820,12 +822,11 @@ export default function Profile({
                     >
                       <div className="h-40 relative overflow-hidden">
                         <img 
-                          src={`https://picsum.photos/seed/${program.name}/800/600`} 
+                          src={getProgramImage(program.name, program.sport)} 
                           alt={program.name} 
-                          className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover opacity-100 group-hover:scale-110 transition-all duration-700"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                         
                         <div className="absolute top-4 right-4">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500 krome-outline ${getProgramAccentColor(program.id)}`}>

@@ -66,7 +66,8 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
               email: user.email, 
               firstName: user.displayName?.split(' ')[0] || '',
               lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-              role: (user.email === 'swolecode@gmail.com' || user.email === 'kromefitness@gmail.com') ? 'admin' : 'athlete'
+              role: (user.email === 'swolecode@gmail.com' || user.email === 'kromefitness@gmail.com') ? 'admin' : 'athlete',
+              avatarUrl: user.photoURL
             })
           });
           
@@ -97,7 +98,8 @@ export default function Auth({ onBack, onLoginSuccess, initialMode = 'login' }: 
             email, 
             firstName,
             lastName,
-            role
+            role,
+            avatarUrl: user.photoURL
           })
         });
         

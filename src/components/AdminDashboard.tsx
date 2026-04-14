@@ -9,6 +9,7 @@ import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentDate } from '../utils/date';
+import { getAthleteImage } from '../utils/imageUtils';
 import { 
   Users, 
   User,
@@ -112,12 +113,13 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
   });
   const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'library' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand' | 'system' | 'assign-program' | 'assign-workout'>(() => {
     const saved = safeStorage.getItem('krome_admin_active_tab');
-    if (window.innerWidth < 1024) return 'menu';
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'menu';
     return initialTab || (saved as any) || 'workouts';
   });
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -798,7 +800,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
               <div key={user.id} className="bg-black/20 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-gold/50 transition-all group relative flex flex-col h-full krome-outline">
                 <div className="h-48 relative overflow-hidden">
                   <img 
-                    src={`https://picsum.photos/seed/${user.username}-athlete/800/600`} 
+                    src={user.avatar_url || getAthleteImage(user.username)} 
                     alt={user.username} 
                     className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
                     referrerPolicy="no-referrer"
@@ -1564,7 +1566,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                                 <div className="font-bold text-sm">{log.name}</div>
                                 <div className="text-[10px] text-white/40 uppercase tracking-wider">{log.meal} • {log.servings}x</div>
                               </div>
-                              <div className="text-xs font-mono text-gold">{Math.round(log.serving.calories * log.servings)} kcal</div>
+                              <div className="text-xs font-mono text-gold">{Math.round((log.serving?.calories || 0) * (log.servings || 0))} kcal</div>
                             </div>
                           ))
                         )}
@@ -1575,7 +1577,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       <button 
                         onClick={() => {
                           if (selectedUser && onNavigate) {
-                            onNavigate('performanceMacroNutrients', selectedUser.id.toString());
+                            onNavigate('performanceMacroNutrients', selectedUser.id?.toString());
                           } else {
                             setIsEditingNutrition(!isEditingNutrition);
                           }

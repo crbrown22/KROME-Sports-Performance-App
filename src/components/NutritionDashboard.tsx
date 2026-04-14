@@ -163,7 +163,7 @@ export default function NutritionDashboard({ user, onBack, onLogout, isOwnProfil
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="bg-black/90 border border-krome/40 rounded-[40px] p-8 backdrop-blur-xl relative overflow-hidden"
+                className="bg-zinc-900/40 border border-krome/20 rounded-[40px] p-4 md:p-8 backdrop-blur-xl relative overflow-hidden"
               >
                 <img 
                   src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=2000&auto=format&fit=crop" 

@@ -52,7 +52,7 @@ export default function PurchaseCRM() {
                 <td className="p-4">{p.username || 'N/A'}</td>
                 <td className="p-4">{p.email || 'N/A'}</td>
                 <td className="p-4">{p.itemName}</td>
-                <td className="p-4">${p.price.toFixed(2)}</td>
+                <td className="p-4">${(p.price || 0).toFixed(2)}</td>
                 <td className="p-4">{new Date(p.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}

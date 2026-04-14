@@ -108,7 +108,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
         safeStorage.setItem(`krome_admin_messages_${selectedUser.id}`, JSON.stringify(formattedMessages));
 
         // Mark as read
-        const unread = data.filter((m: any) => m.sender_id.toString() === selectedUser.id && !m.is_read);
+        const unread = data.filter((m: any) => m.sender_id?.toString() === selectedUser.id?.toString() && !m.is_read);
         for (const msg of unread) {
           await fetch(`/api/messages/${msg.id}/read`, { method: 'PATCH' });
         }
@@ -271,7 +271,7 @@ export default function AdminMessageDashboard({ adminId }: { adminId: string }) 
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  user.username[0].toUpperCase()
+                  user.username ? user.username[0].toUpperCase() : 'U'
                 )}
                 {unreadUserIds.has(user.id) && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4">

@@ -19,7 +19,8 @@ export default function AccountSettings({ user, onUpdate, onDelete, onBack, onLo
     ...user,
     firstName: user.firstName || user.first_name || "",
     lastName: user.lastName || user.last_name || "",
-    username: user.username || ""
+    username: user.username || "",
+    avatar_url: user.avatar_url || user.avatarUrl || ""
   });
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");

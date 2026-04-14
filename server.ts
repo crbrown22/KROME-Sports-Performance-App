@@ -1133,7 +1133,8 @@ app.post('/api/webhook', async (req, res) => {
           email: data.email,
           role: (data.role === 'admin' || data.role === 'coach') ? data.role : 'athlete',
           status: 'active', // Default status
-          avatarUrl: data.avatarUrl
+          avatarUrl: data.avatarUrl || data.avatar_url,
+          avatar_url: data.avatarUrl || data.avatar_url
         };
       });
       res.json(users);
@@ -1331,10 +1332,11 @@ app.post('/api/webhook', async (req, res) => {
 
   // Auth: Register
   app.post("/api/auth/register", async (req, res) => {
-    const { username, email, firstName, lastName, first_name, last_name, role, uid } = req.body;
+    const { username, email, firstName, lastName, first_name, last_name, role, uid, avatarUrl, avatar_url } = req.body;
     try {
       const finalFirstName = firstName || first_name || "";
       const finalLastName = lastName || last_name || "";
+      const finalAvatarUrl = avatarUrl || avatar_url || null;
       
       // 1. Create user document in Firestore
       const userData = {
@@ -1344,6 +1346,7 @@ app.post('/api/webhook', async (req, res) => {
         lastName: finalLastName,
         username: username || email.split('@')[0],
         role: (email === 'swolecode@gmail.com' || email === 'kromefitness@gmail.com') ? 'admin' : (role === 'coach' ? 'coach' : (role === 'user' ? 'athlete' : (role || 'athlete'))),
+        avatarUrl: finalAvatarUrl,
         createdAt: new Date().toISOString()
       };
       await adminDb.collection('users').doc(uid).set(userData);
@@ -1351,13 +1354,14 @@ app.post('/api/webhook', async (req, res) => {
       // 2. Sync with SQLite
       try {
         const insert = db.prepare(`
-          INSERT INTO users (username, email, first_name, last_name, role, uid) 
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO users (username, email, first_name, last_name, role, uid, avatar_url) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(email) DO UPDATE SET 
             username=excluded.username,
             first_name=excluded.first_name,
             last_name=excluded.last_name,
-            uid=excluded.uid
+            uid=excluded.uid,
+            avatar_url=excluded.avatar_url
         `);
         const result = insert.run(
           userData.username,
@@ -1365,7 +1369,8 @@ app.post('/api/webhook', async (req, res) => {
           userData.firstName,
           userData.lastName,
           userData.role,
-          uid
+          uid,
+          finalAvatarUrl
         );
         
         // 3. Send Welcome Email to Athlete
@@ -1473,7 +1478,9 @@ app.post('/api/webhook', async (req, res) => {
           first_name: data?.firstName || data?.first_name,
           last_name: data?.lastName || data?.last_name,
           firstName: data?.firstName || data?.first_name,
-          lastName: data?.lastName || data?.last_name
+          lastName: data?.lastName || data?.last_name,
+          avatar_url: data?.avatarUrl || data?.avatar_url,
+          avatarUrl: data?.avatarUrl || data?.avatar_url
         });
       }
 
