@@ -1389,6 +1389,8 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                       src={getProgramImage(program.name, program.sport)} 
                       alt={program.name} 
                       className="w-full h-full object-cover opacity-100 group-hover:scale-110 transition-all duration-700"
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                     
@@ -1490,10 +1492,11 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
       <div className="space-y-8">
         <header className="flex flex-col bg-zinc-900/50 p-6 lg:p-8 rounded-[40px] border border-white/5 overflow-hidden relative">
           <img 
-            src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2000&auto=format&fit=crop" 
+            src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=2000&q=80" 
             alt="Program Overview" 
             className="absolute inset-0 w-full h-full object-cover opacity-10"
             referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
           />
           <div className="relative z-10">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">

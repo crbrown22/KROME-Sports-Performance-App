@@ -291,6 +291,8 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
                       src={getProgramImage(program.name, program.sport)} 
                       alt={program.name} 
                       className="w-full h-full object-cover opacity-100 group-hover:scale-110 transition-all duration-700"
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                     

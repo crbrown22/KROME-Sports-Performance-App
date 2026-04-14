@@ -850,10 +850,21 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                   {filteredFoods.map((food) => (
                     <motion.div 
                       key={food.id}
-                      layoutId={food.id}
                       className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden flex items-center gap-3 sm:gap-4 hover:border-gold/30 transition-all group p-1"
                     >
-                      <img src={getFoodImage(food.category, food.name)} alt={food.name} className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                      <img 
+                        src={getFoodImage(food.category, food.name)} 
+                        alt={food.name} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl" 
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (!target.src.includes('photo-1546069901-ba9599a7e63c')) {
+                            target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80';
+                          }
+                        }}
+                      />
                       <div className="flex-1 py-1 sm:py-2">
                         <div className="font-bold text-sm sm:text-base text-white group-hover:text-gold transition-colors line-clamp-1">{food.name}</div>
                         <div className="text-[9px] sm:text-[10px] text-white/50 uppercase tracking-widest font-bold mt-0.5 sm:mt-1">{food.serving.size} • {food.serving.calories} kcal</div>

@@ -19,38 +19,38 @@ export const getProgramImage = (programName: string, sport?: string) => {
 
   if (isBaseball) {
     if (seed.includes('52-week') || seed.includes('52 week')) {
-      return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop'; // Elite training
+      return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=800&q=80'; // Elite training
     }
     if (seed.includes('summer')) {
-      return 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=800&auto=format&fit=crop'; // Elite training
+      return 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=800&q=80'; // Elite training
     }
     if (seed.includes('winter')) {
-      return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop'; // Elite training
+      return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80'; // Elite training
     }
   }
 
   if (isSoftball) {
     if (seed.includes('52-week') || seed.includes('52 week')) {
-      return 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=800&auto=format&fit=crop'; // Female athlete
+      return 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=800&q=80'; // Female athlete
     }
     if (seed.includes('summer')) {
-      return 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=800&auto=format&fit=crop'; // Female athlete
+      return 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?auto=format&fit=crop&w=800&q=80'; // Female athlete
     }
     if (seed.includes('winter')) {
-      return 'https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop'; // Female athlete
+      return 'https://images.unsplash.com/photo-1594381898411-846e7d193883?auto=format&fit=crop&w=800&q=80'; // Female athlete
     }
   }
   
   if (seed.includes('strength') && seed.includes('power')) {
-    return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop'; // Elite training
+    return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80'; // Elite training
   }
 
   if (seed.includes('speed') || seed.includes('agility')) {
-    return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop'; // Elite training
+    return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=800&q=80'; // Elite training
   }
 
   if (seed.includes('aerobic') && seed.includes('capacity')) {
-    return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop'; // Running
+    return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=80'; // Running
   }
 
   // Prioritize sport parameter, then check name
@@ -75,22 +75,22 @@ export const getProgramImage = (programName: string, sport?: string) => {
   }
 
   if (sportLower.includes('soccer') || seed.includes('soccer')) {
-    return `https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80`;
   }
   if (sportLower.includes('basketball') || seed.includes('basketball')) {
-    return `https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80`;
   }
   if (sportLower.includes('football') || seed.includes('football')) {
-    return `https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80`;
   }
   if (seed.includes('rehab') || seed.includes('recovery')) {
-    return `https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80`;
   }
   if (seed.includes('strength') || seed.includes('lift') || seed.includes('power')) {
-    return `https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80`;
   }
   if (seed.includes('speed') || seed.includes('agility') || seed.includes('track')) {
-    return `https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=800&auto=format&fit=crop`;
+    return `https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=800&q=80`;
   }
   
   // Default athlete/workout images

@@ -544,10 +544,11 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
             }}
           >
             <img 
-              src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop" 
+              src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=800&q=80" 
               alt="Strength Training" 
               className="absolute inset-0 w-full h-full object-cover opacity-20"
               referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
             />
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#b2d8d8]/10 blur-3xl -mr-32 -mt-32 group-hover:bg-[#b2d8d8]/20 transition-all duration-500" />
             
@@ -748,10 +749,11 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
       {/* Weekly Summary */}
       <div className="bg-black/90 border border-krome/40 rounded-[40px] p-8 backdrop-blur-xl relative overflow-hidden">
         <img 
-          src="https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=800&auto=format&fit=crop" 
+          src="https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80" 
           alt="Weekly Progress" 
           className="absolute inset-0 w-full h-full object-cover opacity-10"
           referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
         />
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-8">
@@ -838,6 +840,7 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
                 alt={item.label} 
                 className="absolute inset-0 w-full h-full object-cover opacity-10"
                 referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
               />
               <div className="flex items-center gap-4 relative z-10">
                 <div className="p-3 rounded-2xl bg-white/5 text-krome group-hover:text-gold transition-colors">
