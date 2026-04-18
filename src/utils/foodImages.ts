@@ -51,7 +51,9 @@ export const getFoodImage = (category: string, name: string): string => {
   };
 
   // Try to find a match by checking if the specific mapping key is contained in the name
-  const match = Object.keys(specificMappings).find(key => lowerName.includes(key));
+  const match = Object.keys(specificMappings).find(key => 
+    lowerName.includes(key) || key.includes(lowerName)
+  );
   
   if (match) {
     return `https://images.unsplash.com/${specificMappings[match]}?auto=format&fit=crop&w=400&q=80`;
@@ -62,8 +64,9 @@ export const getFoodImage = (category: string, name: string): string => {
     .split(',')[0]
     .split('(')[0]
     .split('/')[0]
+    .replace('avg ', '')
     .trim()
     .replace(/\s+/g, ',');
     
-  return `https://loremflickr.com/400/400/food,${keyword}?lock=${lowerName.length}`;
+  return `https://loremflickr.com/400/400/food,${keyword}?lock=${Math.abs(lowerName.split('').reduce((a,b)=>(((a<<5)-a)+b.charCodeAt(0))|0,0))}`;
 };

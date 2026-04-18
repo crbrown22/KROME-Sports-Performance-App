@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from "motion/react";
 import { safeStorage } from '../utils/storage';
 import { ALL_PROGRAMS } from '../data/workoutTemplates';
 import { calculateWorkoutProgress, getWorkoutExercises } from '../lib/workoutUtils';
@@ -720,12 +720,16 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
                 <Award className="w-5 h-5 text-gold" />
                 Active Programs
               </h3>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {activeProgramsProgress.map((prog, i) => (
-                  <div key={i} className="space-y-2">
+                  <button 
+                    key={i} 
+                    onClick={() => onProgramSelect?.(prog.id)}
+                    className="w-full text-left space-y-2 group p-4 -mx-4 rounded-[32px] hover:bg-white/5 transition-all krome-outline"
+                  >
                     <div className="flex justify-between items-end">
                       <div>
-                        <p className="text-xs font-black uppercase italic text-white">{prog.name}</p>
+                        <p className="text-xs font-black uppercase italic text-white group-hover:text-gold transition-colors">{prog.name}</p>
                         <p className="text-[8px] font-bold uppercase tracking-widest text-white/40">{prog.sport || 'General'}</p>
                       </div>
                       <span className="text-xs font-black text-gold italic">{prog.overallProgress}%</span>
@@ -738,7 +742,7 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
                         className="h-full bg-gold"
                       />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { getCurrentDate } from '../utils/date';
 import { getAthleteImage } from '../utils/imageUtils';
 import { 
@@ -16,6 +16,8 @@ import {
   Shield, 
   Edit3,
   ChevronLeft, 
+  ChevronRight,
+  ChevronDown,
   Search,
   UserPlus,
   MoreVertical,
@@ -25,7 +27,6 @@ import {
   X,
   TrendingUp,
   Apple,
-  ChevronRight,
   Calendar,
   Flame,
   Beef,
@@ -103,18 +104,33 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     return safeStorage.getItem('krome_admin_search_term') || "";
   });
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(() => {
+    if (typeof window === 'undefined') return null;
     try {
+      // If we are coming from a specific link that sets initialTab to 'progress',
+      // we might want a fresh start.
+      if (initialTab === 'progress' && !safeStorage.getItem('krome_admin_selected_user')) {
+        return null;
+      }
+      
       const saved = safeStorage.getItem('krome_admin_selected_user');
-      return saved ? JSON.parse(saved) : null;
+      if (!saved || saved === 'undefined' || saved === 'null') return null;
+      const parsed = JSON.parse(saved);
+      if (!parsed || !parsed.id) return null;
+      return parsed;
     } catch (e) {
       console.error("Failed to parse saved admin user", e);
       return null;
     }
   });
   const [activeTab, setActiveTab] = useState<'menu' | 'progress' | 'metrics' | 'parq' | 'nutrition' | 'workouts' | 'composition' | 'overview' | 'activity' | 'programs' | 'builder' | 'library' | 'video' | 'settings' | 'ai-tools' | 'chat' | 'feedback' | 'brand' | 'system' | 'assign-program' | 'assign-workout'>(() => {
-    const saved = safeStorage.getItem('krome_admin_active_tab');
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'menu';
-    return initialTab || (saved as any) || 'workouts';
+    try {
+      const saved = safeStorage.getItem('krome_admin_active_tab');
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'menu';
+      // Prioritize initialTab if provided, then saved, then default
+      return (initialTab as any) || (saved as any) || 'overview';
+    } catch (e) {
+      return 'overview';
+    }
   });
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
@@ -139,13 +155,14 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
   }, [topLevelTab]);
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-      if (initialTab === 'chat') {
-        setTopLevelTab('chat');
-      } else if (initialTab === 'feedback') {
-        setTopLevelTab('feedback');
+    if (initialTab && initialTab !== activeTab) {
+      // If navigating to a global view, potentially clear selectedUser 
+      // but only if explicitly requested or if it's one of the top-level-only tabs
+      if (['chat', 'feedback', 'brand', 'system', 'sales', 'purchases'].includes(initialTab)) {
+        setSelectedUser(null); 
+        setTopLevelTab(initialTab as any);
       }
+      setActiveTab(initialTab);
     }
   }, [initialTab]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
@@ -167,6 +184,87 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
         return sortOrder === 'asc' ? a.action.localeCompare(b.action) : b.action.localeCompare(a.action);
       }
     });
+
+  const renderSystemSettings = (isAdminModal: boolean) => (
+    <div className="space-y-8">
+      <div className="bg-zinc-900/50 border border-white/10 rounded-[40px] p-6 lg:p-10 backdrop-blur-xl shadow-2xl">
+        <h2 className="text-2xl lg:text-3xl font-black uppercase italic mb-2 flex items-center gap-3">
+          <Settings className="w-6 h-6 lg:w-8 lg:h-8 text-gold" />
+          System <span className="text-gold">Settings</span>
+        </h2>
+        <p className="text-white/40 mb-10 text-xs lg:text-sm">Manage system-wide configurations and test integrations.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 lg:p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+              <Bell className="w-5 h-5 lg:w-6 lg:h-6" />
+            </div>
+            <h3 className="text-base lg:text-lg font-bold uppercase italic mb-2">Email Integration</h3>
+            <p className="text-[10px] lg:text-xs text-white/40 mb-6 leading-relaxed">Verify that your SMTP settings are correctly configured by sending a test email to kromefitness@gmail.com.</p>
+            <button 
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/admin/test-smtp', { method: 'POST' });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(data.message);
+                  } else {
+                    alert("Error: " + data.error);
+                  }
+                } catch (err) {
+                  alert("Network error testing SMTP");
+                }
+              }}
+              className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+            >
+              Test SMTP Settings
+            </button>
+          </div>
+
+          <div className="p-6 lg:p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
+              <UserPlus className="w-5 h-5 lg:w-6 lg:h-6" />
+            </div>
+            <h3 className="text-base lg:text-lg font-bold uppercase italic mb-2">Registration Test</h3>
+            <p className="text-[10px] lg:text-xs text-white/40 mb-6 leading-relaxed">Simulate a new athlete registration to verify that both welcome and admin notification emails are sent.</p>
+            <button 
+              onClick={async () => {
+                const testEmail = prompt("Enter a test email address to receive the welcome email:", "test-athlete@example.com");
+                if (!testEmail) return;
+                
+                try {
+                  const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      username: 'test_athlete_' + Date.now(),
+                      email: testEmail,
+                      password: 'testpassword123',
+                      firstName: 'Test',
+                      lastName: 'Athlete',
+                      role: 'athlete',
+                      uid: 'test-uid-' + Date.now()
+                    })
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert("Test registration successful! Check " + testEmail + " for the welcome email and kromefitness@gmail.com for the admin notification.");
+                  } else {
+                    alert("Error: " + data.error);
+                  }
+                } catch (err) {
+                  alert("Network error testing registration");
+                }
+              }}
+              className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+            >
+              Run Registration Test
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   const [isEditingNutrition, setIsEditingNutrition] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const saved = safeStorage.getItem('krome_admin_selected_date');
@@ -258,7 +356,13 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
       if (!selectedUser) return;
       
       const cached = safeStorage.getItem(`krome_admin_activity_${selectedUser.id}`);
-      if (cached) setActivityLogs(JSON.parse(cached));
+      if (cached) {
+        try {
+          setActivityLogs(JSON.parse(cached));
+        } catch (e) {
+          console.error("Failed to parse cached activity", e);
+        }
+      }
 
       try {
         const response = await fetch(`/api/activity/${selectedUser?.id}`);
@@ -277,7 +381,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     if (selectedUser) {
       loadActivityLogs();
     }
-  }, [selectedUser]);
+  }, [selectedUser?.id]);
 
   const fetchUsers = async () => {
     try {
@@ -331,15 +435,15 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
       }
     };
     fetchAssigned();
-  }, [selectedUser]);
+  }, [selectedUser?.id]);
 
   useEffect(() => {
-    if (selectedUser) {
+    if (selectedUser?.id) {
       safeStorage.setItem('krome_admin_selected_user', JSON.stringify(selectedUser));
     } else {
       safeStorage.removeItem('krome_admin_selected_user');
     }
-  }, [selectedUser]);
+  }, [selectedUser?.id]);
 
   useEffect(() => {
     safeStorage.setItem('krome_admin_active_tab', activeTab);
@@ -358,7 +462,13 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
       if (!selectedUser) return;
       
       const cached = safeStorage.getItem(`krome_admin_nutrition_${selectedUser.id}`);
-      if (cached) setNutritionLogs(JSON.parse(cached));
+      if (cached) {
+        try {
+          setNutritionLogs(JSON.parse(cached));
+        } catch (e) {
+          console.error("Failed to parse cached nutrition", e);
+        }
+      }
 
       try {
         const response = await fetch(`/api/nutrition/${selectedUser?.id}`);
@@ -394,14 +504,20 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     if (selectedUser) {
       loadNutrition();
     }
-  }, [selectedUser]);
+  }, [selectedUser?.id]);
 
   useEffect(() => {
     const loadMetrics = async () => {
       if (!selectedUser) return;
       
       const cached = safeStorage.getItem(`krome_admin_metrics_${selectedUser.id}`);
-      if (cached) setBodyMetricsData(JSON.parse(cached));
+      if (cached) {
+        try {
+          setBodyMetricsData(JSON.parse(cached));
+        } catch (e) {
+          console.error("Failed to parse cached metrics", e);
+        }
+      }
 
       try {
         const res = await fetch(`/api/metrics/${selectedUser?.id}`);
@@ -422,7 +538,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     if (selectedUser) {
       loadMetrics();
     }
-  }, [selectedUser]);
+  }, [selectedUser?.id]);
 
   const getTodayStr = () => {
     const date = new Date();
@@ -674,28 +790,28 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
         </div>
 
         {!selectedUser && (
-          <Tabs value={topLevelTab} onValueChange={(v) => setTopLevelTab(v as any)} className="mb-8">
-            <TabsList className="bg-zinc-900 border border-white/10 p-1 h-auto flex flex-wrap gap-2">
-              <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <Users className="w-4 h-4" /> Athletes
+          <Tabs value={topLevelTab} onValueChange={(v) => setTopLevelTab(v as any)} className="mb-12 w-full relative z-[20]">
+            <TabsList className="bg-zinc-900/80 border border-white/10 p-2 !h-auto grid grid-cols-3 md:flex md:flex-wrap gap-3 w-full md:w-fit mx-auto overflow-visible backdrop-blur-xl rounded-[24px] shadow-2xl">
+              <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <Users className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Athletes</span>
               </TabsTrigger>
-              <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4" /> Purchase CRM
+              <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <ShoppingBag className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Purchase<br/>CRM</span>
               </TabsTrigger>
-              <TabsTrigger value="sales" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <LineChart className="w-4 h-4" /> Sales & Growth
+              <TabsTrigger value="sales" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <LineChart className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Sales &<br/>Growth</span>
               </TabsTrigger>
-              <TabsTrigger value="chat" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" /> Chat
+              <TabsTrigger value="chat" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <MessageSquare className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Chat</span>
               </TabsTrigger>
-              <TabsTrigger value="feedback" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <Star className="w-4 h-4" /> Feedback
+              <TabsTrigger value="feedback" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <Star className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Feedback</span>
               </TabsTrigger>
-              <TabsTrigger value="brand" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <ImageIcon className="w-4 h-4" /> Brand
+              <TabsTrigger value="brand" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <ImageIcon className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Brand</span>
               </TabsTrigger>
-              <TabsTrigger value="system" className="data-[state=active]:bg-gold data-[state=active]:text-black px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2">
-                <Settings className="w-4 h-4" /> System
+              <TabsTrigger value="system" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <Settings className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">System</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -712,84 +828,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
         ) : topLevelTab === 'feedback' && !selectedUser ? (
           <FeedbackViewer />
         ) : topLevelTab === 'system' && !selectedUser ? (
-          <div className="space-y-8">
-            <div className="bg-zinc-900/50 border border-white/10 rounded-[40px] p-10 backdrop-blur-xl shadow-2xl">
-              <h2 className="text-3xl font-black uppercase italic mb-2 flex items-center gap-3">
-                <Settings className="w-8 h-8 text-gold" />
-                System <span className="text-gold">Settings</span>
-              </h2>
-              <p className="text-white/40 mb-10 text-sm">Manage system-wide configurations and test integrations.</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
-                  <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
-                    <Bell className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-bold uppercase italic mb-2">Email Integration</h3>
-                  <p className="text-xs text-white/40 mb-6 leading-relaxed">Verify that your SMTP settings are correctly configured by sending a test email to kromefitness@gmail.com.</p>
-                  <button 
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/admin/test-smtp', { method: 'POST' });
-                        const data = await res.json();
-                        if (res.ok) {
-                          alert(data.message);
-                        } else {
-                          alert("Error: " + data.error);
-                        }
-                      } catch (err) {
-                        alert("Network error testing SMTP");
-                      }
-                    }}
-                    className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Test SMTP Settings
-                  </button>
-                </div>
-
-                <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
-                  <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
-                    <UserPlus className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-bold uppercase italic mb-2">Registration Test</h3>
-                  <p className="text-xs text-white/40 mb-6 leading-relaxed">Simulate a new athlete registration to verify that both welcome and admin notification emails are sent.</p>
-                  <button 
-                    onClick={async () => {
-                      const testEmail = prompt("Enter a test email address to receive the welcome email:", "test-athlete@example.com");
-                      if (!testEmail) return;
-                      
-                      try {
-                        const res = await fetch('/api/auth/register', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            username: 'test_athlete_' + Date.now(),
-                            email: testEmail,
-                            password: 'testpassword123',
-                            firstName: 'Test',
-                            lastName: 'Athlete',
-                            role: 'athlete',
-                            uid: 'test-uid-' + Date.now()
-                          })
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          alert("Test registration successful! Check " + testEmail + " for the welcome email and kromefitness@gmail.com for the admin notification.");
-                        } else {
-                          alert("Error: " + data.error);
-                        }
-                      } catch (err) {
-                        alert("Network error testing registration");
-                      }
-                    }}
-                    className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Run Registration Test
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          renderSystemSettings(false)
         ) : !selectedUser ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 px-6 pb-12">
             {loading ? (
@@ -1452,42 +1491,42 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                 ) : activeTab === 'metrics' ? (
                   <BodyMetrics userId={selectedUser?.id?.toString() || '0'} data={bodyMetricsData} setData={setBodyMetricsData} />
                 ) : activeTab === 'nutrition' ? (
-                  <div className="space-y-8">
-                    <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                        <h3 className="font-bold uppercase italic flex items-center gap-2">
-                          <Apple className="w-4 h-4 text-gold" />
-                          Nutrition Logs
-                        </h3>
+                  <div className="space-y-6 md:space-y-8">
+                    <div className="bg-zinc-900/50 border border-white/10 rounded-[32px] md:rounded-[40px] p-6 md:p-10 backdrop-blur-xl shadow-2xl">
+                      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+                        <div>
+                          <h3 className="text-xl md:text-2xl font-black uppercase italic flex items-center gap-3">
+                            <Apple className="w-6 h-6 text-gold" />
+                            Nutrition <span className="text-gold">Logs</span>
+                          </h3>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Daily dietary intake tracking</p>
+                        </div>
                         
                         {/* Date Selector */}
-                        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-1">
-                          <button onClick={() => changeDate(-1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors krome-outline">
-                            <ChevronLeft className="w-4 h-4" />
+                        <div className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-2xl p-1.5 w-full lg:w-auto justify-between lg:justify-start">
+                          <button onClick={() => changeDate(-1)} className="p-2.5 hover:bg-white/5 rounded-xl transition-colors krome-outline text-white/60 hover:text-white">
+                            <ChevronLeft className="w-5 h-5" />
                           </button>
-                          <div className="flex items-center gap-2 px-2">
+                          <div className="flex items-center gap-3 px-2">
                             <Calendar className="w-4 h-4 text-gold" />
-                            <span className="font-bold uppercase tracking-widest text-[10px]">
+                            <span className="font-black uppercase tracking-widest text-[11px] md:text-xs text-white">
                               {displayDate()}
                             </span>
                           </div>
-                          <button onClick={() => changeDate(1)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                            <ChevronRight className="w-4 h-4" />
+                          <button onClick={() => changeDate(1)} className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-white/60 hover:text-white">
+                            <ChevronRight className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
                         {/* Calories */}
-                        <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.calories, targets.calories)}`}>
-                          <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <Flame className="w-16 h-16" />
-                          </div>
+                        <div className={`rounded-3xl p-5 md:p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.calories, targets.calories)}`}>
                           <div className="relative z-10">
-                            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Calories</div>
-                            <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.calories)}</div>
-                            <div className="text-[10px] text-white/40 mb-3">/ {targets.calories} kcal</div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Calories</div>
+                            <div className="text-xl md:text-2xl font-black italic mb-0.5">{Math.round(nutritionTotals.calories)}</div>
+                            <div className="text-[9px] text-white/30 mb-4 font-mono">/ {targets.calories}</div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                               <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${Math.min((nutritionTotals.calories / targets.calories) * 100, 100)}%` }}
@@ -1498,15 +1537,12 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         </div>
 
                         {/* Protein */}
-                        <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.protein, targets.protein)}`}>
-                          <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <Beef className="w-16 h-16" />
-                          </div>
+                        <div className={`rounded-3xl p-5 md:p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.protein, targets.protein)}`}>
                           <div className="relative z-10">
-                            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Protein</div>
-                            <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.protein)}g</div>
-                            <div className="text-[10px] text-white/40 mb-3">/ {targets.protein}g</div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Protein</div>
+                            <div className="text-xl md:text-2xl font-black italic mb-0.5">{Math.round(nutritionTotals.protein)}g</div>
+                            <div className="text-[9px] text-white/30 mb-4 font-mono">/ {targets.protein}g</div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                               <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${Math.min((nutritionTotals.protein / targets.protein) * 100, 100)}%` }}
@@ -1517,15 +1553,12 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         </div>
 
                         {/* Carbs */}
-                        <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.carbs, targets.carbs)}`}>
-                          <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <Wheat className="w-16 h-16" />
-                          </div>
+                        <div className={`rounded-3xl p-5 md:p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.carbs, targets.carbs)}`}>
                           <div className="relative z-10">
-                            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Carbs</div>
-                            <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.carbs)}g</div>
-                            <div className="text-[10px] text-white/40 mb-3">/ {targets.carbs}g</div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Carbs</div>
+                            <div className="text-xl md:text-2xl font-black italic mb-0.5">{Math.round(nutritionTotals.carbs)}g</div>
+                            <div className="text-[9px] text-white/30 mb-4 font-mono">/ {targets.carbs}g</div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                               <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${Math.min((nutritionTotals.carbs / targets.carbs) * 100, 100)}%` }}
@@ -1536,15 +1569,12 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         </div>
 
                         {/* Fat */}
-                        <div className={`rounded-3xl p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.fat, targets.fat)}`}>
-                          <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <Droplets className="w-16 h-16" />
-                          </div>
+                        <div className={`rounded-3xl p-5 md:p-6 relative overflow-hidden transition-colors border ${getCardColor(nutritionTotals.fat, targets.fat)}`}>
                           <div className="relative z-10">
-                            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Fat</div>
-                            <div className="text-2xl font-black italic mb-1">{Math.round(nutritionTotals.fat)}g</div>
-                            <div className="text-[10px] text-white/40 mb-3">/ {targets.fat}g</div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Fat</div>
+                            <div className="text-xl md:text-2xl font-black italic mb-0.5">{Math.round(nutritionTotals.fat)}g</div>
+                            <div className="text-[9px] text-white/30 mb-4 font-mono">/ {targets.fat}g</div>
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                               <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${Math.min((nutritionTotals.fat / targets.fat) * 100, 100)}%` }}
@@ -1555,25 +1585,43 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         </div>
                       </div>
 
-                      <h4 className="text-xs font-black uppercase tracking-widest text-white/40 mb-4">Meals for {displayDate()}</h4>
-                      <div className="space-y-2">
+                      <div className="flex items-center justify-between mb-6">
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Meal History</h4>
+                        <div className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-bold text-white/40 uppercase tracking-widest border border-white/5">
+                          {selectedDateLogs.length} Items
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
                         {selectedDateLogs.length === 0 ? (
-                          <p className="text-center text-white/20 py-8 text-xs font-bold uppercase tracking-widest">No meals logged for this date</p>
+                          <div className="p-12 text-center bg-black/20 rounded-3xl border border-dashed border-white/5">
+                            <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">No physical intake recorded</p>
+                          </div>
                         ) : (
-                          selectedDateLogs.map((log) => (
-                            <div key={log.logId} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
-                              <div>
-                                <div className="font-bold text-sm">{log.name}</div>
-                                <div className="text-[10px] text-white/40 uppercase tracking-wider">{log.meal} • {log.servings}x</div>
+                          <div className="grid grid-cols-1 gap-2">
+                            {selectedDateLogs.map((log) => (
+                              <div key={log.logId} className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-gold/30 transition-all group gap-4 min-w-0">
+                                <div className="flex items-center gap-4 min-w-0">
+                                  <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center text-xs font-black italic group-hover:scale-110 transition-transform shrink-0">
+                                    {log.name[0].toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-sm text-white group-hover:text-gold transition-colors truncate">{log.name}</div>
+                                    <div className="text-[10px] text-white/30 uppercase tracking-[0.1em] font-medium truncate">{log.meal} • {log.servings} serving{log.servings > 1 ? 's' : ''}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-sm font-black italic text-white leading-none mb-1">{Math.round((log.serving?.calories || 0) * (log.servings || 0))}</div>
+                                  <div className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Kcal</div>
+                                </div>
                               </div>
-                              <div className="text-xs font-mono text-gold">{Math.round((log.serving?.calories || 0) * (log.servings || 0))} kcal</div>
-                            </div>
-                          ))
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3">
                       <button 
                         onClick={() => {
                           if (selectedUser && onNavigate) {
@@ -1582,7 +1630,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                             setIsEditingNutrition(!isEditingNutrition);
                           }
                         }}
-                        className="btn-gold px-6 py-2 text-xs flex items-center gap-2"
+                        className="bg-gold hover:bg-gold/90 text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] shadow-xl shadow-gold/20"
                       >
                         <Apple className="w-4 h-4" /> Edit Nutrition Plan
                       </button>
@@ -1597,56 +1645,89 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                     />
                   </div>
                 ) : activeTab === 'activity' ? (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <select 
-                        value={activityFilter} 
-                        onChange={(e) => setActivityFilter(e.target.value)}
-                        className="flex-1 bg-zinc-900 border border-white/10 rounded-xl p-3 text-xs text-white"
-                      >
-                        <option value="all">All Activities</option>
-                        <option value="login">Login</option>
-                        <option value="logout">Logout</option>
-                        <option value="workout_started">Workout Started</option>
-                        <option value="workout_completed">Workout Completed</option>
-                      </select>
-                      <select 
-                        value={sortBy} 
-                        onChange={(e) => setSortBy(e.target.value as 'date' | 'action')}
-                        className="w-24 bg-zinc-900 border border-white/10 rounded-xl p-3 text-xs text-white"
-                      >
-                        <option value="date">Date</option>
-                        <option value="action">Action</option>
-                      </select>
-                      <button 
-                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        className="w-10 bg-zinc-900 border border-white/10 rounded-xl p-3 text-xs text-white flex items-center justify-center krome-outline"
-                      >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                    {filteredAndSortedLogs.map((log) => (
-                      <div key={log.id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex justify-between items-center">
-                        <div>
-                          <div className="font-bold text-sm uppercase">{log.action.replace(/_/g, ' ')}</div>
-                          <div className="text-xs text-white/40">
-                            {(() => {
-                              try {
-                                return log.details ? JSON.stringify(JSON.parse(log.details)) : '';
-                              } catch (e) {
-                                return log.details || '';
-                              }
-                            })()}
-                          </div>
-                        </div>
-                        <div className="text-xs font-mono text-white/40">{new Date(log.created_at).toLocaleString()}</div>
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-3 bg-zinc-900/50 p-4 rounded-3xl border border-white/5">
+                      <div className="flex-1 relative">
+                        <select 
+                          value={activityFilter} 
+                          onChange={(e) => setActivityFilter(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-white appearance-none focus:border-gold transition-all"
+                        >
+                          <option value="all">All Activities</option>
+                          <option value="login">Login</option>
+                          <option value="logout">Logout</option>
+                          <option value="workout_started">Workout Started</option>
+                          <option value="workout_completed">Workout Completed</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gold pointer-events-none" />
                       </div>
-                    ))}
+                      <div className="flex gap-3">
+                        <div className="relative">
+                          <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value as 'date' | 'action')}
+                            className="bg-black/40 border border-white/10 rounded-2xl py-3 px-6 text-xs font-bold text-white appearance-none focus:border-gold transition-all pr-10"
+                          >
+                            <option value="date">Date</option>
+                            <option value="action">Action</option>
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gold pointer-events-none" />
+                        </div>
+                        <button 
+                          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                          className="w-12 bg-black/40 border border-white/10 rounded-2xl flex items-center justify-center text-gold hover:bg-gold hover:text-black transition-all krome-outline"
+                        >
+                          <TrendingUp className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {filteredAndSortedLogs.length === 0 ? (
+                        <div className="p-20 text-center bg-black/20 rounded-[40px] border border-dashed border-white/10">
+                          <Activity className="w-12 h-12 text-white/5 mx-auto mb-4" />
+                          <p className="text-white/20 text-xs font-black uppercase tracking-widest">No activity data found</p>
+                        </div>
+                      ) : (
+                        filteredAndSortedLogs.map((log) => (
+                          <div key={log.id} className="p-5 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                                <Activity className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="font-black text-xs uppercase italic text-white tracking-tight">{log.action.replace(/_/g, ' ')}</div>
+                                <div className="text-[10px] text-white/30 font-bold max-w-md line-clamp-2">
+                                  {(() => {
+                                    try {
+                                      let details = null;
+                                      try {
+                                        details = log.details ? JSON.parse(log.details) : null;
+                                      } catch (e) {
+                                        console.error("Failed to parse log details", e);
+                                      }
+                                      if (!details) return 'System Log';
+                                      return typeof details === 'object' ? Object.entries(details).map(([k,v]) => `${k}: ${v}`).join(' | ') : details;
+                                    } catch (e) {
+                                      return log.details || 'System Log';
+                                    }
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-[10px] font-mono text-white/20 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
+                              {new Date(log.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                ) : activeTab === 'programs' ? (
+                ) : (activeTab === 'programs' && selectedUser) ? (
                   <div className="space-y-8">
                     <ProgramViewer 
-                      userId={selectedUser?.id?.toString() || '0'} 
+                      key={`viewer-${selectedUser.id}`}
+                      userId={selectedUser.id.toString()} 
                       onBack={() => setActiveTab('overview')} 
                       isAdmin={true} 
                       onEdit={(program, isCustom) => {
@@ -1681,9 +1762,9 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       }}
                     />
                   </div>
-                ) : (activeTab === 'builder' || activeTab === 'library') ? (
+                ) : ((activeTab === 'builder' || activeTab === 'library') && (selectedUser || isGlobalTemplate)) ? (
                   <motion.div
-                    key="builder"
+                    key={`builder-${selectedUser?.id || 'global'}`}
                     className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto pt-20 p-4 md:p-8"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -1697,6 +1778,33 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       isCustom={isCustomProgram}
                       isGlobalTemplate={isGlobalTemplate}
                       initialView={activeTab === 'library' ? 'library' : 'builder'}
+                      onBack={() => {
+                        setSelectedProgram(undefined);
+                        setIsCustomProgram(false);
+                        setIsGlobalTemplate(false);
+                        if (selectedUser) {
+                          setActiveTab('menu');
+                        } else {
+                          setActiveTab('overview');
+                        }
+                      }}
+                      breadcrumbs={[
+                        { 
+                          label: 'Dashboard', 
+                          onClick: () => {
+                            setSelectedUser(null);
+                            setActiveTab('overview');
+                          }
+                        },
+                        ...(selectedUser ? [{
+                          label: selectedUser.username,
+                          onClick: () => setActiveTab('menu')
+                        }] : []),
+                        {
+                          label: activeTab === 'library' ? 'Exercise Library' : 'Program Builder',
+                          active: true
+                        }
+                      ]}
                       onSave={() => {
                         if (selectedUser) {
                           fetch('/api/activity', {
@@ -1714,12 +1822,6 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         setIsCustomProgram(false);
                         setIsGlobalTemplate(false);
                         setActiveTab('programs');
-                      }}
-                      onBack={() => {
-                        setSelectedProgram(undefined);
-                        setIsCustomProgram(false);
-                        setIsGlobalTemplate(false);
-                        setActiveTab(selectedUser ? 'programs' : 'menu');
                       }}
                     />
                   </motion.div>
@@ -1744,84 +1846,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                 ) : activeTab === 'feedback' ? (
                   <FeedbackViewer />
                 ) : activeTab === 'system' ? (
-                  <div className="space-y-8">
-                    <div className="bg-zinc-900/50 border border-white/10 rounded-[40px] p-10 backdrop-blur-xl shadow-2xl">
-                      <h2 className="text-3xl font-black uppercase italic mb-2 flex items-center gap-3">
-                        <Settings className="w-8 h-8 text-gold" />
-                        System <span className="text-gold">Settings</span>
-                      </h2>
-                      <p className="text-white/40 mb-10 text-sm">Manage system-wide configurations and test integrations.</p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
-                          <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
-                            <Bell className="w-6 h-6" />
-                          </div>
-                          <h3 className="text-lg font-bold uppercase italic mb-2">Email Integration</h3>
-                          <p className="text-xs text-white/40 mb-6 leading-relaxed">Verify that your SMTP settings are correctly configured by sending a test email to kromefitness@gmail.com.</p>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                const res = await fetch('/api/admin/test-smtp', { method: 'POST' });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  alert(data.message);
-                                } else {
-                                  alert("Error: " + data.error);
-                                }
-                              } catch (err) {
-                                alert("Network error testing SMTP");
-                              }
-                            }}
-                            className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                          >
-                            Test SMTP Settings
-                          </button>
-                        </div>
-
-                        <div className="p-8 bg-black/40 rounded-3xl border border-white/5 hover:border-gold/20 transition-all group">
-                          <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
-                            <UserPlus className="w-6 h-6" />
-                          </div>
-                          <h3 className="text-lg font-bold uppercase italic mb-2">Registration Test</h3>
-                          <p className="text-xs text-white/40 mb-6 leading-relaxed">Simulate a new athlete registration to verify that both welcome and admin notification emails are sent.</p>
-                          <button 
-                            onClick={async () => {
-                              const testEmail = prompt("Enter a test email address to receive the welcome email:", "test-athlete@example.com");
-                              if (!testEmail) return;
-                              
-                              try {
-                                const res = await fetch('/api/auth/register', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    username: 'test_athlete_' + Date.now(),
-                                    email: testEmail,
-                                    password: 'testpassword123',
-                                    firstName: 'Test',
-                                    lastName: 'Athlete',
-                                    role: 'athlete',
-                                    uid: 'test-uid-' + Date.now()
-                                  })
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  alert("Test registration successful! Check " + testEmail + " for the welcome email and kromefitness@gmail.com for the admin notification.");
-                                } else {
-                                  alert("Error: " + data.error);
-                                }
-                              } catch (err) {
-                                alert("Network error testing registration");
-                              }
-                            }}
-                            className="w-full py-3 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                          >
-                            Run Registration Test
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  renderSystemSettings(true)
                 ) : (
                   <PARQ userId={selectedUser?.id?.toString() || '0'} initialReadOnly={false} />
                 )}

@@ -855,9 +855,9 @@ export default function PerformanceMacroNutrients({ userId = 'guest', onBack, is
                       <img 
                         src={getFoodImage(food.category, food.name)} 
                         alt={food.name} 
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl" 
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl bg-zinc-800" 
                         referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
+                        loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (!target.src.includes('photo-1546069901-ba9599a7e63c')) {

@@ -51,22 +51,24 @@ interface BodyMetricsProps {
 const SectionHeader = ({ title, icon: Icon, id, expandedSection, toggleSection }: { title: string, icon: any, id: string, expandedSection: string | null, toggleSection: (id: string) => void }) => (
   <button 
     onClick={() => toggleSection(id)}
-    className={`w-full flex items-center justify-between p-6 md:p-8 transition-all border-b border-white/5 ${expandedSection === id ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
+    className={`w-full flex items-center justify-between p-5 md:p-8 transition-all border-b border-white/5 rounded-2xl md:rounded-[32px] mb-2 ${expandedSection === id ? 'bg-zinc-800/40' : 'bg-zinc-900/40 hover:bg-zinc-800/20'}`}
     aria-expanded={expandedSection === id}
     aria-controls={`section-content-${id}`}
     aria-label={`Toggle ${title} section`}
   >
-    <div className="flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${expandedSection === id ? 'bg-gold text-black' : 'bg-gold/10 text-gold'}`}>
-        <Icon className="w-6 h-6" aria-hidden="true" />
+    <div className="flex items-center gap-3 md:gap-4">
+      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all ${expandedSection === id ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'bg-gold/10 text-gold shadow-sm'}`}>
+        <Icon className="w-5 h-5 md:w-6 md:h-6" aria-hidden="true" />
       </div>
       <div className="text-left">
-        <h3 className="text-xl font-black uppercase italic tracking-tight text-[#b2d8d8]">{title}</h3>
-        {expandedSection !== id && <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Click to expand</p>}
+        <h3 className="text-base md:text-xl font-black uppercase italic tracking-tight text-white/90">{title}</h3>
+        <p className={`text-[8px] md:text-[10px] font-bold uppercase tracking-widest transition-colors ${expandedSection === id ? 'text-gold/60' : 'text-white/30'}`}>
+          {expandedSection === id ? 'Active Section' : 'Tap to expand'}
+        </p>
       </div>
     </div>
-    <div className={`w-10 h-10 rounded-full border border-white/10 flex items-center justify-center transition-all ${expandedSection === id ? 'rotate-180 bg-white/10 text-white' : 'text-white/40'}`}>
-      <ChevronDown className="w-5 h-5" aria-hidden="true" />
+    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/10 flex items-center justify-center transition-all ${expandedSection === id ? 'rotate-180 bg-white/10 text-white shadow-inner' : 'text-white/20'}`}>
+      <ChevronDown className="w-4 h-4 md:w-5 md:h-5" aria-hidden="true" />
     </div>
   </button>
 );

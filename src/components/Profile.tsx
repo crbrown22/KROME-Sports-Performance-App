@@ -990,11 +990,10 @@ export default function Profile({
 
                       let totalWorkouts = 0;
                       let firstWorkoutTitle = '';
-
                       if (program.phases) {
-                        for (const phase of program.phases) {
-                          for (const week of phase.weeks || []) {
-                            for (const workout of week.workouts || []) {
+                        program.phases.forEach((phase: any, pIdx: number) => {
+                          (phase.weeks || []).forEach((week: any, wIdx: number) => {
+                            (week.workouts || []).forEach((workout: any) => {
                               totalWorkouts++;
                               if (totalWorkouts === 1) firstWorkoutTitle = workout.title;
                               const exercises = getWorkoutExercises(workout);
@@ -1012,13 +1011,16 @@ export default function Profile({
                                   title: workout.title,
                                   week: week.week,
                                   day: workout.day,
+                                  phaseIdx: pIdx,
+                                  weekIdx: wIdx,
+                                  workoutId: workout.id,
                                   progress: exercises.length > 0 ? Math.round((workoutCompleted / exercises.length) * 100) : 0,
                                   inProgress: workoutCompleted > 0
                                 };
                               }
-                            }
-                          }
-                        }
+                            });
+                          });
+                        });
                       }
 
                       const overallProgress = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
@@ -1027,7 +1029,7 @@ export default function Profile({
                       return (
                         <button 
                           key={program.id}
-                          onClick={() => onProgramSelect?.(program.id)}
+                          onClick={() => onProgramSelect?.(program.id, nextWorkoutInfo?.phaseIdx, nextWorkoutInfo?.weekIdx, nextWorkoutInfo?.workoutId)}
                           className="p-6 bg-black/40 border border-krome/20 rounded-[32px] flex flex-col hover:bg-white/10 hover:border-krome/40 transition-all group text-left backdrop-blur-xl relative overflow-hidden krome-outline"
                         >
                           <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-3xl -mr-12 -mt-12 group-hover:bg-gold/10 transition-all" />

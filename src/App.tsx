@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { InstallPrompt } from "./components/InstallPrompt";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Dumbbell, 
   Zap, 
@@ -140,15 +140,6 @@ export default function App() {
       setProgramBuilderView('builder');
     }
     
-    // Ensure a program is selected if navigating to viewer or calendar
-    if ((view === 'programViewer' || view === 'programCalendar') && !selectedProgram && !selectedProgramId) {
-      const defaultProgram = ALL_PROGRAMS.find(p => p.id === 'soccer-52-week') || ALL_PROGRAMS[0];
-      if (defaultProgram) {
-        setSelectedProgram(defaultProgram);
-        setSelectedProgramId(defaultProgram.id);
-      }
-    }
-
     if (viewStack[viewStack.length - 1] === view && targetUserId === targetId) return;
     if (targetId) setTargetUserId(targetId);
     else setTargetUserId(null);
@@ -193,6 +184,17 @@ export default function App() {
   const [shopCategory, setShopCategory] = useState<'all' | 'programs' | 'apparel'>('all');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Set default program if none selected for specific views, handled in useEffect to avoid stale closure overrides
+  useEffect(() => {
+    if ((currentView === 'programViewer' || currentView === 'programCalendar') && !selectedProgramId) {
+      const defaultProgram = ALL_PROGRAMS.find(p => p.id === 'soccer-52-week') || ALL_PROGRAMS[0];
+      if (defaultProgram) {
+        setSelectedProgramId(defaultProgram.id);
+        setSelectedProgram(defaultProgram);
+      }
+    }
+  }, [currentView, selectedProgramId]);
 
   useEffect(() => {
     const savedUser = safeStorage.getItem('krome_user');
@@ -1550,15 +1552,16 @@ export default function App() {
         )}
 
         {currentView === 'admin' && (user?.role === 'admin' || user?.role === 'coach') && (
-          <AdminDashboard 
-            key="admin"
-            adminId={user?.id || 1}
-            user={user}
-            onBack={goBack}
-            onNavigate={(view, targetId) => navigateTo(view as View, targetId)}
-            initialTab={adminInitialTab}
-            unreadSenderIds={unreadSenderIds}
-          />
+          <ViewWrapper viewKey="admin">
+            <AdminDashboard 
+              adminId={user?.id || 1}
+              user={user}
+              onBack={goBack}
+              onNavigate={(view, targetId) => navigateTo(view as View, targetId)}
+              initialTab={adminInitialTab}
+              unreadSenderIds={unreadSenderIds}
+            />
+          </ViewWrapper>
         )}
 
         {currentView === 'shop' && (

@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { haptics, share } from '../utils/nativeBridge';
 import { safeStorage } from '../utils/storage';
 import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from "motion/react";
 import ProgramCalendar from './ProgramCalendar';
 import { getProgramImage } from '../utils/imageUtils';
 import { 
@@ -85,12 +85,22 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
   const [currentWeekIdx, setCurrentWeekIdx] = useState(initialWeekIdx || 0);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutTemplate | null>(null);
   const [completedExercises, setCompletedExercises] = useState<Record<string, boolean>>(() => {
-    const saved = safeStorage.getItem(`completedExercises_${userId}`);
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = safeStorage.getItem(`completedExercises_${userId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Failed to load completed exercises", e);
+      return {};
+    }
   });
   const [editedExercises, setEditedExercises] = useState<Record<string, any>>(() => {
-    const saved = safeStorage.getItem(`editedExercises_${userId}`);
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = safeStorage.getItem(`editedExercises_${userId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Failed to load edited exercises", e);
+      return {};
+    }
   });
 
   useEffect(() => {

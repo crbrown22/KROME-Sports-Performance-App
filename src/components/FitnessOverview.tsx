@@ -15,43 +15,100 @@ const WorkoutStatistics = ({ userId }: { userId: string }) => {
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
 
   useEffect(() => {
-    // In a real app, fetch statistics from backend
     // Mocking data for now
     setData([
-      { category: 'Strength', volume: 4000, sets: 20, reps: 100, duration: 45 },
-      { category: 'Conditioning', volume: 2000, sets: 10, reps: 50, duration: 30 },
-      { category: 'Mobility', volume: 500, sets: 5, reps: 20, duration: 20 },
+      { category: 'Strength', volume: 4500, sets: 24, reps: 120, duration: 55 },
+      { category: 'Conditioning', volume: 2200, sets: 12, reps: 60, duration: 35 },
+      { category: 'Mobility', volume: 800, sets: 8, reps: 30, duration: 25 },
+      { category: 'Endurance', volume: 3000, sets: 15, reps: 200, duration: 60 },
     ]);
   }, [userId, period]);
 
   return (
-    <div className="bg-zinc-900/50 border border-white/5 rounded-[32px] md:rounded-[48px] p-6 md:p-12 shadow-2xl krome-outline">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
-        <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tight flex items-center gap-3">
-          <BarChart3 className="w-5 h-5 text-gold" />
-          Workout <span className="text-gold">Statistics</span>
-        </h3>
-        <select 
-          value={period} 
-          onChange={(e) => setPeriod(e.target.value as any)}
-          className="bg-black/50 border border-white/5 rounded-full px-4 py-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest outline-none focus:border-gold transition-colors"
-        >
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
+    <div className="bg-zinc-900/40 border border-white/5 rounded-[40px] p-6 md:p-10 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
+      <div className="absolute -right-20 -top-20 w-64 h-64 bg-gold/5 rounded-full blur-[100px] group-hover:bg-gold/10 transition-colors" />
+      
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10 relative z-10">
+        <div>
+          <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gold/20 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-gold" />
+            </div>
+            Performance <span className="text-gold">Analytics</span>
+          </h3>
+          <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mt-1 ml-13">Volume & training load distribution</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-2xl border border-white/5 shadow-inner">
+          {['weekly', 'monthly'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p as any)}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${period === p ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="h-[300px] md:h-[400px] w-full">
+
+      <div className="h-[350px] md:h-[450px] w-full relative z-10">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
+          <BarChart data={data} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#D4AF37" stopOpacity={1}/>
+                <stop offset="100%" stopColor="#D4AF37" stopOpacity={0.6}/>
+              </linearGradient>
+              <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#00E5FF" stopOpacity={1}/>
+                <stop offset="100%" stopColor="#00ACC1" stopOpacity={0.6}/>
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-            <XAxis dataKey="category" stroke="#ffffff20" fontSize={9} fontWeight="bold" tickLine={false} axisLine={false} dy={10} />
-            <YAxis stroke="#ffffff20" fontSize={9} fontWeight="bold" tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }} />
-            <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
-            <Bar dataKey="volume" fill="#D4AF37" name="Volume" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="sets" fill="#008080" name="Sets" radius={[8, 8, 0, 0]} />
+            <XAxis 
+              dataKey="category" 
+              stroke="#ffffff20" 
+              fontSize={10} 
+              fontWeight="900" 
+              tickLine={false} 
+              axisLine={false} 
+              dy={15}
+              tick={{ fill: 'rgba(255,255,255,0.4)' }}
+            />
+            <YAxis 
+              stroke="#ffffff10" 
+              fontSize={10} 
+              fontWeight="bold" 
+              tickLine={false} 
+              axisLine={false} 
+              hide={true}
+            />
+            <Tooltip 
+              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              contentStyle={{ 
+                backgroundColor: '#09090b', 
+                border: '1px solid rgba(255,255,255,0.1)', 
+                borderRadius: '24px',
+                padding: '16px',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                backdropFilter: 'blur(10px)'
+              }}
+              itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+            />
+            <Bar dataKey="volume" fill="url(#goldGradient)" name="Volume" radius={[12, 12, 4, 4]} barSize={40} />
+            <Bar dataKey="sets" fill="url(#cyanGradient)" name="Sets" radius={[12, 12, 4, 4]} barSize={40} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-white/5 relative z-10">
+        {data.map((item, i) => (
+          <div key={i} className="bg-black/20 p-4 rounded-2xl border border-white/5 flex flex-col items-center text-center group/card hover:border-gold/30 transition-all">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/20 mb-1 group-hover/card:text-gold/50 transition-colors">{item.category}</span>
+            <span className="text-lg font-black italic text-white/80">{item.duration}m</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -327,14 +384,35 @@ export default function FitnessOverview({ userId, showGenerationCard = true }: F
 }
 
 function ComparativeMetricCard({ title, current, previous, trend }: { title: string, current: string, previous: string, trend: 'up' | 'down' }) {
+  const isNeutral = previous === 'N/A';
+  
   return (
-    <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-xl">
-      <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-2">{title}</div>
-      <div className="flex items-end justify-between">
-        <div className="text-2xl font-black italic">{current}</div>
-        <div className={`flex items-center gap-1 text-xs font-bold ${trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>
-          {trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingUp className="w-4 h-4 rotate-180" />}
-          {previous}
+    <div className="bg-zinc-900/40 border border-white/10 rounded-[40px] p-8 md:p-10 backdrop-blur-xl shadow-2xl relative overflow-hidden group hover:border-gold/30 transition-all">
+      <div className="absolute -right-10 -top-10 w-32 h-32 bg-gold/5 rounded-full blur-3xl opacity-50 group-hover:bg-gold/10 transition-colors" />
+      
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-6">
+          <div className={`w-2 h-2 rounded-full ${trend === 'up' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]'}`} />
+          <div className="text-[10px] font-black italic text-white/40 uppercase tracking-[0.2em]">{title}</div>
+        </div>
+
+        <div className="flex items-baseline justify-between gap-4 min-w-0">
+          <div className="text-3xl sm:text-4xl md:text-5xl font-black italic text-white tracking-tighter transition-transform group-hover:scale-[1.05] origin-left duration-500 truncate min-w-0 flex-1">
+            {current.split(' ')[0]}
+            <span className="text-[10px] md:text-xs font-black uppercase text-white/20 not-italic ml-1.5 md:ml-2 tracking-widest leading-none">
+              {current.split(' ')[1] || ''}
+            </span>
+          </div>
+          
+          <div className="flex flex-col items-end shrink-0">
+            {!isNeutral && (
+              <div className={`flex items-center gap-1 md:gap-1.5 text-[9px] md:text-[10px] font-black uppercase tracking-tight py-1 px-2 md:px-3 rounded-full ${trend === 'up' ? 'text-emerald-500 bg-emerald-500/10' : 'text-rose-500 bg-rose-500/10'}`}>
+                {trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingUp className="w-3 h-3 rotate-180" />}
+                {previous}
+              </div>
+            )}
+            <div className="text-[7px] md:text-[8px] font-bold text-white/10 uppercase tracking-widest mt-2 whitespace-nowrap">Baseline</div>
+          </div>
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { safeStorage } from '../utils/storage';
 import { haptics } from '../utils/nativeBridge';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Plus, 
   Trash2, 
@@ -119,11 +119,18 @@ interface WeekEntry {
   days: DayEntry[];
 }
 
+interface Breadcrumb {
+  label: string;
+  onClick?: () => void;
+  active?: boolean;
+}
+
 interface ProgramBuilderProps {
   userId: string;
   userRole?: string;
   onSave?: () => void;
   onBack?: () => void;
+  breadcrumbs?: Breadcrumb[];
   initialProgram?: FullProgramTemplate;
   initialPhaseIdx?: number;
   isCustom?: boolean;
@@ -136,6 +143,7 @@ export default function ProgramBuilder({
   userRole,
   onSave, 
   onBack, 
+  breadcrumbs,
   initialProgram, 
   initialPhaseIdx = 0, 
   isCustom = false,
@@ -1078,14 +1086,40 @@ export default function ProgramBuilder({
         referrerPolicy="no-referrer"
       />
       <div className="relative z-10 space-y-4 md:space-y-8">
-      {onBack && (
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all px-2"
-        >
-          <ChevronLeft className="w-3 h-3 md:w-4 md:h-4" /> Back
-        </button>
-      )}
+      <div className="flex flex-col md:flex-row md:items-center gap-4 px-2">
+        {onBack && (
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-gold font-bold uppercase text-[10px] md:text-xs tracking-widest hover:gap-4 transition-all group shrink-0"
+          >
+            <ChevronLeft className="w-3 h-3 md:w-4 md:h-4 group-hover:-translate-x-1 transition-transform" /> Back
+          </button>
+        )}
+        
+        {breadcrumbs && breadcrumbs.length > 0 && (
+          <>
+            <div className="hidden md:block w-px h-4 bg-white/10 mx-2" />
+            <nav className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+              {breadcrumbs.map((crumb, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />}
+                  <button
+                    onClick={crumb.onClick}
+                    disabled={crumb.active || !crumb.onClick}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${
+                      crumb.active 
+                        ? 'text-gold underline underline-offset-4 decoration-gold/30' 
+                        : 'text-white/40 hover:text-white underline-none'
+                    }`}
+                  >
+                    {crumb.label}
+                  </button>
+                </React.Fragment>
+              ))}
+            </nav>
+          </>
+        )}
+      </div>
       <header className="bg-zinc-900/50 p-4 md:p-8 rounded-[24px] md:rounded-[40px] border border-krome/20 shadow-2xl">
         <div className="flex flex-col gap-4 md:gap-6">
           <div className="flex flex-col md:flex-row gap-6 mb-6">
