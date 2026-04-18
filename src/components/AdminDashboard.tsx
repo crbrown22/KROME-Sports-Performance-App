@@ -23,6 +23,7 @@ import {
   MoreVertical,
   ShieldCheck,
   ShieldAlert,
+  Trash2,
   Activity,
   X,
   TrendingUp,
@@ -273,6 +274,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
   });
   const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [addFormData, setAddFormData] = useState({
     username: '',
@@ -621,20 +623,37 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     }
   };
 
-  const deleteUser = async (user: UserRecord) => {
+  const deleteUser = (user: UserRecord) => {
     setUserToDelete(user);
     setShowDeleteConfirm(true);
   };
 
   const confirmDelete = async () => {
     if (!userToDelete) return;
+    setIsDeleting(true);
     try {
-      await fetch(`/api/admin/users/${userToDelete.id}?adminId=${user.id}`, { method: 'DELETE' });
+      const adminIdValue = user?.id || adminId || finalAdminId;
+      console.log(`[Admin] Deleting user ${userToDelete.id} initiated by admin ${adminIdValue}`);
+      
+      const response = await fetch(`/api/admin/users/${userToDelete.id}?adminId=${adminIdValue}`, { 
+        method: 'DELETE' 
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete user");
+      }
+
       setShowDeleteConfirm(false);
       setUserToDelete(null);
-      fetchUsers();
-    } catch (err) {
-      showError("Failed to delete user");
+      
+      // Page refresh as requested
+      window.location.reload();
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      showError(err.message || "Failed to delete user");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -710,7 +729,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
       style={{ paddingTop: 'calc(100px + var(--safe-area-top))' }}
     >
       {error && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg font-bold text-sm uppercase tracking-widest">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-red-500 text-white px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.5)] font-bold text-sm uppercase tracking-widest animate-in fade-in slide-in-from-top-4">
           {error}
         </div>
       )}
@@ -846,6 +865,18 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
                   
+                  {/* Delete Button */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteUser(user);
+                    }}
+                    className="absolute top-4 right-4 z-20 p-2.5 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-xl backdrop-blur-md border border-red-500/30 transition-all opacity-0 group-hover:opacity-100 shadow-lg shadow-red-500/20"
+                    title="Delete User"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+
                   <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl gold-gradient p-0.5 shrink-0 shadow-xl">
                       <div className="w-full h-full bg-zinc-900 rounded-[10px] flex items-center justify-center overflow-hidden">
@@ -1886,19 +1917,19 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {showDeleteConfirm && userToDelete && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[150] flex items-start justify-center p-6 bg-black/40 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowDeleteConfirm(false)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-md"
+              className="absolute inset-0"
             />
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: -40 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-md bg-zinc-900 border border-red-500/20 rounded-[40px] p-10 text-center shadow-2xl"
+              exit={{ scale: 0.9, opacity: 0, y: -40 }}
+              className="relative w-full max-w-md bg-zinc-900 border border-red-500/20 rounded-[40px] p-10 text-center shadow-2xl mt-20"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-8 shadow-xl">
@@ -1911,13 +1942,15 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={confirmDelete}
-                  className="w-full py-4 bg-red-500 text-white rounded-full font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 krome-outline"
+                  disabled={isDeleting}
+                  className={`w-full py-4 bg-red-500 text-white rounded-full font-black uppercase tracking-widest transition-all shadow-lg shadow-red-500/20 krome-outline ${isDeleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600'}`}
                 >
-                  Confirm Termination
+                  {isDeleting ? 'Terminating...' : 'Confirm Termination'}
                 </button>
                 <button 
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="w-full py-4 bg-white/5 text-white rounded-full font-black uppercase tracking-widest hover:bg-white/10 transition-all krome-outline"
+                  disabled={isDeleting}
+                  className="w-full py-4 bg-white/5 text-white rounded-full font-black uppercase tracking-widest hover:bg-white/10 transition-all krome-outline disabled:opacity-50"
                 >
                   Cancel
                 </button>

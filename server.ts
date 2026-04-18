@@ -1682,14 +1682,20 @@ app.post('/api/webhook', async (req, res) => {
       }
       
       // 1. Delete from SQLite
+      // Get the target UID before deleting from SQLite if we are giving an ID
+      const userTarget = db.prepare('SELECT uid FROM users WHERE uid = ? OR id = ?').get(id, id) as { uid: string } | undefined;
+      const targetUid = userTarget?.uid || id;
+
       db.prepare('DELETE FROM users WHERE uid = ? OR id = ?').run(id, id);
 
       // 2. Delete from Firestore
-      if (adminDb) {
+      if (adminDb && targetUid) {
         try {
-          await adminDb.collection('users').doc(id).delete();
+          // Ensure it's a string for Firestore doc ID
+          await adminDb.collection('users').doc(targetUid.toString()).delete();
+          console.log(`[Admin] Deleted user ${targetUid} from Firestore`);
         } catch (firestoreErr) {
-          console.error("Error deleting user from Firestore (Quota Exceeded?), but deleted from SQLite:", firestoreErr);
+          console.error("Error deleting user from Firestore, but deleted from SQLite:", firestoreErr);
         }
       }
 
