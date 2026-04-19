@@ -73,12 +73,13 @@ interface ProgramViewerProps {
   isAdmin?: boolean;
   onEdit?: (program: FullProgramTemplate, isCustom: boolean) => void;
   onDelete?: (programId: string) => void;
+  onUnassign?: (programId: string) => void;
   onProgramSelect?: (programId: string, phaseIdx?: number, weekIdx?: number, workoutId?: string) => void;
   onCreateNew?: () => void;
   onAssign?: (program: FullProgramTemplate) => void;
 }
 
-export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, initialProgramId, initialPhaseIdx, initialWeekIdx, initialWorkoutId, isAdmin = false, onEdit, onDelete, onProgramSelect, onCreateNew, onAssign }: ProgramViewerProps) {
+export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, initialProgramId, initialPhaseIdx, initialWeekIdx, initialWorkoutId, isAdmin = false, onEdit, onDelete, onUnassign, onProgramSelect, onCreateNew, onAssign }: ProgramViewerProps) {
   const { programs: allPrograms } = usePrograms();
   console.log("ProgramViewer rendering");
   const [selectedProgram, setSelectedProgram] = useState<FullProgramTemplate | null>(null);
@@ -146,6 +147,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
   const [isCoachOpen, setIsCoachOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
+  const [assignedProgramIds, setAssignedProgramIds] = useState<string[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isAddingExercise, setIsAddingExercise] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
@@ -274,6 +276,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
         if (assignedRes.ok) {
           const data = await assignedRes.json();
           const assignedIds = data.map((ap: any) => String(ap.programId || ap.program_id));
+          setAssignedProgramIds(assignedIds);
           purchased = [...new Set([...purchased, ...assignedIds])];
         }
         setPurchasedPrograms(purchased);
@@ -1422,6 +1425,17 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
                             className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all border border-rose-500/30"
                           >
                             <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      {isAdmin && onUnassign && assignedProgramIds.includes(String(program.id)) && (
+                        <div className="flex gap-2 mr-2">
+                          <button 
+                            title="Revoke This Assignment"
+                            onClick={(e) => { e.stopPropagation(); onUnassign(program.id); }}
+                            className="flex items-center gap-2 px-3 h-8 rounded-lg bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all border border-red-500/30 text-[10px] font-black uppercase tracking-widest"
+                          >
+                            <Trash2 className="w-3 h-3" /> Revoke
                           </button>
                         </div>
                       )}

@@ -3240,6 +3240,27 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
+  app.post("/api/admin/unassign-program", async (req, res) => {
+    const { userId, programId } = req.body;
+    try {
+      const snapshot = await adminDb.collection('assigned_programs')
+        .where('userId', '==', String(userId))
+        .get();
+        
+      const programMatch = snapshot.docs.find(d => d.data().programId === String(programId) || d.data().program_id === String(programId));
+      
+      if (!programMatch) {
+        return res.status(404).json({ error: "Assignment not found." });
+      }
+
+      await adminDb.collection('assigned_programs').doc(programMatch.id).delete();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error unassigning program:", err);
+      res.status(500).json({ error: "Failed to unassign program." });
+    }
+  });
+
   app.post("/api/admin/assign-program", async (req, res) => {
     const { userId, programId, assignedBy } = req.body;
     console.log("Assigning program:", { userId, programId, assignedBy });

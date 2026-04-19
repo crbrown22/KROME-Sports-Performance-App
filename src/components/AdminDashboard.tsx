@@ -1516,8 +1516,36 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                                 <div className="flex items-center justify-between mt-auto">
                                   <span className="text-gold font-black text-lg">${template.price}</span>
                                   <button
-                                    disabled={isAssigned}
                                     onClick={async () => {
+                                      if (isAssigned) {
+                                        if (window.confirm(`Are you sure you want to revoke access to ${template.name} for this user?`)) {
+                                          try {
+                                            const res = await fetch('/api/admin/unassign-program', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({
+                                                userId: selectedUser?.id,
+                                                programId: template.id
+                                              })
+                                            });
+                                            if (res.ok) {
+                                              const assignedRes = await fetch(`/api/assigned-programs/${selectedUser?.id}`);
+                                              if (assignedRes.ok) {
+                                                const data = await assignedRes.json();
+                                                setAssignedPrograms(data);
+                                              }
+                                              alert("Program access revoked successfully.");
+                                            } else {
+                                              const errorData = await res.json();
+                                              alert(errorData.error || "Failed to revoke access.");
+                                            }
+                                          } catch (err) {
+                                            console.error("Failed to revoke program access", err);
+                                            alert("Failed to revoke program access");
+                                          }
+                                        }
+                                        return;
+                                      }
                                       try {
                                         const res = await fetch('/api/admin/assign-program', {
                                           method: 'POST',
@@ -1529,7 +1557,6 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                                           })
                                         });
                                         if (res.ok) {
-                                          // Refresh assigned programs
                                           const assignedRes = await fetch(`/api/assigned-programs/${selectedUser?.id}`);
                                           if (assignedRes.ok) {
                                             const data = await assignedRes.json();
@@ -1544,9 +1571,9 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                                         alert("Failed to assign program");
                                       }
                                     }}
-                                    className={`px-6 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all ${isAssigned ? 'bg-white/5 text-white/20 cursor-not-allowed' : 'bg-gold text-black hover:scale-105 active:scale-95 shadow-lg shadow-gold/20'}`}
+                                    className={`px-6 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center gap-2 ${isAssigned ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40' : 'bg-gold text-black hover:scale-105 active:scale-95 shadow-lg shadow-gold/20'}`}
                                   >
-                                    {isAssigned ? 'Assigned' : 'Assign Now'}
+                                    {isAssigned ? <><Trash2 className="w-3 h-3" /> Revoke</> : 'Assign Now'}
                                   </button>
                                 </div>
                               </div>
@@ -1847,6 +1874,36 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                         } catch (err) {
                           console.error(err);
                           haptics.error();
+                        }
+                      }}
+                      onUnassign={async (programId) => {
+                        if (!selectedUser) return;
+                        if (window.confirm("Are you sure you want to revoke access to this assigned program?")) {
+                          try {
+                            const res = await fetch('/api/admin/unassign-program', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                userId: selectedUser.id,
+                                programId: programId
+                              })
+                            });
+                            if (res.ok) {
+                              haptics.success();
+                              alert("Program access revoked successfully.");
+                              // We can trigger a refresh hack by toggling active tab or just relying on alert
+                              setActiveTab('overview');
+                              setTimeout(() => setActiveTab('programs'), 100);
+                            } else {
+                              const errorData = await res.json();
+                              alert(errorData.error || "Failed to revoke access.");
+                              haptics.error();
+                            }
+                          } catch (err) {
+                            console.error("Failed to revoke program access", err);
+                            alert("Failed to revoke program access");
+                            haptics.error();
+                          }
                         }
                       }}
                     />
