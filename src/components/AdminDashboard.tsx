@@ -58,6 +58,7 @@ import PurchaseCRM from "./PurchaseCRM";
 import SalesAndGrowthCRM, { calculateKPIs } from "./SalesAndGrowthCRM";
 import ProgramBuilder from "./ProgramBuilder";
 import ProgramViewer from "./ProgramViewer";
+import ExerciseLibrary from "./ExerciseLibrary";
 import { LoggedFood } from "../data/nutritionData";
 import { calculateNutritionRecommendations } from "../utils/nutrition";
 import { getSupplementRecommendation, generateDefaultSupplements } from "../utils/supplements";
@@ -1793,7 +1794,15 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       }}
                     />
                   </div>
-                ) : ((activeTab === 'builder' || activeTab === 'library') && (selectedUser || isGlobalTemplate)) ? (
+                ) : activeTab === 'library' ? (
+                  <div className="px-6 pb-20">
+                    <ExerciseLibrary 
+                      isAdmin={user?.role === 'admin' || user?.role === 'coach'}
+                      userId={selectedUser?.id?.toString() || user?.id?.toString()}
+                      onBack={selectedUser ? () => setActiveTab('menu') : undefined}
+                    />
+                  </div>
+                ) : (activeTab === 'builder' && (selectedUser || isGlobalTemplate)) ? (
                   <motion.div
                     key={`builder-${selectedUser?.id || 'global'}`}
                     className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto pt-20 p-4 md:p-8"
@@ -1808,7 +1817,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       initialProgram={selectedProgram}
                       isCustom={isCustomProgram}
                       isGlobalTemplate={isGlobalTemplate}
-                      initialView={activeTab === 'library' ? 'library' : 'builder'}
+                      initialView="builder"
                       onBack={() => {
                         setSelectedProgram(undefined);
                         setIsCustomProgram(false);
@@ -1832,7 +1841,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                           onClick: () => setActiveTab('menu')
                         }] : []),
                         {
-                          label: activeTab === 'library' ? 'Exercise Library' : 'Program Builder',
+                          label: 'Program Builder',
                           active: true
                         }
                       ]}

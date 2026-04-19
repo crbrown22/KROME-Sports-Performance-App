@@ -334,25 +334,26 @@ export default function ProgramBuilder({
       try {
         const data = await fetchExercisesFromDb();
         if (data.length === 0) {
-          // Initialize with static library if empty
-          for (const ex of STATIC_EXERCISE_LIBRARY) {
-            await addExerciseToDb(ex);
+          // Initialize with static library visually immediately
+          setExercises(STATIC_EXERCISE_LIBRARY);
+          // Only try to populate DB if admin/coach to avoid 403 errors
+          if (userRole === 'admin' || userRole === 'coach') {
+            for (const ex of STATIC_EXERCISE_LIBRARY) {
+              addExerciseToDb(ex).catch(err => console.error("Auto-init error:", err));
+            }
           }
-          const newData = await fetchExercisesFromDb();
-          setExercises(newData);
         } else {
           setExercises(data);
         }
       } catch (error) {
         console.error("Error fetching exercises:", error);
-        // Fallback to static library on error
         setExercises(STATIC_EXERCISE_LIBRARY);
       } finally {
         setIsLoadingExercises(false);
       }
     };
     fetchExercises();
-  }, []);
+  }, [userRole]);
 
   const isAdmin = userRole === 'admin' || userRole === 'coach';
 

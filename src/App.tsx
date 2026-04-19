@@ -45,6 +45,7 @@ import MovementLanding from "./components/MovementLanding";
 import NutritionLanding from "./components/NutritionLanding";
 import BreakProgramsLanding from "./components/BreakProgramsLanding";
 import ProgramBuilder from "./components/ProgramBuilder";
+import ExerciseLibrary from "./components/ExerciseLibrary";
 import ProgramViewer from "./components/ProgramViewer";
 import ProgramCatalog from "./components/ProgramCatalog";
 import ProductDescription from "./components/ProductDescription";
@@ -134,9 +135,13 @@ export default function App() {
   const navigateTo = (view: View, targetId?: string) => {
     console.log(`[Navigation] Navigating to: ${view}${targetId ? ` (Target: ${targetId})` : ''}`);
     if (view === 'exerciseLibrary') {
-      setProgramBuilderView('library');
-      view = 'programBuilder';
-    } else if (view === 'programBuilder') {
+      if (viewStack[viewStack.length - 1] === 'exerciseLibrary') return;
+      setTargetUserId(null);
+      setViewStack(prev => [...prev, 'exerciseLibrary']);
+      return;
+    }
+
+    if (view === 'programBuilder') {
       setProgramBuilderView('builder');
     }
     
@@ -1753,6 +1758,16 @@ export default function App() {
           ) : (
             <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
+        )}
+
+        {currentView === 'exerciseLibrary' && (
+          <ViewWrapper viewKey="exerciseLibrary">
+            <ExerciseLibrary 
+              onBack={goBack} 
+              isAdmin={user?.role === 'admin' || user?.role === 'coach'}
+              userId={user?.id.toString()}
+            />
+          </ViewWrapper>
         )}
 
         {currentView === 'programBuilder' && user && (
