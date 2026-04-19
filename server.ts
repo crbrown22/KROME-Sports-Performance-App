@@ -2931,6 +2931,80 @@ app.post('/api/webhook', async (req, res) => {
     }
   });
 
+  // Global Programs: Get all global program templates
+  app.get("/api/global-programs", async (req, res) => {
+    try {
+      const snapshot = await adminDb.collection('global_programs').get();
+      const programs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(programs);
+    } catch (err) {
+      console.error("Error fetching global programs:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Global Programs: Save or Update a global program
+  app.post("/api/global-programs", async (req, res) => {
+    const { id, name, description, phases, category, price } = req.body;
+    try {
+      if (id) {
+        // Update existing
+        await adminDb.collection('global_programs').doc(id).set({
+          name,
+          description,
+          phases,
+          category,
+          price,
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+        res.json({ id, success: true });
+      } else {
+        // Create new
+        const docRef = await adminDb.collection('global_programs').add({
+          name,
+          description,
+          phases,
+          category,
+          price,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        res.json({ id: docRef.id, success: true });
+      }
+    } catch (err) {
+      console.error("Error saving global program:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Global Programs: Patch an existing global program
+  app.patch("/api/global-programs/:id", async (req, res) => {
+    const { id } = req.params;
+    const updateData = req.body;
+    try {
+      await adminDb.collection('global_programs').doc(id).update({
+        ...updateData,
+        updated_at: new Date().toISOString()
+      });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error updating global program:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Global Programs: Delete a global program
+  app.delete("/api/global-programs/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      await adminDb.collection('global_programs').doc(id).delete();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting global program:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   // Custom Foods: Save a custom food
   app.post("/api/custom-food/:userId", firebaseDbCheck, async (req, res) => {
     const { userId } = req.params;

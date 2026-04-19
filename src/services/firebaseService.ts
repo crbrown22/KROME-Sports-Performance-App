@@ -144,3 +144,28 @@ export const updateExercise = async (id: string, exerciseData: any) => {
 export const deleteExercise = async (id: string) => {
   return await deleteDoc(doc(db, 'exercises', id));
 };
+
+export const getGlobalPrograms = async () => {
+  const snapshot = await getDocs(collection(db, 'global_programs'));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const saveGlobalProgram = async (programData: any) => {
+  if (programData.id) {
+    const programRef = doc(db, 'global_programs', programData.id);
+    return await updateDoc(programRef, {
+      ...programData,
+      updated_at: serverTimestamp()
+    });
+  } else {
+    return await addDoc(collection(db, 'global_programs'), {
+      ...programData,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
+  }
+};
+
+export const deleteGlobalProgram = async (id: string) => {
+  return await deleteDoc(doc(db, 'global_programs', id));
+};

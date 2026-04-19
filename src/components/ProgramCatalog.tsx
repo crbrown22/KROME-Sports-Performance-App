@@ -14,6 +14,7 @@ import {
   Lock
 } from 'lucide-react';
 import { ALL_PROGRAMS, FullProgramTemplate } from '../data/workoutTemplates';
+import { usePrograms } from '../context/ProgramContext';
 
 interface ProgramCatalogProps {
   userId: string;
@@ -25,6 +26,7 @@ interface ProgramCatalogProps {
 }
 
 export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSelectProgram, onBrowseCatalog, type = 'all' }: ProgramCatalogProps) {
+  const { programs: allPrograms } = usePrograms();
   const [purchasedPrograms, setPurchasedPrograms] = useState<string[]>([]);
   const [assignedPrograms, setAssignedPrograms] = useState<any[]>([]);
   const [globalTemplates, setGlobalTemplates] = useState<FullProgramTemplate[]>([]);
@@ -114,15 +116,15 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
   const getBasePrograms = () => {
     if (type === 'breaks') {
       const ids = ['softball-winter', 'baseball-winter', 'softball-summer', 'baseball-summer'];
-      return ids.map(id => ALL_PROGRAMS.find(p => p.id === id)).filter((p): p is FullProgramTemplate => !!p);
+      return ids.map(id => allPrograms.find(p => p.id === id)).filter((p): p is FullProgramTemplate => !!p);
     }
     if (type === 'movement') {
       const ids = ['lower-back-rehab'];
-      return ids.map(id => ALL_PROGRAMS.find(p => p.id === id)).filter((p): p is FullProgramTemplate => !!p);
+      return ids.map(id => allPrograms.find(p => p.id === id)).filter((p): p is FullProgramTemplate => !!p);
     }
     if (type === 'myPrograms') {
       const purchased = purchasedPrograms
-        .map(id => ALL_PROGRAMS.find(p => p.id === id) || globalTemplates.find(gt => String(gt.id) === String(id)))
+        .map(id => allPrograms.find(p => p.id === id) || globalTemplates.find(gt => String(gt.id) === String(id)))
         .filter((p): p is FullProgramTemplate => !!p);
       
       const assigned = assignedPrograms
@@ -131,7 +133,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
 
       return [...purchased, ...assigned, ...customPrograms];
     }
-    return [...ALL_PROGRAMS, ...globalTemplates];
+    return [...allPrograms, ...globalTemplates];
   };
 
   const basePrograms = getBasePrograms();

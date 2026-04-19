@@ -21,6 +21,7 @@ import { getCurrentDate, parseISODate } from '../utils/date';
 import { getWorkoutExercises, calculateWorkoutProgress } from '../lib/workoutUtils';
 import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
 import { ALL_PROGRAMS } from '../data/workoutTemplates';
+import { usePrograms } from '../context/ProgramContext';
 import VideoModal from './VideoModal';
 import { 
   subscribeToWorkoutLogs, 
@@ -33,6 +34,7 @@ interface ProgramCalendarProps {
 }
 
 export default function ProgramCalendar({ userId, onBack }: ProgramCalendarProps) {
+  const { programs: allPrograms } = usePrograms();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [progressData, setProgressData] = useState<any[]>([]);
   const [workoutLogs, setWorkoutLogs] = useState<any[]>([]);
@@ -74,7 +76,7 @@ export default function ProgramCalendar({ userId, onBack }: ProgramCalendarProps
         const data = await purchasesRes.json();
         purchasedData = data.map((p: any) => {
           const programId = p.program_id || p.item_id || p.item_name;
-          const template = ALL_PROGRAMS.find(t => t.id === programId || t.name === programId);
+          const template = allPrograms.find(t => t.id === programId || t.name === programId);
           if (template) {
             return {
               id: template.id,
@@ -104,7 +106,7 @@ export default function ProgramCalendar({ userId, onBack }: ProgramCalendarProps
     // Add any programs that are scheduled but not in userPrograms
     scheduledProgramIds.forEach(id => {
       if (!programsToUse.some(p => String(p.id) === String(id))) {
-        const template = ALL_PROGRAMS.find(t => String(t.id) === String(id));
+        const template = allPrograms.find(t => String(t.id) === String(id));
         if (template) {
           programsToUse.push({ id: template.id, name: template.name, data: template, isCustom: false });
         }
@@ -113,7 +115,7 @@ export default function ProgramCalendar({ userId, onBack }: ProgramCalendarProps
 
     // If showAllTemplates is true, add all templates
     if (showAllTemplates) {
-      ALL_PROGRAMS.forEach(template => {
+      allPrograms.forEach(template => {
         if (!programsToUse.some(p => String(p.id) === String(template.id))) {
           programsToUse.push({ id: template.id, name: template.name, data: template, isCustom: false });
         }
@@ -854,7 +856,7 @@ export default function ProgramCalendar({ userId, onBack }: ProgramCalendarProps
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
                           {(showAllTemplates ? [
                             ...userPrograms,
-                            ...ALL_PROGRAMS.filter(p => !userPrograms.some(up => String(up.id) === String(p.id))).map(p => ({
+                            ...allPrograms.filter(p => !userPrograms.some(up => String(up.id) === String(p.id))).map(p => ({
                               id: p.id,
                               name: p.name,
                               sport: p.sport || 'General',

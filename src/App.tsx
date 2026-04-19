@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
+import { ProgramProvider, usePrograms } from "./context/ProgramContext";
 import NotificationIcon from "./components/NotificationIcon";
 import ProgramIntro from "./components/ProgramIntro";
 import SpecializedProgram from "./components/SpecializedProgram";
@@ -123,6 +124,15 @@ const programPrices: Record<string, number> = {
 };
 
 export default function App() {
+  return (
+    <ProgramProvider>
+      <AppContent />
+    </ProgramProvider>
+  );
+}
+
+function AppContent() {
+  const { programs: dynamicPrograms } = usePrograms();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [viewStack, setViewStack] = useState<View[]>(['home']);
@@ -193,13 +203,13 @@ export default function App() {
   // Set default program if none selected for specific views, handled in useEffect to avoid stale closure overrides
   useEffect(() => {
     if ((currentView === 'programViewer' || currentView === 'programCalendar') && !selectedProgramId) {
-      const defaultProgram = ALL_PROGRAMS.find(p => p.id === 'soccer-52-week') || ALL_PROGRAMS[0];
+      const defaultProgram = dynamicPrograms.find(p => p.id === 'soccer-52-week') || dynamicPrograms[0];
       if (defaultProgram) {
         setSelectedProgramId(defaultProgram.id);
         setSelectedProgram(defaultProgram);
       }
     }
-  }, [currentView, selectedProgramId]);
+  }, [currentView, selectedProgramId, dynamicPrograms]);
 
   useEffect(() => {
     const savedUser = safeStorage.getItem('krome_user');
@@ -1596,7 +1606,7 @@ export default function App() {
               key="flexibilityMobility"
               onBack={goBack}
               onStartProgram={() => {
-                const program = ALL_PROGRAMS.find(p => p.id === 'lower-back-rehab');
+                const program = dynamicPrograms.find(p => p.id === 'lower-back-rehab');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
                 const isAdmin = user?.role === 'admin' || user?.role === 'coach';
 
@@ -1622,7 +1632,7 @@ export default function App() {
               key="strengthPower"
               onBack={goBack}
               onStartProgram={() => {
-                const program = ALL_PROGRAMS.find(p => p.id === 'strength-power');
+                const program = dynamicPrograms.find(p => p.id === 'strength-power');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
                 const isAdmin = user?.role === 'admin' || user?.role === 'coach';
                 
@@ -1648,7 +1658,7 @@ export default function App() {
               key="conditioningSpeed"
               onBack={goBack}
               onStartProgram={() => {
-                const program = ALL_PROGRAMS.find(p => p.id === 'speed-agility');
+                const program = dynamicPrograms.find(p => p.id === 'speed-agility');
                 const isPurchased = purchasedPrograms.includes(program?.name || '');
                 const isAdmin = user?.role === 'admin' || user?.role === 'coach';
 

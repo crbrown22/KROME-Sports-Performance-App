@@ -40,6 +40,7 @@ import VolumeProgressionChart from './VolumeProgressionChart';
 import VideoModal from './VideoModal';
 import ConfirmModal from './ConfirmModal';
 import { ALL_PROGRAMS, FullProgramTemplate, WorkoutTemplate, ExerciseTemplate } from '../data/workoutTemplates';
+import { usePrograms } from '../context/ProgramContext';
 import { getWorkoutExercises, calculateWorkoutProgress } from '../lib/workoutUtils';
 import { EXERCISE_LIBRARY, CATEGORIES } from '../data/exerciseLibrary';
 import { getCurrentDate, addDays } from '../utils/date';
@@ -78,6 +79,7 @@ interface ProgramViewerProps {
 }
 
 export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, initialProgramId, initialPhaseIdx, initialWeekIdx, initialWorkoutId, isAdmin = false, onEdit, onDelete, onProgramSelect, onCreateNew, onAssign }: ProgramViewerProps) {
+  const { programs: allPrograms } = usePrograms();
   console.log("ProgramViewer rendering");
   const [selectedProgram, setSelectedProgram] = useState<FullProgramTemplate | null>(null);
   const [customPrograms, setCustomPrograms] = useState<FullProgramTemplate[]>([]);
@@ -180,7 +182,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
   }, [selectedProgram]);
 
   const availablePrograms = useMemo(() => {
-    const filteredAll = isAdmin ? ALL_PROGRAMS : ALL_PROGRAMS.filter(p => 
+    const filteredAll = isAdmin ? allPrograms : allPrograms.filter(p => 
       purchasedPrograms.some(pp => String(pp) === String(p.name) || String(pp) === String(p.id))
     );
     return [...filteredAll, ...customPrograms];
@@ -359,7 +361,7 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
 
         // Handle initial program
         if (initialProgramId) {
-          const allAvailable = [...ALL_PROGRAMS, ...loadedCustom, ...globalTemplates];
+          const allAvailable = [...allPrograms, ...loadedCustom, ...globalTemplates];
           const program = allAvailable.find(p => String(p.id) === String(initialProgramId));
           const isCustom = loadedCustom.some(p => String(p.id) === String(initialProgramId));
           if (program && (purchased.includes(program.name) || purchased.includes(String(program.id)) || isAdmin || isCustom)) {

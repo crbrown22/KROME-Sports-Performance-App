@@ -18,6 +18,7 @@ import {
   ChevronLeft, 
   ChevronRight,
   ChevronDown,
+  Plus,
   Search,
   UserPlus,
   MoreVertical,
@@ -65,6 +66,7 @@ import { getSupplementRecommendation, generateDefaultSupplements } from "../util
 import { BodyMetricsData, INITIAL_DATA } from "../types";
 import { haptics } from "../utils/nativeBridge";
 import { FullProgramTemplate } from "../data/workoutTemplates";
+import { usePrograms } from "../context/ProgramContext";
 import AdminAssistant from "./AdminAssistant";
 import VideoAnalyzer from "./VideoAnalyzer";
 import AthleteSettings from "./AthleteSettings";
@@ -100,6 +102,7 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId, user, unreadSenderIds = new Set() }: AdminDashboardProps) {
   const finalAdminId = adminId || 1;
+  const { programs: allPrograms, refreshPrograms } = usePrograms();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(() => {
@@ -143,12 +146,13 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback' | 'brand' | 'system'>(() => {
+  const [topLevelTab, setTopLevelTab] = useState<'users' | 'purchases' | 'sales' | 'chat' | 'feedback' | 'brand' | 'system' | 'programs'>(() => {
     const saved = safeStorage.getItem('krome_admin_top_level_tab');
     if (initialTab === 'chat') return 'chat';
     if (initialTab === 'feedback') return 'feedback';
     if (initialTab === 'brand') return 'brand';
     if (initialTab === 'system') return 'system';
+    if (initialTab === 'programs' && !selectedUser) return 'programs';
     return (saved as any) || 'sales';
   });
 
@@ -827,6 +831,9 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
               <TabsTrigger value="feedback" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
                 <Star className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Feedback</span>
               </TabsTrigger>
+              <TabsTrigger value="programs" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
+                <Calendar className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Global<br/>Programs</span>
+              </TabsTrigger>
               <TabsTrigger value="brand" className="data-[state=active]:bg-gold data-[state=active]:text-black text-white/60 hover:text-white p-3 rounded-xl font-black uppercase tracking-widest text-[8px] md:text-xs transition-all flex flex-col items-center justify-center gap-2 text-center min-h-[80px] md:min-h-0 border border-transparent data-[state=active]:border-gold/50 shadow-lg">
                 <ImageIcon className="w-5 h-5 md:w-4 md:h-4" /> <span className="leading-tight">Brand</span>
               </TabsTrigger>
@@ -849,6 +856,66 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
           <FeedbackViewer />
         ) : topLevelTab === 'system' && !selectedUser ? (
           renderSystemSettings(false)
+        ) : topLevelTab === 'programs' && !selectedUser ? (
+          <div className="px-6 pb-20">
+            <div className="bg-zinc-900/50 border border-white/10 rounded-[32px] md:rounded-[40px] p-6 md:p-10 backdrop-blur-xl shadow-2xl">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-black uppercase italic flex items-center gap-3">
+                    <Calendar className="w-6 h-6 text-gold" />
+                    Global <span className="text-gold">Programs</span>
+                  </h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Manage and edit all program templates</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setSelectedProgram(undefined);
+                    setIsCustomProgram(false);
+                    setIsGlobalTemplate(true);
+                    setActiveTab('builder');
+                  }}
+                  className="btn-gold flex items-center gap-2 !py-3 !px-6"
+                >
+                  <Plus className="w-4 h-4" /> Create New Program
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {allPrograms.map((program) => (
+                  <div 
+                    key={program.id}
+                    className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:border-gold/30 transition-all group flex flex-col h-full"
+                  >
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-gold group-hover:scale-110 transition-transform">
+                        <Dumbbell className="w-6 h-6" />
+                      </div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-white/40 bg-white/5 px-2 py-1 rounded-lg">
+                        {program.sport || 'General'}
+                      </div>
+                    </div>
+                    
+                    <h4 className="text-lg font-black uppercase italic text-white mb-2 leading-none">{program.name}</h4>
+                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-6 h-10 line-clamp-2">{program.description}</p>
+                    
+                    <div className="mt-auto space-y-3">
+                      <button 
+                        onClick={() => {
+                          setSelectedProgram(program);
+                          setIsCustomProgram(false);
+                          setIsGlobalTemplate(true);
+                          setActiveTab('builder');
+                        }}
+                        className="w-full py-3 px-4 bg-white/5 hover:bg-gold hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/10 flex items-center justify-center gap-2"
+                      >
+                        <Edit3 className="w-4 h-4" /> Edit Template
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : !selectedUser ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 px-6 pb-12">
             {loading ? (

@@ -57,6 +57,7 @@ import {
   Legend
 } from 'recharts';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { usePrograms } from '../context/ProgramContext';
 import { EXERCISE_LIBRARY as STATIC_EXERCISE_LIBRARY, CATEGORIES } from '../data/exerciseLibrary';
 import { FullProgramTemplate } from '../data/workoutTemplates';
 import { getExercises as fetchExercisesFromDb, addExercise as addExerciseToDb, updateExercise as updateExerciseInDb, deleteExercise as deleteExerciseFromDb } from '../services/firebaseService';
@@ -150,6 +151,7 @@ export default function ProgramBuilder({
   isGlobalTemplate = false,
   initialView = 'builder'
 }: ProgramBuilderProps) {
+  const { refreshPrograms } = usePrograms();
   const [programName, setProgramName] = useState(initialProgram?.name || '');
   const [programDescription, setProgramDescription] = useState(initialProgram?.description || '');
   const [programCategory, setProgramCategory] = useState(initialProgram?.category || 'Custom');
@@ -941,8 +943,8 @@ export default function ProgramBuilder({
       let url = '';
 
       if (isGlobalTemplate) {
-        method = initialProgram?.id ? 'PATCH' : 'POST';
-        url = initialProgram?.id ? `/api/program-templates/${initialProgram.id}` : '/api/program-templates';
+        method = initialProgram?.id ? 'POST' : 'POST'; // We use POST for both now since server handles merge if ID is present in body
+        url = '/api/global-programs';
       } else {
         method = (isCustom && initialProgram?.id) ? 'PATCH' : 'POST';
         url = (isCustom && initialProgram?.id) ? `/api/custom-programs/${userId}/${initialProgram.id}` : `/api/custom-programs/${userId}`;
@@ -954,6 +956,7 @@ export default function ProgramBuilder({
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: isGlobalTemplate ? initialProgram?.id : undefined,
           name: trimmedName,
           description: programDescription,
           category: programCategory,
@@ -967,6 +970,9 @@ export default function ProgramBuilder({
       if (res.ok) {
         const result = await res.json();
         console.log("Save successful:", result);
+        if (isGlobalTemplate) {
+          await refreshPrograms();
+        }
         setMessage({ type: 'success', text: 'Program saved successfully!' });
         if (onSave) onSave();
       } else {
