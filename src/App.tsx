@@ -58,6 +58,7 @@ import FitnessGoalOnboarding from "./components/FitnessGoalOnboarding";
 import OnboardingFlow from "./components/OnboardingFlow";
 import { BodyMetricsData, INITIAL_DATA } from "./types";
 import VideoAnalyzer from "./components/VideoAnalyzer";
+import PublicExerciseLibrary from "./components/PublicExerciseLibrary";
 import PARQ from "./components/PARQ";
 import ProgramCalendar from "./components/ProgramCalendar";
 import AccountSettings from "./components/AccountSettings";
@@ -134,8 +135,12 @@ export default function App() {
   const navigateTo = (view: View, targetId?: string) => {
     console.log(`[Navigation] Navigating to: ${view}${targetId ? ` (Target: ${targetId})` : ''}`);
     if (view === 'exerciseLibrary') {
-      setProgramBuilderView('library');
-      view = 'programBuilder';
+      if (user) {
+        setProgramBuilderView('library');
+        view = 'programBuilder';
+      } else {
+        view = 'exerciseLibrary';
+      }
     } else if (view === 'programBuilder') {
       setProgramBuilderView('builder');
     }
@@ -955,16 +960,14 @@ export default function App() {
                     <p className="text-xl text-white/70 mb-8 leading-relaxed">
                       Unlock 100+ exercise videos with the KROME Fitness Exercise Library. Get workout ideas you can do at home, the gym, or anywhere—anytime!
                     </p>
-                    <a 
-                      href="https://www.youtube.com/@kromefitnessexerciselibrar9313/playlists"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button 
+                      onClick={() => navigateTo('exerciseLibrary')}
                       className="btn-accent inline-flex items-center gap-3"
-                      aria-label="Explore KROME Fitness Exercise Library on YouTube"
+                      aria-label="Explore KROME Fitness Exercise Library"
                     >
                       <PlayCircle className="w-6 h-6" aria-hidden="true" />
                       Explore Library
-                    </a>
+                    </button>
                   </motion.div>
 
                   <motion.div 
@@ -1397,6 +1400,12 @@ export default function App() {
           ) : (
             <Auth key="auth" initialMode="login" onBack={goBack} onLoginSuccess={handleLoginSuccess} />
           )
+        )}
+
+        {currentView === 'exerciseLibrary' && (
+          <div className="px-6 max-w-7xl mx-auto" style={{ paddingTop: 'calc(100px + var(--safe-area-top))' }}>
+            <PublicExerciseLibrary onBack={() => navigateTo('home')} />
+          </div>
         )}
 
         {currentView === 'bodyComposition' && user && (
