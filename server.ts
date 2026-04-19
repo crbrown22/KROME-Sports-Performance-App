@@ -1373,7 +1373,34 @@ app.post('/api/webhook', async (req, res) => {
           finalAvatarUrl
         );
         
-        // 3. Send Welcome Email to Athlete
+        // 3. Add to Sales Pipeline as a new lead
+        const leadData = {
+          name: `${userData.firstName} ${userData.lastName}`.trim() || userData.username,
+          email: email,
+          status: 'New Lead',
+          value: 0,
+          dateAdded: new Date().toISOString(),
+          lastContact: new Date().toISOString(),
+          user_id: result.lastInsertRowid // SQLite ID
+        };
+        
+        // Add to SQLite
+        const insertLead = db.prepare(`
+          INSERT INTO leads (name, email, status, value, created_at, user_id)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const leadResult = insertLead.run(leadData.name, leadData.email, leadData.status, leadData.value, leadData.dateAdded, leadData.user_id);
+        
+        // Add to Firestore
+        try {
+          const firestoreLeadData = { ...leadData, created_at: leadData.dateAdded };
+          const firestoreRef = await adminDb.collection('leads').add(firestoreLeadData);
+          db.prepare('UPDATE leads SET firestore_id = ? WHERE id = ?').run(firestoreRef.id, leadResult.lastInsertRowid);
+        } catch (firestoreErr) {
+          console.error("Error adding lead to Firestore during registration:", firestoreErr);
+        }
+
+        // 4. Send Welcome Email to Athlete
         try {
           await sendWelcomeEmail(email, finalFirstName);
           await sendAdminRegistrationNotification(userData);
@@ -3215,29 +3242,32 @@ app.post('/api/webhook', async (req, res) => {
 
   app.post("/api/admin/assign-program", async (req, res) => {
     const { userId, programId, assignedBy } = req.body;
+    console.log("Assigning program:", { userId, programId, assignedBy });
     try {
       // Check if already assigned
       const existing = await adminDb.collection('assigned_programs')
-        .where('userId', '==', userId)
-        .where('programId', '==', programId)
+        .where('userId', '==', String(userId))
         .get();
+        
+      // Filter by programId manually since Firestore composite queries might need an index
+      const programMatch = existing.docs.find(d => d.data().programId === String(programId));
       
-      if (!existing.empty) {
+      if (programMatch) {
         return res.status(400).json({ error: "Program already assigned to this user" });
       }
 
       const docRef = await adminDb.collection('assigned_programs').add({
-        userId,
-        programId,
-        assignedBy,
+        userId: String(userId),
+        programId: String(programId),
+        assignedBy: String(assignedBy),
         assignedAt: new Date().toISOString()
       });
 
       // Update SQLite
       const sqliteUserId = resolveUserId(userId);
       const sqliteAdminId = resolveUserId(assignedBy);
-      db.prepare('INSERT INTO program_assignments (user_id, program_id, assigned_by, firestore_id) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING')
-        .run(sqliteUserId, programId, sqliteAdminId, docRef.id);
+      db.prepare('INSERT INTO program_assignments (user_id, program_id, assigned_by, firestore_id, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(sqliteUserId, programId, sqliteAdminId, docRef.id, new Date().toISOString());
 
       // Notify user
       if (sqliteUserId) {
@@ -3246,10 +3276,10 @@ app.post('/api/webhook', async (req, res) => {
           "New Program Assigned",
           "An admin has assigned a new training program to your account. You now have full access.",
           "/programs"
-        );
+        ).catch(e => console.error("Notification failed", e));
       }
 
-      res.json({ id: docRef.id, success: true });
+      res.json({ success: true, id: docRef.id });
     } catch (err) {
       console.error("Error assigning program:", err);
       res.status(500).json({ error: "Database error" });

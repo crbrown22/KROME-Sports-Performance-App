@@ -13,16 +13,41 @@ interface FitnessOverviewProps {
 const WorkoutStatistics = ({ userId }: { userId: string }) => {
   const [data, setData] = useState<any[]>([]);
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mocking data for now
-    setData([
-      { category: 'Strength', volume: 4500, sets: 24, reps: 120, duration: 55 },
-      { category: 'Conditioning', volume: 2200, sets: 12, reps: 60, duration: 35 },
-      { category: 'Mobility', volume: 800, sets: 8, reps: 30, duration: 25 },
-      { category: 'Endurance', volume: 3000, sets: 15, reps: 200, duration: 60 },
-    ]);
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/workout-logs/${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch logs');
+        const logs = await response.json();
+        
+        // Aggregate log data
+        const aggregated: Record<string, any> = {};
+        logs.forEach((log: any) => {
+          const data = log.edited_data ? JSON.parse(log.edited_data) : {};
+          const category = data.category || 'General';
+          if (!aggregated[category]) {
+            aggregated[category] = { category, volume: 0, sets: 0, reps: 0, duration: 0 };
+          }
+          aggregated[category].volume += (data.volume || 0);
+          aggregated[category].sets += (data.sets || 0);
+          aggregated[category].reps += (data.reps || 0);
+          aggregated[category].duration += (data.duration || 0);
+        });
+        
+        setData(Object.values(aggregated));
+      } catch (err) {
+        console.error('Error fetching logs:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
   }, [userId, period]);
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="bg-zinc-900/40 border border-white/5 rounded-[40px] p-6 md:p-10 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
@@ -95,9 +120,10 @@ const WorkoutStatistics = ({ userId }: { userId: string }) => {
                 backdropFilter: 'blur(10px)'
               }}
               itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              formatter={(value: any, name: string) => [value, name]}
             />
-            <Bar dataKey="volume" fill="url(#goldGradient)" name="Volume" radius={[12, 12, 4, 4]} barSize={40} />
-            <Bar dataKey="sets" fill="url(#cyanGradient)" name="Sets" radius={[12, 12, 4, 4]} barSize={40} />
+            <Bar dataKey="volume" fill="url(#goldGradient)" name="Volume (lbs)" radius={[12, 12, 12, 12]} barSize={40} />
+            <Bar dataKey="duration" fill="url(#cyanGradient)" name="Duration (min)" radius={[12, 12, 12, 12]} barSize={40} />
           </BarChart>
         </ResponsiveContainer>
       </div>

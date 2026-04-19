@@ -589,10 +589,10 @@ export default function Profile({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pb-8 bg-transparent px-4 md:px-6"
+      className="min-h-screen pb-8 bg-transparent px-4 md:px-12"
       style={{ paddingTop: 'calc(100px + var(--safe-area-top))' }}
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full relative z-10">
         {/* Profile Header */}
         <div className="relative z-10 flex flex-col items-center mb-2 text-center">
           <div className="relative mb-4 group">
@@ -784,41 +784,18 @@ export default function Profile({
                 <h3 className="text-xl font-black uppercase italic text-krome leading-none">My Programs</h3>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mt-2">Your active training protocols</p>
               </div>
-              {allUserPrograms.length > 1 && (
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setCarouselIndex(prev => Math.max(0, prev - 1))}
-                    disabled={carouselIndex === 0}
-                    className="p-3 rounded-2xl bg-black/40 border border-krome/20 text-krome hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all krome-outline"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button 
-                    onClick={() => setCarouselIndex(prev => Math.min(allUserPrograms.length - 1, prev + 1))}
-                    disabled={carouselIndex >= allUserPrograms.length - 1}
-                    className="p-3 rounded-2xl bg-black/40 border border-krome/20 text-krome hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all krome-outline"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
             </div>
 
             {allUserPrograms.length > 0 ? (
-              <div className="relative overflow-hidden px-2">
-                <motion.div 
-                  className="flex gap-6"
-                  animate={{ x: `-${carouselIndex * (100 / (allUserPrograms.length > 1 ? 1.2 : 1))}%` }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ width: `${allUserPrograms.length * 100}%` }}
-                >
+              <div className="px-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {allUserPrograms.map((program) => (
                     <motion.button
                       key={program.id}
                       whileHover={{ y: -8, scale: 1.01 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => onProgramSelect?.(program.id)}
-                      className="group relative text-left bg-black/20 backdrop-blur-md border border-krome/40 rounded-[32px] md:rounded-[40px] hover:border-gold/50 transition-all overflow-hidden krome-outline flex flex-col h-full w-full max-w-[400px]"
+                      className="group relative text-left bg-black/20 backdrop-blur-md border border-krome/40 rounded-[32px] md:rounded-[40px] hover:border-gold/50 transition-all overflow-hidden krome-outline flex flex-col h-full w-full"
                     >
                       <div className="h-40 relative overflow-hidden">
                         <img 
@@ -870,7 +847,7 @@ export default function Profile({
                       </div>
                     </motion.button>
                   ))}
-                </motion.div>
+                </div>
               </div>
             ) : (
               <div className="p-12 bg-black/20 backdrop-blur-md border border-dashed border-krome/20 rounded-[40px] text-center">

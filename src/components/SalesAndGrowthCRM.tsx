@@ -54,13 +54,18 @@ export const calculateKPIs = (users: any[] = [], purchases: any[] = [], leads: L
   const ltv = safeUsers.length > 0 ? totalRevenue / safeUsers.length : 850;
   
   const websiteVisitors = 12500;
-  const leadsGenerated = Math.max(850, safeLeads.length);
-  const consultations = Math.max(120, safeLeads.filter(l => l && ['Consultation', 'Proposal', 'Closed Won'].includes(l.status)).length);
-  const closedWon = Math.max(45, safeLeads.filter(l => l && l.status === 'Closed Won').length);
+  
+  // Pipeline-based KPI definitions
+  const totalLeads = safeLeads.length;
+  const contactedLeads = safeLeads.filter(l => l && ['Contacted', 'Consultation', 'Proposal', 'Closed Won', 'Closed Lost'].includes(l.status)).length;
+  const consultations = safeLeads.filter(l => l && ['Consultation', 'Proposal', 'Closed Won', 'Closed Lost'].includes(l.status)).length;
+  const closedWon = safeLeads.filter(l => l && l.status === 'Closed Won').length;
+  const closedTotal = safeLeads.filter(l => l && ['Closed Won', 'Closed Lost'].includes(l.status)).length;
 
-  const leadsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
-  const consultationsPercentage = leadsGenerated > 0 ? ((consultations / leadsGenerated) * 100).toFixed(1) : '0.0';
-  const closedWonPercentage = consultations > 0 ? ((closedWon / consultations) * 100).toFixed(1) : '0.0';
+  // Percentage calculations
+  const leadsPercentage = totalLeads > 0 ? ((contactedLeads / totalLeads) * 100).toFixed(1) : '0.0';
+  const consultationsPercentage = totalLeads > 0 ? ((consultations / totalLeads) * 100).toFixed(1) : '0.0';
+  const closedWonPercentage = closedTotal > 0 ? ((closedWon / closedTotal) * 100).toFixed(1) : '0.0';
 
   return {
     totalRevenue,
@@ -68,7 +73,7 @@ export const calculateKPIs = (users: any[] = [], purchases: any[] = [], leads: L
     ltv,
     activeUsers: safeUsers.length,
     websiteVisitors,
-    leadsGenerated,
+    leadsGenerated: totalLeads,
     consultations,
     closedWon,
     leadsPercentage,

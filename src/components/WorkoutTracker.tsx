@@ -660,7 +660,7 @@ export default function WorkoutTracker({ userId, isAdminView = false, onBack }: 
       </div>
 
       {viewMode === 'calendar' ? (
-        <div className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8">
+        <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-5">
           <ReactCalendar 
             onChange={(value) => setSelectedDate(value as Date)} 
             value={selectedDate}

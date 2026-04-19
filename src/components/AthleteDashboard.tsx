@@ -408,7 +408,7 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
 
   return (
     <div className="min-h-screen">
-      <div className="space-y-4 p-8">
+      <div className="space-y-4 px-4 md:px-8">
         <button onClick={() => onNavigate('dashboard')} className="flex items-center gap-2 text-white/60 mb-4">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
@@ -574,25 +574,25 @@ export default function AthleteDashboard({ user, onNavigate, isOwnProfile = true
                 
                 {nextWorkout ? (
                   <>
-                    <h3 className="text-3xl font-black uppercase italic leading-tight mb-2 text-[#b2d8d8]">
+                    <h3 className="text-2xl font-black uppercase italic leading-tight mb-1 text-[#b2d8d8]">
                       {nextWorkout.title}
                     </h3>
-                    <div className="space-y-1 mb-6">
-                      <p className="text-sm font-bold opacity-80 uppercase tracking-widest">
+                    <div className="space-y-0.5 mb-4">
+                      <p className="text-xs font-bold opacity-80 uppercase tracking-widest">
                         {nextWorkout.programName}
                       </p>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[#b2d8d8]/60">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-[#b2d8d8]/60">
                         Week {nextWorkout.week} • Day {nextWorkout.day}
                       </p>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="mb-8">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest">Workout Progress</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest">{nextWorkout.progress}%</span>
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest">Workout Progress</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest">{nextWorkout.progress}%</span>
                       </div>
-                      <div className="w-full h-2 bg-[#b2d8d8]/10 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-[#b2d8d8]/10 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${nextWorkout.progress}%` }}

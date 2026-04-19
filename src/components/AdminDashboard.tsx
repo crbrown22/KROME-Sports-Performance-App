@@ -1089,19 +1089,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                       onClick={() => setActiveTab('programs')}
                       className={`w-full px-4 py-2.5 rounded-xl flex items-center gap-3 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'programs' ? 'bg-gold text-black shadow-xl shadow-gold/20 scale-[1.02]' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
                     >
-                      <Calendar className="w-4 h-4" /> Training Program
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('assign-program')}
-                      className={`w-full px-4 py-2.5 rounded-xl flex items-center gap-3 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'assign-program' ? 'bg-gold text-black shadow-xl shadow-gold/20 scale-[1.02]' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
-                    >
-                      <ShoppingBag className="w-4 h-4" /> Assign Program
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('assign-workout')}
-                      className={`w-full px-4 py-2.5 rounded-xl flex items-center gap-3 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'assign-workout' ? 'bg-gold text-black shadow-xl shadow-gold/20 scale-[1.02]' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
-                    >
-                      <Dumbbell className="w-4 h-4" /> Assign Workout
+                      <Calendar className="w-4 h-4" /> Training Programs
                     </button>
                     <button 
                       onClick={() => setActiveTab('builder')}
@@ -1537,7 +1525,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                                           body: JSON.stringify({
                                             userId: selectedUser?.id,
                                             programId: template.id,
-                                            assignedBy: user.id
+                                            assignedBy: user?.id || 'admin'
                                           })
                                         });
                                         if (res.ok) {
@@ -1845,13 +1833,15 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                             body: JSON.stringify({
                               userId: selectedUser.id,
                               programId: program.id,
-                              itemName: program.name,
-                              price: 0
+                              assignedBy: user?.id || 'admin'
                             })
                           });
                           if (res.ok) {
                             haptics.success();
+                            alert("Program assigned successfully!");
                           } else {
+                            const error = await res.json();
+                            alert(error.error || "Failed to assign program");
                             haptics.error();
                           }
                         } catch (err) {
@@ -1872,7 +1862,7 @@ export default function AdminDashboard({ onBack, onNavigate, initialTab, adminId
                 ) : (activeTab === 'builder' && (selectedUser || isGlobalTemplate)) ? (
                   <motion.div
                     key={`builder-${selectedUser?.id || 'global'}`}
-                    className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto pt-20 p-4 md:p-8"
+                    className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto pt-20 p-4 md:p-4"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}

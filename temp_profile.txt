@@ -1,0 +1,8 @@
+595:      <div className="max-w-4xl mx-auto">
+626:          <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter leading-none mb-2 break-words max-w-full px-4 text-white">
+642:          <div className="flex flex-wrap justify-center gap-2 w-full max-w-lg mb-2 pt-6">
+745:                  <p className="text-xl md:text-2xl font-black uppercase italic text-white truncate max-w-[120px] sm:max-w-full">
+758:                  <p className="text-xl md:text-2xl font-black uppercase italic text-white truncate max-w-[120px] sm:max-w-full">
+771:                  <p className="text-xl md:text-2xl font-black uppercase italic text-white truncate max-w-[120px] sm:max-w-full">
+821:                      className="group relative text-left bg-black/20 backdrop-blur-md border border-krome/40 rounded-[32px] md:rounded-[40px] hover:border-gold/50 transition-all overflow-hidden krome-outline flex flex-col h-full w-full max-w-[400px]"
+1129:                    <p className="text-white/40 text-xs mb-8 max-w-xs mx-auto leading-relaxed">Unlock elite training protocols from our catalog to start your performance journey.</p>

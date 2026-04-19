@@ -152,9 +152,9 @@ export default function NutritionDashboard({ user, onBack, onLogout, isOwnProfil
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`${isStandalone ? 'min-h-screen pt-4 pb-24' : ''} bg-transparent px-6 relative`}
+      className={`${isStandalone ? 'min-h-screen pt-4 pb-24' : ''} bg-transparent relative`}
     >
-      <div className="max-w-4xl mx-auto relative z-20">
+      <div className="w-full relative z-20">
         <div className="space-y-4">
           <AnimatePresence mode="wait">
             {activeView === 'tracker' && (
