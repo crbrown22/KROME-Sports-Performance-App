@@ -185,7 +185,7 @@ export default function Profile({
     
     return [
       ...uniquePurchased, 
-      ...customPrograms.map(p => ({ ...p, isCustom: true }))
+      ...customPrograms.map(p => ({ ...p, isCustom: p.isCustom !== undefined ? p.isCustom : true }))
     ];
   }, [purchasedPrograms, customPrograms]);
 
@@ -219,19 +219,29 @@ export default function Profile({
       if (!user?.id) return;
       setLoadingPrograms(true);
       try {
-        const [purchasesRes, customRes, logsRes] = await Promise.all([
+        const [purchasesRes, customRes, logsRes, assignedRes, globalTemplatesRes] = await Promise.all([
           fetch(`/api/purchases/${user.id}`),
           fetch(`/api/custom-programs/${user.id}`),
-          fetch(`/api/workout-logs/${user.id}`)
+          fetch(`/api/workout-logs/${user.id}`),
+          fetch(`/api/assigned-programs/${user.id}`),
+          fetch(`/api/program-templates`)
         ]);
+
+        let allPurchasedIds: string[] = [];
 
         if (purchasesRes.ok) {
           const data = await purchasesRes.json();
-          // Map both program_id and item_name to ensure we catch all purchases
-          const programIdentifiers = data.map((p: any) => p.program_id || p.item_name).filter(Boolean);
-          // Remove duplicates
-          setPurchasedPrograms(Array.from(new Set(programIdentifiers as string[])));
+          const programIdentifiers = data.map((p: any) => p.programId || p.program_id || p.item_name).filter(Boolean);
+          allPurchasedIds = [...allPurchasedIds, ...programIdentifiers];
         }
+
+        if (assignedRes.ok) {
+          const data = await assignedRes.json();
+          const assignedIds = data.map((ap: any) => String(ap.programId || ap.program_id)).filter(Boolean);
+          allPurchasedIds = [...allPurchasedIds, ...assignedIds];
+        }
+
+        setPurchasedPrograms(Array.from(new Set(allPurchasedIds)));
 
         if (logsRes.ok) {
           const logs = await logsRes.json();
@@ -240,6 +250,23 @@ export default function Profile({
             completed[`${log.workout_id}-${log.exercise_id}`] = log.completed === 1 || log.completed === true;
           });
           setCompletedExercises(prev => ({ ...prev, ...completed }));
+        }
+        
+        let loadedGlobalTemplates: any[] = [];
+        if (globalTemplatesRes.ok) {
+          const data = await globalTemplatesRes.json();
+          loadedGlobalTemplates = data.map((p: any) => {
+            let parsedData = p.data || {};
+            if (typeof p.data === 'string') {
+              try { parsedData = JSON.parse(p.data); } catch (e) { parsedData = {}; }
+            }
+            return {
+              ...p,
+              ...parsedData,
+              isGlobal: true,
+              isCustom: false
+            };
+          }).filter((p: any) => allPurchasedIds.includes(String(p.id)));
         }
 
         if (customRes.ok) {
@@ -255,7 +282,9 @@ export default function Profile({
               isCustom: true
             };
           });
-          setCustomPrograms(transformed);
+          setCustomPrograms([...transformed, ...loadedGlobalTemplates]);
+        } else if (loadedGlobalTemplates.length > 0) {
+          setCustomPrograms(loadedGlobalTemplates);
         }
       } catch (err) {
         console.error("Failed to fetch programs", err);

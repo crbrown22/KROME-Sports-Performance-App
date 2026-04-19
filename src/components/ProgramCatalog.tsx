@@ -49,7 +49,7 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
 
         if (purchasesRes.ok) {
           const data = await purchasesRes.json();
-          setPurchasedPrograms(data.map((p: any) => p.program_id || p.item_name));
+          setPurchasedPrograms(data.map((p: any) => p.programId || p.program_id || p.item_name));
         }
 
         if (assignedRes.ok) {
@@ -128,7 +128,10 @@ export default function ProgramCatalog({ userId, isAdmin = false, onBack, onSele
         .filter((p): p is FullProgramTemplate => !!p);
       
       const assigned = assignedPrograms
-        .map(ap => globalTemplates.find(gt => String(gt.id) === String(ap.program_id)))
+        .map(ap => {
+          const apId = String(ap.programId || ap.program_id);
+          return allPrograms.find(p => String(p.id) === apId) || globalTemplates.find(gt => String(gt.id) === apId);
+        })
         .filter((p): p is FullProgramTemplate => !!p);
 
       return [...purchased, ...assigned, ...customPrograms];

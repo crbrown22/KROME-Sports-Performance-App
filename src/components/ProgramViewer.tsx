@@ -268,12 +268,12 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
 
         if (pRes.ok) {
           const data = await pRes.json();
-          purchased = data.map((p: any) => p.program_id || p.item_name).filter(Boolean);
+          purchased = data.map((p: any) => p.programId || p.program_id || p.item_name).filter(Boolean);
         }
 
         if (assignedRes.ok) {
           const data = await assignedRes.json();
-          const assignedIds = data.map((ap: any) => String(ap.program_id));
+          const assignedIds = data.map((ap: any) => String(ap.programId || ap.program_id));
           purchased = [...new Set([...purchased, ...assignedIds])];
         }
         setPurchasedPrograms(purchased);
@@ -293,12 +293,12 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
             return {
               ...p,
               ...parsedData,
-              id: p.id,
+              id: String(p.id),
               name: p.name,
               description: p.description,
               isGlobal: true
             };
-          });
+          }).filter((p: any) => purchased.includes(String(p.id)) || isAdmin);
         }
 
         // Load custom programs
@@ -326,6 +326,8 @@ export default function ProgramViewer({ userId, onBack, onSelectLockedProgram, i
             };
           });
           setCustomPrograms([...loadedCustom, ...globalTemplates]);
+        } else if (globalTemplates.length > 0) {
+          setCustomPrograms(globalTemplates);
         }
 
         // Load progress
